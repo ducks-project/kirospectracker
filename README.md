@@ -1,5 +1,15 @@
 # Kiro Spec Tracker
 
+[![CI](https://github.com/ducks-project/kirospectracker/actions/workflows/ci.yml/badge.svg)](https://github.com/ducks-project/kirospectracker/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/ducks-project/kirospectracker/actions/workflows/codeql.yml/badge.svg)](https://github.com/ducks-project/kirospectracker/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/ducks-project/kirospectracker/branch/main/graph/badge.svg)](https://codecov.io/gh/ducks-project/kirospectracker)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+<!-- Enable these once the extension is published to Open VSX:
+[![Open VSX Version](https://img.shields.io/open-vsx/v/ducks-project/kirospectracker)](https://open-vsx.org/extension/ducks-project/kirospectracker)
+[![Open VSX Downloads](https://img.shields.io/open-vsx/dt/ducks-project/kirospectracker)](https://open-vsx.org/extension/ducks-project/kirospectracker)
+-->
+
 Kiro Spec Tracker reads the [Kiro](https://kiro.dev) specs in your workspace
 (`.kiro/specs/<name>/`) and surfaces their progress across the IDE: status badges in the
 file explorer, a dedicated dashboard in the activity bar, and quick entry points to open
@@ -8,6 +18,7 @@ or run a spec. It is read-only, fully local, and ships no telemetry and no netwo
 ## Table of contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [How progress is computed](#how-progress-is-computed)
 - [Usage](#usage)
 - [Settings](#settings)
@@ -31,6 +42,19 @@ or run a spec. It is read-only, fully local, and ships no telemetry and no netwo
 - **Run tasks (honest MVP)** — from the dashboard, the explorer context menu on a spec
   folder, or the Command Palette, open a spec's `tasks.md` and, only with your explicit
   consent, copy a ready-to-paste execution prompt to the clipboard.
+
+## Screenshots
+
+> The images below are placeholders until the first real captures are added. See
+> [media/screenshots/README.md](media/screenshots/README.md) for the capture guide.
+
+The activity-bar dashboard with per-spec status, progress bars and statistics:
+
+![Kiro Spec Tracker dashboard showing specs grouped by status with required and optional progress bars](media/screenshots/dashboard.png)
+
+Status badges applied to spec folders in the file explorer:
+
+![File explorer showing status badges on spec folders under .kiro/specs](media/screenshots/explorer-decorations.png)
 
 ## How progress is computed
 
