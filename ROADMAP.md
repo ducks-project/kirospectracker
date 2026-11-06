@@ -9,6 +9,16 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
+## v0.5.0 — Dashboard interaction hardening [Planned]
+
+- [ ] Lock the tree-view context-menu `when` clauses in `package.json` against the pure
+      context-value token vocabulary with an automated assertion, so renaming a token cannot
+      silently break the menu.
+- [ ] Make `SpecStatToggleView.valueFor` depend on an explicit typed mapping from filter key
+      to the statistics field, rather than relying on the key names lining up implicitly.
+- [ ] Narrow `resolveSpecNodeFolderPath` to validate that the resolved `folderPath` is a
+      string before use (defensive; the host always supplies a real node today).
+
 ## v1.0.0 — First stable release [Planned]
 
 - [ ] Publish to Open VSX and stabilize the public contribution points and settings.
