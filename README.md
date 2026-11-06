@@ -4,11 +4,8 @@
 [![CodeQL](https://github.com/ducks-project/kirospectracker/actions/workflows/codeql.yml/badge.svg)](https://github.com/ducks-project/kirospectracker/actions/workflows/codeql.yml)
 [![codecov](https://codecov.io/gh/ducks-project/kirospectracker/branch/main/graph/badge.svg)](https://codecov.io/gh/ducks-project/kirospectracker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-<!-- Enable these once the extension is published to Open VSX:
 [![Open VSX Version](https://img.shields.io/open-vsx/v/ducks-project/kirospectracker)](https://open-vsx.org/extension/ducks-project/kirospectracker)
 [![Open VSX Downloads](https://img.shields.io/open-vsx/dt/ducks-project/kirospectracker)](https://open-vsx.org/extension/ducks-project/kirospectracker)
--->
 
 Kiro Spec Tracker reads the [Kiro](https://kiro.dev) specs in your workspace
 (`.kiro/specs/<name>/`) and surfaces their progress across the IDE: status badges in the
