@@ -85,9 +85,12 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
 
   /**
    * Resolve the webview: lock it down, render the shell and wire the protocol.
+   * Any repository subscription held from a previous resolve is released first
+   * so a re-resolved view never accumulates duplicate listeners.
    * @param view The webview view to populate.
    */
   public resolveWebviewView(view: vscode.WebviewView): void {
+    this.disposeRepositoryListener?.();
     this.view = view;
     const { webview } = view;
     const mediaUri = vscode.Uri.joinPath(this.extensionUri, MEDIA_FOLDER);

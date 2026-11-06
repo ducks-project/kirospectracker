@@ -70,6 +70,8 @@ function makeView(webview: vscode.Webview): vscode.WebviewView {
  */
 describe('Spec dashboard (Node host)', () => {
   let api: IExtensionApi;
+  let inProgressTasksUri: vscode.Uri | undefined;
+  let originalTasksContent: Uint8Array | undefined;
 
   before(async function activateExtension() {
     const extension = vscode.extensions.getExtension<IExtensionApi>(EXTENSION_ID);
@@ -82,6 +84,17 @@ describe('Spec dashboard (Node host)', () => {
     }
     api = await extension.activate();
     await waitFor(() => 0 < api.repository.getSpecs().length);
+    const inProgress = api.repository.getSpecs().find((spec) => 'in-progress' === spec.name);
+    expect(inProgress).to.not.equal(undefined);
+    inProgressTasksUri = vscode.Uri.file(path.join(inProgress!.folderPath, 'tasks.md'));
+    originalTasksContent = await vscode.workspace.fs.readFile(inProgressTasksUri);
+  });
+
+  after(async function restoreFixture() {
+    if (undefined === inProgressTasksUri || undefined === originalTasksContent) {
+      return;
+    }
+    await vscode.workspace.fs.writeFile(inProgressTasksUri, originalTasksContent);
   });
 
   it('resolves the webview view with a strict CSP and a nonce', () => {
@@ -108,11 +121,11 @@ describe('Spec dashboard (Node host)', () => {
     api.dashboard.resolveWebviewView(makeView(makeWebview(posted)));
     await waitFor(() => posted.some((message) => 'render' === message.type));
 
-    const inProgress = api.repository.getSpecs().find((spec) => 'in-progress' === spec.name);
-    expect(inProgress).to.not.equal(undefined);
-    const tasksUri = vscode.Uri.file(path.join(inProgress!.folderPath, 'tasks.md'));
+    expect(inProgressTasksUri).to.not.equal(undefined);
+    // Write content that differs from the restored baseline so the host
+    // FileSystemWatcher reliably observes an onDidChange, independent of run order.
     const edited = '# Implementation Plan\n\n- [x] 1. Done task\n- [x] 2. Pending task\n';
-    await vscode.workspace.fs.writeFile(tasksUri, Buffer.from(edited, 'utf8'));
+    await vscode.workspace.fs.writeFile(inProgressTasksUri!, Buffer.from(edited, 'utf8'));
 
     await waitFor(() => posted.some((message) => 'specUpdated' === message.type));
     const updates = posted.filter((message) => 'specUpdated' === message.type);

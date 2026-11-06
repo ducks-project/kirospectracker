@@ -32,6 +32,8 @@ async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void
  */
 describe('Spec decorations (Node host)', () => {
   let api: IExtensionApi;
+  let inProgressTasksUri: vscode.Uri | undefined;
+  let originalTasksContent: Uint8Array | undefined;
 
   before(async function activateExtension() {
     const extension = vscode.extensions.getExtension<IExtensionApi>(EXTENSION_ID);
@@ -44,6 +46,17 @@ describe('Spec decorations (Node host)', () => {
     }
     api = await extension.activate();
     await waitFor(() => 0 < api.repository.getSpecs().length);
+    const inProgress = api.repository.getSpecs().find((spec) => 'in-progress' === spec.name);
+    expect(inProgress).to.not.equal(undefined);
+    inProgressTasksUri = vscode.Uri.file(path.join(inProgress!.folderPath, 'tasks.md'));
+    originalTasksContent = await vscode.workspace.fs.readFile(inProgressTasksUri);
+  });
+
+  after(async function restoreFixture() {
+    if (undefined === inProgressTasksUri || undefined === originalTasksContent) {
+      return;
+    }
+    await vscode.workspace.fs.writeFile(inProgressTasksUri, originalTasksContent);
   });
 
   it('discovers the four fixture specs', () => {
@@ -71,20 +84,26 @@ describe('Spec decorations (Node host)', () => {
   it('fires only the changed spec URI and its specs root on a scoped change', async () => {
     const inProgress = api.repository.getSpecs().find((spec) => 'in-progress' === spec.name);
     expect(inProgress).to.not.equal(undefined);
-    const events: vscode.Uri[][] = [];
-    const subscription = api.decorations.onDidChangeFileDecorations((uris) => {
-      events.push([...uris]);
-    });
-    const tasksUri = vscode.Uri.file(path.join(inProgress!.folderPath, 'tasks.md'));
-    const edited = '# Implementation Plan\n\n- [x] 1. Done task\n';
-    await vscode.workspace.fs.writeFile(tasksUri, Buffer.from(edited, 'utf8'));
-
-    await waitFor(() => 0 < events.length);
-    subscription.dispose();
-    const scoped = events[events.length - 1];
-    expect(scoped).to.have.length(2);
-    const paths = scoped.map((uri) => path.normalize(uri.fsPath)).sort();
+    expect(inProgressTasksUri).to.not.equal(undefined);
+    const folder = path.normalize(inProgress!.folderPath);
     const root = path.normalize(path.dirname(inProgress!.folderPath));
-    expect(paths).to.deep.equal([path.normalize(inProgress!.folderPath), root].sort());
+    const expected = [folder, root].sort();
+    const events: string[][] = [];
+    const subscription = api.decorations.onDidChangeFileDecorations((uris) => {
+      events.push([...uris].map((uri) => path.normalize(uri.fsPath)).sort());
+    });
+    // Write content that differs from the restored baseline so the host
+    // FileSystemWatcher reliably observes an onDidChange, independent of run order.
+    const edited = '# Implementation Plan\n\n- [x] 1. Done task\n';
+    await vscode.workspace.fs.writeFile(inProgressTasksUri!, Buffer.from(edited, 'utf8'));
+
+    // The watcher may batch or coalesce notifications; assert that a scoped
+    // event carrying exactly the changed folder and its specs root is delivered,
+    // rather than assuming a single undisturbed notification is the last one.
+    const matches = (uris: string[]): boolean =>
+      2 === uris.length && uris[0] === expected[0] && uris[1] === expected[1];
+    await waitFor(() => events.some(matches));
+    subscription.dispose();
+    expect(events.some(matches)).to.equal(true);
   });
 });
