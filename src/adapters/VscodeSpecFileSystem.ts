@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 
+import { Debouncer } from '../core/Debouncer';
 import type { ISpecChangeNotifier } from './ports/ISpecChangeNotifier';
 import type { ISpecFileSystem } from './ports/ISpecFileSystem';
+import { TimeoutScheduler } from './TimeoutScheduler';
 
 /** Glob matching every file under any workspace `.kiro/specs/` tree. */
 const SPECS_GLOB = '**/.kiro/specs/**';
@@ -25,12 +27,18 @@ export class VscodeSpecFileSystem implements ISpecFileSystem, ISpecChangeNotifie
 
   private readonly emitter: vscode.EventEmitter<string> = new vscode.EventEmitter<string>();
 
+  private readonly debouncer: Debouncer = new Debouncer(new TimeoutScheduler());
+
   /**
    * Build the wrapper and wire the specs file-system watcher to the emitter.
+   *
+   * Burst events for the same path are debounced per path, so a flurry of writes
+   * to one spec fires a single change (and thus a single scoped re-parse).
    */
   public constructor() {
     this.watcher = vscode.workspace.createFileSystemWatcher(SPECS_GLOB);
-    const forward = (uri: vscode.Uri): void => this.emitter.fire(uri.fsPath);
+    const forward = (uri: vscode.Uri): void =>
+      this.debouncer.schedule(uri.fsPath, () => this.emitter.fire(uri.fsPath));
     this.watcher.onDidCreate(forward);
     this.watcher.onDidChange(forward);
     this.watcher.onDidDelete(forward);
@@ -100,6 +108,7 @@ export class VscodeSpecFileSystem implements ISpecFileSystem, ISpecChangeNotifie
    * Release the watcher and emitter.
    */
   public dispose(): void {
+    this.debouncer.cancelAll();
     this.watcher.dispose();
     this.emitter.dispose();
   }
