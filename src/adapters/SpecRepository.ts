@@ -13,6 +13,9 @@ const SPECS_SEGMENT_SPECS = 'specs';
 /** Editor history directory excluded from discovery. */
 const HISTORY_DIRECTORY = '.history';
 
+/** Path separator used to enforce a folder boundary when matching paths. */
+const PATH_SEPARATOR = '/';
+
 /** Canonical and annex document file names read for each spec. */
 const DOCUMENT_FILES = {
   tasks: 'tasks.md',
@@ -172,11 +175,35 @@ export class SpecRepository {
 
   /**
    * Find the cached spec whose folder contains the changed file.
+   *
+   * Matching enforces a folder boundary so a sibling spec whose name is a
+   * prefix of another (e.g. `auth` vs `auth-v2`) is never misattributed. When
+   * several folders match, the longest one wins (the most specific spec).
    * @param changedPath Absolute path of the changed file.
    * @returns The owning snapshot, or `undefined` when none matches.
    */
   private findAffectedSpec(changedPath: string): ISpecSnapshot | undefined {
-    return this.getSpecs().find((snapshot) => changedPath.startsWith(snapshot.folderPath));
+    let best: ISpecSnapshot | undefined;
+    this.getSpecs().forEach((snapshot) => {
+      if (!this.isWithinFolder(changedPath, snapshot.folderPath)) {
+        return;
+      }
+      if (undefined === best || best.folderPath.length < snapshot.folderPath.length) {
+        best = snapshot;
+      }
+    });
+    return best;
+  }
+
+  /**
+   * Tell whether a changed path lies within a spec folder on a folder boundary.
+   * @param changedPath Absolute path of the changed file.
+   * @param folderPath Absolute path of the candidate spec folder.
+   * @returns `true` when the path is the folder itself or a descendant of it.
+   */
+  // eslint-disable-next-line class-methods-use-this
+  private isWithinFolder(changedPath: string, folderPath: string): boolean {
+    return changedPath === folderPath || changedPath.startsWith(`${folderPath}${PATH_SEPARATOR}`);
   }
 
   /**

@@ -105,6 +105,28 @@ describe('SpecRepository', () => {
     expect(notified).to.equal(1);
   });
 
+  it('routes a change to the right spec when sibling names share a prefix', async () => {
+    const root = `${WORKSPACE}/.kiro/specs`;
+    // 'auth' is seeded before 'auth-v2' so the first prefix match would be wrong.
+    const directories = new Set<string>([`${root}/auth`, `${root}/auth-v2`]);
+    const files = new Map<string, string>([
+      [`${root}/auth/tasks.md`, '- [x] 1. Done\n- [ ] 2. Todo'],
+      [`${root}/auth-v2/tasks.md`, '- [ ] 1. Todo'],
+    ]);
+    const fs = new FakeSpecFileSystem([WORKSPACE], files, directories);
+    const repository = new SpecRepository(fs, makeFactory(), fs);
+    await repository.refresh();
+    // Edit auth-v2 to fully done and emit the change on it.
+    fs.setFile(`${root}/auth-v2/tasks.md`, '- [x] 1. Done');
+    fs.emit(`${root}/auth-v2/tasks.md`);
+    await flush();
+    const auth = repository.getSpecs().find((spec) => 'auth' === spec.name);
+    const authV2 = repository.getSpecs().find((spec) => 'auth-v2' === spec.name);
+    // auth-v2 flips to completed; auth (untouched, prefix name) stays as is.
+    expect(authV2?.status).to.equal(SpecStatus.FullyCompleted);
+    expect(auth?.status).to.equal(SpecStatus.InProgress);
+  });
+
   it('releases its subscription on dispose', async () => {
     const fs = seededFileSystem();
     const repository = new SpecRepository(fs, makeFactory(), fs);
