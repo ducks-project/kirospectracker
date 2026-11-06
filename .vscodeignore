@@ -2,6 +2,7 @@
 # the manifest-related files are shipped.
 
 # Editor, CI, agent and history metadata
+coverage/**
 .vscode/**
 .vscode-test/**
 .github/**
@@ -28,6 +29,9 @@ esbuild.mjs
 .prettierrc.json
 .prettierignore
 .mocharc.json
+.markdownlint.json
+.c8rc.json
+.c8rc.adapters.json
 lefthook.yml
 
 # TypeScript sources, source maps and build info
