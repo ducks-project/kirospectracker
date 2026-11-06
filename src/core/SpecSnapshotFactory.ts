@@ -62,7 +62,6 @@ export class SpecSnapshotFactory {
       folderPath: input.folderPath,
       workspacePath: input.workspacePath,
       documents: input.documents,
-      tasks,
       status,
       progress,
     };

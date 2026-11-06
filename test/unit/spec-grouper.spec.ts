@@ -16,7 +16,6 @@ function snapshotOf(name: string, status: SpecStatus): ISpecSnapshot {
     folderPath: `/ws/.kiro/specs/${name}`,
     workspacePath: '/ws',
     documents: { tasks: true, requirements: false, design: false, notes: false },
-    tasks: [],
     status,
     progress: {
       requiredDone: 0,

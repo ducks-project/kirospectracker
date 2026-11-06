@@ -190,7 +190,13 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   const gateway = new VscodeWorkspaceGateway();
   const stats = new SpecStatsCalculator();
   const openDocument = new OpenDocumentCommand(repository, gateway);
-  const runTasks = new RunTasksCommand(repository, gateway, new RunPromptBuilder());
+  const runTasks = new RunTasksCommand(
+    repository,
+    gateway,
+    new RunPromptBuilder(),
+    fileSystem,
+    new TasksMarkdownParser(),
+  );
   const dashboard = createDashboard(context, repository, stats, openDocument, runTasks);
   const decorations = new SpecFileDecorationProvider(repository, new SpecDecorationMapper(), stats);
   const tree = new SpecTreeDataProvider(repository, new SpecGrouper());

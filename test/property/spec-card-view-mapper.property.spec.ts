@@ -20,7 +20,7 @@ const progressArb = fc.record({
   optionalRatio: fc.double({ min: 0, max: 1, noNaN: true }),
 });
 
-/** Arbitrary over a full snapshot (with a possibly non-empty task tree). */
+/** Arbitrary over a full snapshot. */
 const snapshotArb: fc.Arbitrary<ISpecSnapshot> = fc.record({
   name: fc.string(),
   folderPath: fc.string(),
@@ -31,17 +31,6 @@ const snapshotArb: fc.Arbitrary<ISpecSnapshot> = fc.record({
     design: fc.boolean(),
     notes: fc.boolean(),
   }),
-  tasks: fc.array(
-    fc.record({
-      id: fc.string(),
-      title: fc.string(),
-      done: fc.boolean(),
-      optional: fc.boolean(),
-      children: fc.constant([]),
-      requirements: fc.constant([]),
-    }),
-    { maxLength: 10 },
-  ),
   status: statusArb,
   progress: progressArb,
 });

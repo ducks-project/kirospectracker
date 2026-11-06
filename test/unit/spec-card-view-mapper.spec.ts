@@ -26,9 +26,6 @@ function makeSnapshot(name: string): ISpecSnapshot {
     folderPath: `/ws/.kiro/specs/${name}`,
     workspacePath: '/ws',
     documents: { tasks: true, requirements: true, design: false, notes: false },
-    tasks: [
-      { id: '1', title: 'Task', done: false, optional: false, children: [], requirements: [] },
-    ],
     status: SpecStatus.InProgress,
     progress: PROGRESS,
   };

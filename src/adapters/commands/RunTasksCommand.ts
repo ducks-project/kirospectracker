@@ -1,6 +1,8 @@
 import type { ISpecSnapshot } from '../../core/model/ISpecSnapshot';
 import type { ITaskItem } from '../../core/model/ITaskItem';
+import type { TasksMarkdownParser } from '../../core/parsing/TasksMarkdownParser';
 import type { RunPromptBuilder } from '../../core/RunPromptBuilder';
+import type { ISpecFileSystem } from '../ports/ISpecFileSystem';
 import type { IWorkspaceGateway } from '../ports/IWorkspaceGateway';
 import type { SpecRepository } from '../SpecRepository';
 import { SpecStatus } from '../../core/model/SpecStatus';
@@ -49,20 +51,31 @@ export class RunTasksCommand {
 
   private readonly promptBuilder: RunPromptBuilder;
 
+  private readonly fileSystem: ISpecFileSystem;
+
+  private readonly parser: TasksMarkdownParser;
+
   /**
-   * Build the command over the repository, gateway and prompt builder.
+   * Build the command over the repository, gateway, prompt builder and the
+   * collaborators used to parse `tasks.md` on demand.
    * @param repository The spec repository.
    * @param gateway The workspace gateway.
    * @param promptBuilder The pure execution-prompt builder.
+   * @param fileSystem The file-system port reading the spec's `tasks.md`.
+   * @param parser The parser turning `tasks.md` text into a task tree.
    */
   public constructor(
     repository: SpecRepository,
     gateway: IWorkspaceGateway,
     promptBuilder: RunPromptBuilder,
+    fileSystem: ISpecFileSystem,
+    parser: TasksMarkdownParser,
   ) {
     this.repository = repository;
     this.gateway = gateway;
     this.promptBuilder = promptBuilder;
+    this.fileSystem = fileSystem;
+    this.parser = parser;
   }
 
   /**
@@ -94,9 +107,24 @@ export class RunTasksCommand {
     if (!consented) {
       return;
     }
-    const prompt = this.promptBuilder.build(snapshot.name, pendingLeafTitles(snapshot.tasks));
+    const tasks = await this.readTasks(snapshot.folderPath);
+    const prompt = this.promptBuilder.build(snapshot.name, pendingLeafTitles(tasks));
     await this.gateway.copyToClipboard(prompt);
     this.gateway.showInfo('Execution prompt copied to the clipboard.');
+  }
+
+  /**
+   * Read and parse the spec's `tasks.md` on demand.
+   * @param folderPath Absolute path of the spec folder.
+   * @returns The parsed task tree; empty when the file is absent/unreadable.
+   */
+  private async readTasks(folderPath: string): Promise<readonly ITaskItem[]> {
+    const tasksPath = this.fileSystem.join(folderPath, documentFileName('tasks'));
+    const content = await this.fileSystem.readFile(tasksPath);
+    if (undefined === content) {
+      return [];
+    }
+    return this.parser.parse(content);
   }
 
   /**

@@ -1,6 +1,5 @@
 import type { ISpecDocuments } from './ISpecDocuments';
 import type { ISpecProgress } from './ISpecProgress';
-import type { ITaskItem } from './ITaskItem';
 import type { SpecStatus } from './SpecStatus';
 
 /**
@@ -10,6 +9,10 @@ import type { SpecStatus } from './SpecStatus';
  * It is plain data so it can cross the webview `postMessage` boundary unchanged:
  * the webview never holds a `vscode` object, and the core never holds webview
  * state.
+ *
+ * Progress and status are precomputed here; the full parsed task tree is NOT
+ * retained on the snapshot. `RunTasksCommand` parses `tasks.md` on demand when
+ * the user runs a spec, so the repository never caches the task trees.
  */
 export interface ISpecSnapshot {
   /** Spec name, i.e. the direct sub-folder name under `.kiro/specs/`. */
@@ -23,9 +26,6 @@ export interface ISpecSnapshot {
 
   /** Presence flags of the spec's canonical and annex documents. */
   readonly documents: ISpecDocuments;
-
-  /** Parsed task tree from `tasks.md`; empty when the spec is malformed. */
-  readonly tasks: readonly ITaskItem[];
 
   /** Resolved lifecycle status of the spec. */
   readonly status: SpecStatus;
