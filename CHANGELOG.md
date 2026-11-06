@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-06
+
+### Security
+
+- Upgrade the vulnerable development dependencies to patched major versions,
+  bringing `npm audit` to 0 known vulnerabilities (previously 14: 2 high, 12
+  moderate). None of the affected packages ship in the VSIX; this is build and
+  tooling hygiene with no user-facing change. Bumped `esbuild` 0.24 to 0.28,
+  `mocha` 10 to 12, `@vscode/vsce` 3 to 4, `ovsx` 0.10 to 1.3,
+  `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin` 7 to 8, and
+  the direct `glob` dependency 11 to 14, and pinned patched `glob` and `minimatch`
+  transitively via `overrides`.
+
+### Changed
+
+- Replace the unmaintained `eslint-config-airbnb-typescript` base (hard-pinned to
+  the vulnerable `@typescript-eslint` 7 line and to rules removed in
+  `@typescript-eslint` 8) with a minimal ESLint config built on
+  `@typescript-eslint/recommended`, `eslint-plugin-import`, and `prettier`. The
+  project's enforced rules (strict equality, Yoda equality, no `var`, no
+  `any`, import ordering, naming) are preserved and the lint suite stays green
+  with no source changes.
+
 ## [0.1.1] - 2026-11-06
 
 ### Fixed
@@ -35,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ducks-project/kirospectracker/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/ducks-project/kirospectracker/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ducks-project/kirospectracker/releases/tag/v0.1.0
