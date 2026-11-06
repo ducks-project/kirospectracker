@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update the dashboard incrementally when a single spec changes: the repository now
+  emits a fine-grained change delta, the dashboard replaces only the one affected
+  spec card (plus the recomputed aggregate), and the explorer refreshes only the
+  changed spec and its `.kiro/specs` root. Steady-state editing no longer scales with
+  the number of specs in the workspace (previously about 192 ms per edit at 500 specs).
+- Ship a leaner dashboard view-model: the per-spec data sent to the webview and retained
+  in memory no longer carries the parsed task tree, which the dashboard never rendered.
+  `RunTasksCommand` now parses `tasks.md` on demand when you run a spec, cutting retained
+  memory and the message payload at large spec counts.
+- Bound the file-read concurrency during spec discovery (a default of 12 concurrent reads)
+  instead of issuing every read at once, smoothing cold-scan tail latency and file-handle
+  pressure on large or remote workspaces. The discovered result is unchanged.
+
 ## [0.2.0] - 2026-11-06
 
 ### Security

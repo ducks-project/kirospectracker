@@ -119,6 +119,7 @@
     "pretest:integration": "npm run compile:test",
     "test:integration": "node --loader ts-node/esm --no-warnings ./test/runTest.ts",
     "bench": "node --loader ts-node/esm --no-warnings ./benchmark/parse.bench.ts",
+    "bench:update": "node --loader ts-node/esm --no-warnings ./benchmark/incremental-update.bench.ts",
     "package": "vsce package",
     "publish": "ovsx publish"
   },

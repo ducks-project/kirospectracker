@@ -20,6 +20,34 @@ npm run bench
 | medium (~250)    | 1.44            | ms   |
 | large (~2500)    | 15.31           | ms   |
 
+## Extension version 0.3.0
+
+Version 0.3.0 reworked the steady-state editing path so a single spec change no longer
+reprocesses every spec. A second benchmark,
+[incremental-update.bench.ts](../benchmark/incremental-update.bench.ts), contrasts the old
+full-render fan-out with the new incremental `specUpdated` path across 50, 200 and 500 specs.
+
+```bash
+npm run bench:update
+```
+
+- Single-change update path, before (the old fan-out reprojected all N cards and refreshed
+  every decoration on each edit): roughly 13 ms at 50 specs, 81 ms at 200 specs and 192 ms at
+  500 specs, growing linearly with the spec count.
+- Single-change update path, after (the `specUpdated` message carries one `ISpecCardView`):
+  flat at a few nanoseconds regardless of the spec count, so editing a 500-spec workspace
+  costs the same as editing a handful. The micro-benchmark isolates the projection work that
+  changed from O(N) to O(1); the aggregate stats recompute is a shared single-field scan.
+- Memory: dropping the retained parsed task tree from each snapshot (the dashboard never used
+  it; `RunTasksCommand` now parses `tasks.md` on demand) removes about 107 MB of retained
+  task nodes at 500 specs with complex task lists.
+- Discovery: spec file reads during a cold scan are now bounded (a default of 12 concurrent
+  reads) instead of issuing all N reads at once, smoothing tail latency and file-handle
+  pressure on large or remote workspaces without changing the result.
+
+Reproduce the figures with `npm run bench:update`; like the parser benchmark they are
+informational and do not gate CI.
+
 ## Reading the results
 
 - Parsing a typical spec (a few to a few dozen tasks) costs tens of microseconds: well below

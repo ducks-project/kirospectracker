@@ -87,11 +87,20 @@ sequenceDiagram
   R->>R: re-parse only the affected spec
   R->>C: parse tasks.md, resolve status, compute progress
   C-->>R: ISpecSnapshot (immutable)
-  R-->>D: onDidChangeSpecs(snapshots)
-  D->>D: build stats + escaped HTML with a per-render nonce
-  D->>W: postMessage(render)
+  R-->>D: onDidChangeSpecs(SpecChangeDelta)
+  D->>D: project the one changed snapshot to ISpecCardView + recompute stats
+  D->>W: postMessage(specUpdated: one card + stats)
   W-->>D: postMessage(openDocument / runTasks / search / setLayout)
 ```
+
+`onDidChangeSpecs` carries a fine-grained `SpecChangeDelta`
+([ISpecChangeDelta](../src/core/model/ISpecChangeDelta.ts)): a `specChanged` delta names the
+single changed `folderPath`, while a `fullRefresh` delta marks a full rediscovery. On mount
+or a `fullRefresh` the provider sends a `render` message carrying every card; on a
+`specChanged` it sends an incremental `specUpdated` message carrying only the one
+[ISpecCardView](../src/core/model/ISpecCardView.ts) plus the recomputed aggregate stats. The
+webview keeps a `Map` of mounted card nodes keyed by `folderPath` and replaces only the
+changed node, so a single edit no longer reprocesses or re-renders all N specs.
 
 ## Run-tasks flow (MVP)
 
@@ -107,11 +116,17 @@ sequenceDiagram
   X->>G: open tasks.md
   X->>U: ask for consent to copy a prompt
   alt consent granted
-    X->>P: build the ready-to-paste prompt
+    X->>X: read + parse tasks.md on demand (ISpecFileSystem + TasksMarkdownParser)
+    X->>P: build the ready-to-paste prompt from the pending leaf tasks
     P-->>X: prompt text
     X->>G: write to clipboard
   end
 ```
+
+Since 0.3.0 the snapshot no longer caches the parsed task tree, so `RunTasksCommand` parses
+`tasks.md` on demand through the `ISpecFileSystem` port and `TasksMarkdownParser` when the
+user actually runs a spec, then derives the pending leaf titles for the prompt. It is the
+only consumer of the full task tree, which keeps the retained dashboard data lean.
 
 ## Patterns
 
@@ -127,6 +142,18 @@ sequenceDiagram
 - Single-responsibility helpers: badge/color/tooltip, stats, grouping, HTML/CSP/nonce and
   prompt building each live in their own pure core class, kept out of the host-only
   providers.
+- Observer with a fine-grained payload: `SpecRepository.onDidChangeSpecs` notifies its
+  listeners with a `SpecChangeDelta` ([ISpecChangeDelta](../src/core/model/ISpecChangeDelta.ts))
+  rather than a payloadless "something changed" signal, so the dashboard and the decoration
+  providers react to only the changed spec instead of reprocessing the whole workspace.
+- DTO / view-model projection: [SpecCardViewMapper](../src/core/status/SpecCardViewMapper.ts)
+  projects a full [ISpecSnapshot](../src/core/model/ISpecSnapshot.ts) onto the lean
+  [ISpecCardView](../src/core/model/ISpecCardView.ts) the webview consumes, dropping the task
+  tree so each `postMessage` payload stays small.
+- Bounded-concurrency iterator: [mapWithLimit](../src/core/BoundedMap.ts) is a pure,
+  order-preserving worker-pool used by `SpecRepository` discovery to cap the number of
+  in-flight spec reads, smoothing cold-scan tail latency and file-handle pressure without
+  changing the result.
 
 ## Security boundary
 
