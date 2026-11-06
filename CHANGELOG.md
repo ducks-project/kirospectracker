@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-06
+
+### Fixed
+
+- Keep the dashboard search box focused and its caret in place while typing: the
+  webview now preserves the toolbar across re-renders and rewrites only the stats
+  and spec-list regions, so a render triggered by a file change no longer steals
+  focus or wipes the query after each keystroke.
+
 ## [0.1.0] - 2026-11-06
 
 ### Added
@@ -26,5 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/ducks-project/kirospectracker/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ducks-project/kirospectracker/releases/tag/v0.1.0
