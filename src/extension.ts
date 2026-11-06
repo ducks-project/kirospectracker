@@ -13,8 +13,10 @@ import { SpecStatusResolver } from './core/status/SpecStatusResolver';
 import { SpecDecorationMapper } from './core/status/SpecDecorationMapper';
 import { TasksOnlyDocumentPolicy } from './core/status/TasksOnlyDocumentPolicy';
 import { TasksMarkdownParser } from './core/parsing/TasksMarkdownParser';
+import { SpecGrouper } from './core/status/SpecGrouper';
 import { SpecRepository } from './adapters/SpecRepository';
 import { SpecFileDecorationProvider } from './adapters/SpecFileDecorationProvider';
+import { SpecTreeDataProvider, TREE_VIEW_ID } from './adapters/SpecTreeDataProvider';
 import { DASHBOARD_VIEW_ID, SpecDashboardViewProvider } from './adapters/SpecDashboardViewProvider';
 import { VscodeSpecFileSystem } from './adapters/VscodeSpecFileSystem';
 import { VscodeWorkspaceGateway } from './adapters/VscodeWorkspaceGateway';
@@ -51,6 +53,7 @@ interface IWiring {
   readonly fileSystem: VscodeSpecFileSystem;
   readonly dashboard: SpecDashboardViewProvider;
   readonly decorations: SpecFileDecorationProvider;
+  readonly tree: SpecTreeDataProvider;
   readonly openDocument: OpenDocumentCommand;
   readonly runTasks: RunTasksCommand;
   readonly toggleLayout: ToggleLayoutCommand;
@@ -169,11 +172,13 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
     createDashboardActions(openDocument, runTasks),
   );
   const decorations = new SpecFileDecorationProvider(repository, new SpecDecorationMapper(), stats);
+  const tree = new SpecTreeDataProvider(repository, new SpecGrouper());
   return {
     repository,
     fileSystem,
     dashboard,
     decorations,
+    tree,
     openDocument,
     runTasks,
     toggleLayout: new ToggleLayoutCommand(dashboard),
@@ -193,8 +198,10 @@ function registerDisposables(context: vscode.ExtensionContext, wiring: IWiring):
     wiring.fileSystem,
     wiring.decorations,
     wiring.dashboard,
+    wiring.tree,
     vscode.window.registerWebviewViewProvider(DASHBOARD_VIEW_ID, wiring.dashboard),
     vscode.window.registerFileDecorationProvider(wiring.decorations),
+    vscode.window.registerTreeDataProvider(TREE_VIEW_ID, wiring.tree),
     vscode.commands.registerCommand(REFRESH_COMMAND_ID, () =>
       guard(wiring.gateway, () => wiring.refresh.execute()),
     ),

@@ -85,6 +85,10 @@
           "id": "kirospectracker.dashboard",
           "name": "Specs Dashboard",
           "type": "webview"
+        },
+        {
+          "id": "kirospectracker.tree",
+          "name": "Specs by Status"
         }
       ]
     }

@@ -1,0 +1,60 @@
+import { expect } from 'chai';
+
+import type { ISpecSnapshot } from '../../src/core/model/ISpecSnapshot';
+import { SpecStatus } from '../../src/core/model/SpecStatus';
+import { SpecGrouper } from '../../src/core/status/SpecGrouper';
+
+/**
+ * Build a snapshot carrying the given name and status.
+ * @param name Spec name.
+ * @param status Spec status.
+ * @returns A snapshot fixture.
+ */
+function snapshotOf(name: string, status: SpecStatus): ISpecSnapshot {
+  return {
+    name,
+    folderPath: `/ws/.kiro/specs/${name}`,
+    workspacePath: '/ws',
+    documents: { tasks: true, requirements: false, design: false, notes: false },
+    tasks: [],
+    status,
+    progress: {
+      requiredDone: 0,
+      requiredTotal: 0,
+      optionalDone: 0,
+      optionalTotal: 0,
+      requiredRatio: 1,
+      optionalRatio: 0,
+    },
+  };
+}
+
+/**
+ * Behaviour specification for {@link SpecGrouper}.
+ */
+describe('SpecGrouper', () => {
+  const grouper = new SpecGrouper();
+
+  it('drops empty groups and keeps the display order', () => {
+    const groups = grouper.group([
+      snapshotOf('b', SpecStatus.InProgress),
+      snapshotOf('a', SpecStatus.Malformed),
+    ]);
+    expect(groups.map((group) => group.status)).to.deep.equal([
+      SpecStatus.InProgress,
+      SpecStatus.Malformed,
+    ]);
+  });
+
+  it('sorts specs within a group by name', () => {
+    const groups = grouper.group([
+      snapshotOf('zeta', SpecStatus.NotStarted),
+      snapshotOf('alpha', SpecStatus.NotStarted),
+    ]);
+    expect(groups[0].specs.map((spec) => spec.name)).to.deep.equal(['alpha', 'zeta']);
+  });
+
+  it('returns no group for an empty input', () => {
+    expect(grouper.group([])).to.deep.equal([]);
+  });
+});
