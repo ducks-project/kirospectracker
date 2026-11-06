@@ -17,7 +17,11 @@ import { TasksMarkdownParser } from './core/parsing/TasksMarkdownParser';
 import { SpecGrouper } from './core/status/SpecGrouper';
 import { SpecRepository } from './adapters/SpecRepository';
 import { SpecFileDecorationProvider } from './adapters/SpecFileDecorationProvider';
-import { SpecTreeDataProvider, TREE_VIEW_ID } from './adapters/SpecTreeDataProvider';
+import {
+  resolveSpecNodeFolderPath,
+  SpecTreeDataProvider,
+  TREE_VIEW_ID,
+} from './adapters/SpecTreeDataProvider';
 import { DASHBOARD_VIEW_ID, SpecDashboardViewProvider } from './adapters/SpecDashboardViewProvider';
 import { VscodeSpecFileSystem } from './adapters/VscodeSpecFileSystem';
 import { VscodeWorkspaceGateway } from './adapters/VscodeWorkspaceGateway';
@@ -32,6 +36,22 @@ import {
 
 /** Command id opening a spec document, invoked from the dashboard webview. */
 const OPEN_DOCUMENT_COMMAND_ID = 'kirospectracker.openDocument';
+
+/**
+ * Tree context-menu command ids. Each opens one document of the spec targeted by
+ * the "Specs by Status" tree item; they are thin, tree-item-aware wrappers over
+ * {@link OpenDocumentCommand} so the declarative menu can target a node argument
+ * while reusing the existing open behaviour.
+ */
+const TREE_OPEN_COMMAND_IDS: Readonly<Record<SpecDocumentKind, string>> = {
+  requirements: 'kirospectracker.tree.openRequirements',
+  design: 'kirospectracker.tree.openDesign',
+  tasks: 'kirospectracker.tree.openTasks',
+  notes: 'kirospectracker.tree.openNotes',
+};
+
+/** Tree context-menu command id running the targeted spec's tasks. */
+const TREE_RUN_TASKS_COMMAND_ID = 'kirospectracker.tree.runTasks';
 
 /**
  * Public API the extension returns from {@link activate}.
@@ -132,6 +152,26 @@ async function runWithFolder(
 }
 
 /**
+ * Run an action with the spec folder path resolved from a tree context-menu
+ * node argument, surfacing a guard message when the argument is not a spec leaf.
+ * @param gateway The workspace gateway for error surfacing.
+ * @param argument The raw command argument (the targeted tree node).
+ * @param action The action to run with the resolved folder path.
+ */
+async function runWithNode(
+  gateway: VscodeWorkspaceGateway,
+  argument: unknown,
+  action: (folderPath: string) => Promise<void>,
+): Promise<void> {
+  const folderPath = resolveSpecNodeFolderPath(argument);
+  if (undefined === folderPath) {
+    gateway.showError('No spec was selected in the tree.');
+    return;
+  }
+  await guard(gateway, () => action(folderPath));
+}
+
+/**
  * Build the pure snapshot factory from the core collaborators.
  * @returns A configured {@link SpecSnapshotFactory}.
  */
@@ -223,6 +263,33 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
 }
 
 /**
+ * Register the tree context-menu commands as disposables.
+ *
+ * Each open command is a thin, tree-item-aware wrapper over the shared
+ * {@link OpenDocumentCommand}; the run command reuses {@link RunTasksCommand}
+ * (which already refuses a malformed spec). All resolve the targeted spec from
+ * the context-menu node argument.
+ * @param context The extension context owning the disposables.
+ * @param wiring The constructed collaborators.
+ */
+function registerTreeCommands(context: vscode.ExtensionContext, wiring: IWiring): void {
+  (Object.keys(TREE_OPEN_COMMAND_IDS) as SpecDocumentKind[]).forEach((document) => {
+    context.subscriptions.push(
+      vscode.commands.registerCommand(TREE_OPEN_COMMAND_IDS[document], (node: unknown) =>
+        runWithNode(wiring.gateway, node, (folderPath) =>
+          wiring.openDocument.execute(folderPath, document),
+        ),
+      ),
+    );
+  });
+  context.subscriptions.push(
+    vscode.commands.registerCommand(TREE_RUN_TASKS_COMMAND_ID, (node: unknown) =>
+      runWithNode(wiring.gateway, node, (folderPath) => wiring.runTasks.execute(folderPath)),
+    ),
+  );
+}
+
+/**
  * Register the view, providers and command handlers as disposables.
  * @param context The extension context owning the disposables.
  * @param wiring The constructed collaborators.
@@ -250,6 +317,7 @@ function registerDisposables(context: vscode.ExtensionContext, wiring: IWiring):
         guard(wiring.gateway, () => wiring.openDocument.execute(folderPath, document)),
     ),
   );
+  registerTreeCommands(context, wiring);
 }
 
 /**

@@ -34,10 +34,16 @@
   "homepage": "https://github.com/ducks-project/kirospectracker#readme",
   "activationEvents": [
     "onView:kirospectracker.dashboard",
+    "onView:kirospectracker.tree",
     "onCommand:kirospectracker.refresh",
     "onCommand:kirospectracker.runTasks",
     "onCommand:kirospectracker.toggleLayout",
-    "onCommand:kirospectracker.openDocument"
+    "onCommand:kirospectracker.openDocument",
+    "onCommand:kirospectracker.tree.openRequirements",
+    "onCommand:kirospectracker.tree.openDesign",
+    "onCommand:kirospectracker.tree.openTasks",
+    "onCommand:kirospectracker.tree.openNotes",
+    "onCommand:kirospectracker.tree.runTasks"
   ],
   "contributes": {
     "commands": [
@@ -53,6 +59,31 @@
       {
         "command": "kirospectracker.toggleLayout",
         "title": "Kiro Spec Tracker: Toggle Dashboard Layout"
+      },
+      {
+        "command": "kirospectracker.tree.openRequirements",
+        "title": "Open Requirements",
+        "icon": "$(book)"
+      },
+      {
+        "command": "kirospectracker.tree.openDesign",
+        "title": "Open Design",
+        "icon": "$(symbol-structure)"
+      },
+      {
+        "command": "kirospectracker.tree.openTasks",
+        "title": "Open Tasks",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "kirospectracker.tree.openNotes",
+        "title": "Open Notes",
+        "icon": "$(note)"
+      },
+      {
+        "command": "kirospectracker.tree.runTasks",
+        "title": "Run Tasks",
+        "icon": "$(play)"
       }
     ],
     "menus": {
@@ -73,6 +104,33 @@
           "command": "kirospectracker.toggleLayout",
           "when": "view == kirospectracker.dashboard",
           "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "kirospectracker.tree.openRequirements",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )doc-requirements( |$)/",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kirospectracker.tree.openDesign",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )doc-design( |$)/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kirospectracker.tree.openTasks",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )doc-tasks( |$)/",
+          "group": "navigation@3"
+        },
+        {
+          "command": "kirospectracker.tree.openNotes",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )doc-notes( |$)/",
+          "group": "navigation@4"
+        },
+        {
+          "command": "kirospectracker.tree.runTasks",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )runnable( |$)/",
+          "group": "run@1"
         }
       ]
     },
