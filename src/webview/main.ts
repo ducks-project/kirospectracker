@@ -6,13 +6,26 @@ import type {
 } from '../core/model/IDashboardMessage';
 import type { ISpecCardView } from '../core/model/ISpecCardView';
 import type { ISpecStats } from '../core/model/ISpecStats';
+import type { SpecFilterKey } from '../core/model/SpecFilterKey';
+import type { ISpecLayoutOptionView } from '../core/status/SpecLayoutToggleView';
+import type { ISpecStatToggleView } from '../core/status/SpecStatToggleView';
 import { planDashboardRender } from './DashboardRenderPlanner';
+import { SpecCardFilter } from '../core/status/SpecCardFilter';
+import { SpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
+import { SpecStatToggleView } from '../core/status/SpecStatToggleView';
+import { SpecStatusFilter } from '../core/status/SpecStatusFilter';
+
+/** Persisted webview state surviving re-renders and view reloads. */
+interface IWebviewState {
+  readonly layout?: DashboardLayout;
+  readonly filterKeys?: readonly SpecFilterKey[];
+}
 
 /** Minimal shape of the VS Code webview API injected into the global scope. */
 interface IWebviewApi {
   postMessage(message: DashboardInboundMessage): void;
-  getState(): { layout?: DashboardLayout } | undefined;
-  setState(state: { layout: DashboardLayout }): void;
+  getState(): IWebviewState | undefined;
+  setState(state: IWebviewState): void;
 }
 
 declare function acquireVsCodeApi(): IWebviewApi;
@@ -23,7 +36,13 @@ const PERCENT = 100;
 /** Document links rendered per spec, in display order. */
 const DOCUMENT_KINDS: readonly SpecDocumentKind[] = ['requirements', 'design', 'tasks', 'notes'];
 
+/** Pure core projectors shared across renders. */
+const statToggleView = new SpecStatToggleView();
+const layoutToggleView = new SpecLayoutToggleView();
+
 const vscodeApi = acquireVsCodeApi();
+
+const persistedState = vscodeApi.getState();
 
 /** Current render state kept between messages. */
 const state: {
@@ -31,12 +50,22 @@ const state: {
   stats: ISpecStats;
   query: string;
   layout: DashboardLayout;
+  filter: SpecStatusFilter;
 } = {
   cards: [],
   stats: { total: 0, completed: 0, inProgress: 0, notStarted: 0, malformed: 0 },
   query: '',
-  layout: vscodeApi.getState()?.layout ?? 'list',
+  layout: persistedState?.layout ?? 'list',
+  filter: SpecStatusFilter.fromUnknown(persistedState?.filterKeys ?? []),
 };
+
+/**
+ * Persist the parts of the render state that must survive a re-render or a view
+ * reload: the chosen layout and the active status-filter keys.
+ */
+function persistState(): void {
+  vscodeApi.setState({ layout: state.layout, filterKeys: state.filter.toArray() });
+}
 
 /**
  * Mounted card nodes keyed by their spec folder path.
@@ -65,24 +94,84 @@ function el(tag: string, className?: string, text?: string): HTMLElement {
   return node;
 }
 
+/** SVG namespace used to build the toolbar icon glyphs. */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Icon viewBox side length (a 16x16 grid, codicon convention). */
+const ICON_SIZE = 16;
+
+/** Path data for each representative toolbar glyph, drawn on a 16x16 grid. */
+const ICON_PATHS: Readonly<Record<string, string>> = {
+  // Three stacked rows, i.e. a list.
+  list: 'M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h12v2H2v-2z',
+  // Four cells, i.e. a grid.
+  grid: 'M2 2h5v5H2V2zm7 0h5v5H9V2zM2 9h5v5H2V9zm7 0h5v5H9V9z',
+  // A diagonal cross, i.e. a clear/close glyph.
+  close: 'M4 3L3 4l3.5 3.5L3 11l1 1 3.5-3.5L11 12l1-1-3.5-3.5L12 4l-1-1-3.5 3.5L4 3z',
+};
+
 /**
- * Render the aggregate statistics header.
+ * Build a static, decorative SVG icon for a known glyph name.
+ *
+ * The icon is assembled with `createElementNS`/`setAttribute` only (never
+ * `innerHTML`), uses `currentColor` so it inherits the button's theme color, and
+ * is marked `aria-hidden` because the hosting button already carries the label.
+ * @param glyph The glyph name (a key of {@link ICON_PATHS}).
+ * @returns The SVG element.
+ */
+function icon(glyph: string): SVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${ICON_SIZE} ${ICON_SIZE}`);
+  svg.setAttribute('width', String(ICON_SIZE));
+  svg.setAttribute('height', String(ICON_SIZE));
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.classList.add('icon');
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', ICON_PATHS[glyph] ?? '');
+  path.setAttribute('fill', 'currentColor');
+  svg.appendChild(path);
+  return svg;
+}
+
+/**
+ * Toggle a status filter key, persist the new set and re-render.
+ * @param key The filter key to toggle.
+ */
+function toggleStatusFilter(key: SpecFilterKey): void {
+  state.filter = state.filter.toggle(key);
+  persistState();
+  rerender();
+}
+
+/**
+ * Render one clickable statistic toggle as an accessible pressed-state button.
+ * @param toggle The stat toggle view (key, label, value, pressed).
+ * @returns The button element.
+ */
+function renderStatToggle(toggle: ISpecStatToggleView): HTMLElement {
+  const button = el('button', toggle.pressed ? 'stat pressed' : 'stat');
+  button.setAttribute('type', 'button');
+  button.setAttribute('aria-pressed', String(toggle.pressed));
+  button.setAttribute('aria-label', `Filter by ${toggle.label}`);
+  button.title = `Filter by ${toggle.label}`;
+  button.appendChild(el('span', 'stat-value', String(toggle.value)));
+  button.appendChild(el('span', 'stat-label', toggle.label));
+  button.addEventListener('click', () => toggleStatusFilter(toggle.key));
+  return button;
+}
+
+/**
+ * Render the aggregate statistics header as additive toggle filters.
  * @param stats The aggregate counts.
  * @returns The header element.
  */
 function renderStats(stats: ISpecStats): HTMLElement {
   const header = el('section', 'stats');
-  const entries: ReadonlyArray<readonly [string, number]> = [
-    ['Completed', stats.completed],
-    ['In progress', stats.inProgress],
-    ['Not started', stats.notStarted],
-    ['Malformed', stats.malformed],
-  ];
-  entries.forEach(([label, value]) => {
-    const card = el('div', 'stat');
-    card.appendChild(el('span', 'stat-value', String(value)));
-    card.appendChild(el('span', 'stat-label', label));
-    header.appendChild(card);
+  header.setAttribute('role', 'group');
+  header.setAttribute('aria-label', 'Filter specs by status');
+  statToggleView.build(stats, state.filter).forEach((toggle) => {
+    header.appendChild(renderStatToggle(toggle));
   });
   return header;
 }
@@ -183,15 +272,12 @@ function renderCard(card: ISpecCardView): HTMLElement {
 }
 
 /**
- * Filter cards by the current search query (case-insensitive name match).
+ * Filter cards by the active status toggles and the search query, composed by
+ * the pure {@link SpecCardFilter}.
  * @returns The filtered cards.
  */
 function filtered(): readonly ISpecCardView[] {
-  const query = state.query.trim().toLowerCase();
-  if (0 === query.length) {
-    return state.cards;
-  }
-  return state.cards.filter((card) => card.name.toLowerCase().includes(query));
+  return new SpecCardFilter(state.filter, state.query).apply(state.cards);
 }
 
 /**
@@ -248,15 +334,47 @@ function renderGroup(title: string, cards: readonly ISpecCardView[]): HTMLElemen
 let rerender: () => void = () => undefined;
 
 /**
- * Build the persistent toolbar (search box + layout toggle).
- *
- * This element is created once on the initial mount and then reused across
- * every subsequent render, so the live search input keeps its focus and caret
- * position even when a render arrives mid-typing (e.g. a spec file changed).
- * @returns The toolbar element.
+ * Switch the dashboard to a given layout, persisting it and informing the host.
+ * @param layout The layout to activate.
  */
-function renderToolbar(): HTMLElement {
-  const toolbar = el('div', 'toolbar');
+function selectLayout(layout: DashboardLayout): void {
+  if (layout === state.layout) {
+    return;
+  }
+  state.layout = layout;
+  persistState();
+  vscodeApi.postMessage({ type: 'setLayout', layout: state.layout });
+  rerender();
+}
+
+/**
+ * Render one icon layout toggle as an accessible pressed-state button.
+ * @param option The layout option (layout, codicon glyph, label).
+ * @returns The button element.
+ */
+function renderLayoutToggle(option: ISpecLayoutOptionView): HTMLElement {
+  const pressed = layoutToggleView.isPressed(option, state.layout);
+  const button = el('button', pressed ? 'toggle pressed' : 'toggle');
+  button.setAttribute('type', 'button');
+  button.setAttribute('data-layout', option.layout);
+  button.setAttribute('aria-pressed', String(pressed));
+  button.setAttribute('aria-label', option.label);
+  button.title = option.label;
+  button.appendChild(icon(option.glyph));
+  button.addEventListener('click', () => selectLayout(option.layout));
+  return button;
+}
+
+/**
+ * Build the search box together with its enlarged, accessible clear button.
+ *
+ * The clear button is a comfortably sized target (see the stylesheet): clicking
+ * anywhere in it clears the query and refocuses the input, so the v0.1.1 focus
+ * fix is preserved.
+ * @returns The search wrapper element.
+ */
+function renderSearch(): HTMLElement {
+  const wrapper = el('div', 'search-box');
   const search = document.createElement('input');
   search.type = 'search';
   search.placeholder = 'Search specs by name';
@@ -266,28 +384,58 @@ function renderToolbar(): HTMLElement {
     state.query = search.value;
     rerender();
   });
-  const toggle = el('button', 'toggle', 'list' === state.layout ? 'Grid view' : 'List view');
-  toggle.addEventListener('click', () => {
-    state.layout = 'list' === state.layout ? 'grid' : 'list';
-    vscodeApi.setState({ layout: state.layout });
-    vscodeApi.postMessage({ type: 'setLayout', layout: state.layout });
+  const clear = el('button', 'search-clear');
+  clear.setAttribute('type', 'button');
+  clear.setAttribute('aria-label', 'Clear search');
+  clear.title = 'Clear search';
+  clear.appendChild(icon('close'));
+  clear.addEventListener('click', () => {
+    state.query = '';
+    search.value = '';
+    search.focus();
     rerender();
   });
-  toolbar.appendChild(search);
-  toolbar.appendChild(toggle);
+  wrapper.appendChild(search);
+  wrapper.appendChild(clear);
+  return wrapper;
+}
+
+/**
+ * Build the persistent toolbar (search box + icon layout toggles).
+ *
+ * This element is created once on the initial mount and then reused across
+ * every subsequent render, so the live search input keeps its focus and caret
+ * position even when a render arrives mid-typing (e.g. a spec file changed).
+ * @returns The toolbar element.
+ */
+function renderToolbar(): HTMLElement {
+  const toolbar = el('div', 'toolbar');
+  toolbar.appendChild(renderSearch());
+  const toggles = el('div', 'layout-toggles');
+  toggles.setAttribute('role', 'group');
+  toggles.setAttribute('aria-label', 'Dashboard layout');
+  layoutToggleView.listOptions().forEach((option) => {
+    toggles.appendChild(renderLayoutToggle(option));
+  });
+  toolbar.appendChild(toggles);
   return toolbar;
 }
 
 /**
- * Update the label of the persistent layout toggle to match the current layout.
+ * Refresh the pressed state of the persistent layout toggles to match the
+ * current layout, without rebuilding the toolbar (which hosts the search input).
  * @param app The app root hosting the toolbar.
  */
 function syncToggleLabel(app: HTMLElement): void {
-  const toggle = app.querySelector('.toolbar .toggle');
-  if (null === toggle) {
-    return;
-  }
-  toggle.textContent = 'list' === state.layout ? 'Grid view' : 'List view';
+  const toggles = app.querySelectorAll('.toolbar .layout-toggles .toggle');
+  toggles.forEach((node) => {
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+    const pressed = node.getAttribute('data-layout') === state.layout;
+    node.setAttribute('aria-pressed', String(pressed));
+    node.classList.toggle('pressed', pressed);
+  });
 }
 
 /**
@@ -426,7 +574,7 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
   }
   if ('toggleLayout' === message.type) {
     state.layout = 'list' === state.layout ? 'grid' : 'list';
-    vscodeApi.setState({ layout: state.layout });
+    persistState();
     render();
   }
 });
