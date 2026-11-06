@@ -1,7 +1,7 @@
 {
   "name": "kirospectracker",
   "displayName": "Kiro Spec Tracker",
-  "description": "TODO",
+  "description": "Track the progress of your Kiro specs across the IDE: explorer badges, a dashboard, and per-spec status.",
   "version": "0.1.0",
   "publisher": "ducks-project",
   "license": "MIT",
@@ -11,10 +11,16 @@
     "vscode": "^1.85.0"
   },
   "categories": [
-    "TODO"
+    "Visualization",
+    "Other"
   ],
   "keywords": [
-    "TODO"
+    "kiro",
+    "spec",
+    "spec-driven",
+    "tasks",
+    "progress",
+    "dashboard"
   ],
   "main": "./dist/node/extension.js",
   "browser": "./dist/browser/extension.js",

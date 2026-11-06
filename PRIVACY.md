@@ -17,5 +17,6 @@ The extension makes no network request. It does not contact any remote server.
 
 ## Processing
 
-All processing (reading the document or the selection, computing and applying the
-replacements) happens locally in the IDE. No information leaves your machine.
+All processing (discovering specs under `.kiro/specs/`, reading their Markdown files,
+parsing task checkboxes, and computing status and progress) happens locally in the IDE.
+No information leaves your machine.
