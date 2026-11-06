@@ -30,6 +30,11 @@ coverage/
 # Whether to version them (and which ones) is a decision left to the maintainer later.
 .kiro
 
+# Exception: integration-test fixtures ship their own throwaway .kiro/specs trees,
+# which MUST be versioned so the @vscode/test-electron suite has them under CI.
+!test/fixtures/**/.kiro
+!test/fixtures/**/.kiro/**
+
 # Agent task artifacts (scaffolding plan, FEAT descriptors, verdicts): never versioned.
 .agents
 

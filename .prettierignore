@@ -6,3 +6,7 @@ coverage/
 .vscode-test/
 package-lock.json
 CHANGELOG.md
+
+# Integration-test spec fixtures mimic real Kiro tasks.md files verbatim; prettier
+# would escape the `]*` optional marker (to `]\*`) and defeat the parser fixtures.
+test/fixtures/**

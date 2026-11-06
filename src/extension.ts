@@ -30,6 +30,21 @@ import {
 /** Command id opening a spec document, invoked from the dashboard webview. */
 const OPEN_DOCUMENT_COMMAND_ID = 'kirospectracker.openDocument';
 
+/**
+ * Public API the extension returns from {@link activate}.
+ *
+ * It is intentionally minimal and exists for the integration harness to observe
+ * the wired providers and repository without reaching into private state.
+ */
+export interface IExtensionApi {
+  /** The spec repository (discovery, caching, change events). */
+  readonly repository: SpecRepository;
+  /** The explorer file-decoration provider. */
+  readonly decorations: SpecFileDecorationProvider;
+  /** The dashboard webview provider. */
+  readonly dashboard: SpecDashboardViewProvider;
+}
+
 /** Disposable collaborators registered at activation. */
 interface IWiring {
   readonly repository: SpecRepository;
@@ -204,10 +219,15 @@ function registerDisposables(context: vscode.ExtensionContext, wiring: IWiring):
  * driven by the targeted `onView:`/`onCommand:` events declared in `package.json`.
  * @param context The extension context owning the disposables.
  */
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(context: vscode.ExtensionContext): IExtensionApi {
   const wiring = buildWiring(context);
   registerDisposables(context, wiring);
   wiring.repository.refresh().then(undefined, (error) => reportError(wiring.gateway, error));
+  return {
+    repository: wiring.repository,
+    decorations: wiring.decorations,
+    dashboard: wiring.dashboard,
+  };
 }
 
 /**
