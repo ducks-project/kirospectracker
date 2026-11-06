@@ -4,6 +4,10 @@ import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
 import type { ISpecRawInput, SpecSnapshotFactory } from '../core/SpecSnapshotFactory';
 import type { ISpecChangeNotifier } from './ports/ISpecChangeNotifier';
 import type { ISpecFileSystem } from './ports/ISpecFileSystem';
+import { mapWithLimit } from '../core/BoundedMap';
+
+/** Default number of spec reads kept in flight during a cold scan. */
+const DEFAULT_READ_CONCURRENCY = 12;
 
 /** Directory segment holding Kiro specs inside a workspace folder. */
 const SPECS_SEGMENT_KIRO = '.kiro';
@@ -50,20 +54,25 @@ export class SpecRepository {
 
   private readonly disposeNotifier: () => void;
 
+  private readonly cap: number;
+
   /**
    * Build a repository over the file-system and change-notifier ports.
    * @param fileSystem The `vscode`-free file-system port.
    * @param factory The pure snapshot factory.
    * @param notifier The change notifier firing on spec file changes.
+   * @param cap Maximum number of spec reads kept in flight during discovery.
    */
   public constructor(
     fileSystem: ISpecFileSystem,
     factory: SpecSnapshotFactory,
     notifier: ISpecChangeNotifier,
+    cap: number = DEFAULT_READ_CONCURRENCY,
   ) {
     this.fileSystem = fileSystem;
     this.factory = factory;
     this.notifier = notifier;
+    this.cap = cap;
     this.disposeNotifier = this.notifier.onDidChange((changedPath) => {
       this.handleChange(changedPath).catch(() => undefined);
     });
@@ -123,10 +132,8 @@ export class SpecRepository {
     const specsRoot = this.fileSystem.join(workspacePath, SPECS_SEGMENT_KIRO, SPECS_SEGMENT_SPECS);
     const names = await this.fileSystem.listDirectories(specsRoot);
     const specNames = names.filter((name) => HISTORY_DIRECTORY !== name);
-    return Promise.all(
-      specNames.map((name) =>
-        this.buildSnapshot(workspacePath, this.fileSystem.join(specsRoot, name), name),
-      ),
+    return mapWithLimit(specNames, this.cap, (name) =>
+      this.buildSnapshot(workspacePath, this.fileSystem.join(specsRoot, name), name),
     );
   }
 
