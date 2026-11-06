@@ -127,6 +127,31 @@ describe('SpecRepository', () => {
     expect(auth?.status).to.equal(SpecStatus.InProgress);
   });
 
+  it('notifies a view that resolved against an empty cache once discovery completes', async () => {
+    // Reproduces the real activation ordering: a view resolves and renders
+    // from the still-empty cache BEFORE the initial refresh() completes, then
+    // the completed refresh must notify so the view re-renders the discovered
+    // specs. Mirrors SpecDashboardViewProvider.resolveWebviewView, which reads
+    // getSpecs() on resolve and re-reads it on every onDidChangeSpecs.
+    const fs = seededFileSystem();
+    const repository = new SpecRepository(fs, makeFactory(), fs);
+    let rendered: readonly string[] = [];
+    const render = (): void => {
+      rendered = repository
+        .getSpecs()
+        .map((spec) => spec.name)
+        .sort();
+    };
+    repository.onDidChangeSpecs(render);
+    // The view resolves first and renders the empty cache (discovery pending).
+    render();
+    expect(rendered).to.deep.equal([]);
+    // Discovery completes (activation fires refresh without awaiting it).
+    await repository.refresh();
+    await flush();
+    expect(rendered).to.deep.equal(['alpha', 'beta']);
+  });
+
   it('releases its subscription on dispose', async () => {
     const fs = seededFileSystem();
     const repository = new SpecRepository(fs, makeFactory(), fs);

@@ -82,6 +82,9 @@ export class SpecRepository {
 
   /**
    * Discover every spec across all workspace folders and fill the cache.
+   *
+   * It notifies listeners once the cache is (re)populated, so any view that
+   * resolved before discovery completed re-renders with the discovered specs.
    * @returns The discovered snapshots, one per spec folder.
    */
   public async refresh(): Promise<readonly ISpecSnapshot[]> {
@@ -89,6 +92,7 @@ export class SpecRepository {
     const folders = this.fileSystem.workspaceFolders();
     const perFolder = await Promise.all(folders.map((folder) => this.discoverWorkspace(folder)));
     perFolder.flat().forEach((snapshot) => this.cache.set(snapshot.folderPath, snapshot));
+    this.emitChange();
     return this.getSpecs();
   }
 
@@ -160,8 +164,9 @@ export class SpecRepository {
   private async handleChange(changedPath: string): Promise<void> {
     const affected = this.findAffectedSpec(changedPath);
     if (undefined === affected) {
+      // A full re-discovery emits its own change event once the cache is
+      // repopulated, so no second notification is needed here.
       await this.refresh();
-      this.emitChange();
       return;
     }
     const snapshot = await this.buildSnapshot(
