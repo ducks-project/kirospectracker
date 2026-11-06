@@ -9,6 +9,12 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
+## v0.1.1 — Dashboard search focus fix [Planned]
+
+- [ ] Fix the dashboard search box losing focus after each keystroke, so a query can be
+      typed without interruption (the webview rebuilds the DOM on every render and drops
+      the input focus).
+
 ## v0.2.0 — Hardening and dependency updates [Planned]
 
 - [ ] Update the vulnerable dev dependencies (esbuild, `@vscode/vsce`, `ovsx`/glob,
@@ -16,12 +22,6 @@ of truth for what has been released. Items use GitHub task lists: `- [ ]` (not d
       full quality gate. These are build/CI tools only; they are not shipped in the VSIX.
 - [ ] Add batching and a strategy for workspaces with a very large number of specs,
       validated against the parsing benchmark budget.
-
-## v0.2.1 — Dashboard search focus fix [Planned]
-
-- [ ] Fix the dashboard search box losing focus after each keystroke, so a query can be
-      typed without interruption (the webview rebuilds the DOM on every render and drops
-      the input focus).
 
 ## v0.3.0 — Dashboard interactions [Planned]
 
