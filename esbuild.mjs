@@ -101,6 +101,36 @@ const webTestOptions = {
 };
 
 /**
+ * Dashboard webview bundle options. The webview script is a browser-only module
+ * loaded by the Webview (not the extension host), so it is a browser-platform
+ * IIFE with no `vscode` import. Its stylesheet is bundled to `media/dashboard.css`
+ * so the CSP can restrict resources to the webview's local `cspSource`.
+ * @type {import('esbuild').BuildOptions}
+ */
+const webviewOptions = {
+  entryPoints: ['src/webview/main.ts'],
+  bundle: true,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2021',
+  outfile: 'media/dashboard.js',
+  sourcemap: !isProd,
+  minify: isProd,
+  loader: { '.css': 'css' },
+};
+
+/**
+ * Stylesheet bundle options emitting `media/dashboard.css` from the webview CSS.
+ * @type {import('esbuild').BuildOptions}
+ */
+const webviewStyleOptions = {
+  entryPoints: ['src/webview/styles.css'],
+  bundle: true,
+  outfile: 'media/dashboard.css',
+  minify: isProd,
+};
+
+/**
  * Build the browser target and run the secondary post-build scan over the
  * emitted bundle. The `nodeBuiltinGuard` plugin is the primary guard (it rejects
  * Node built-ins at resolution time); the scan is a cheap secondary assertion on
@@ -111,6 +141,14 @@ const webTestOptions = {
 async function buildBrowserTarget() {
   await esbuild.build(browserOptions);
   await assertBrowserBundleHasNoNodeBuiltins(browserOptions.outfile);
+}
+
+/**
+ * Build the dashboard webview script and stylesheet bundles.
+ * @returns {Promise<void>} Resolves once both webview assets are emitted.
+ */
+async function buildWebviewTarget() {
+  await Promise.all([esbuild.build(webviewOptions), esbuild.build(webviewStyleOptions)]);
 }
 
 if (isWatch) {
@@ -124,6 +162,7 @@ if (isWatch) {
   // Explicit single browser build.
   await buildBrowserTarget();
 } else {
-  // Default/dev/prod: build BOTH declared entry points so the package is complete.
-  await Promise.all([esbuild.build(nodeOptions), buildBrowserTarget()]);
+  // Default/dev/prod: build BOTH declared entry points plus the webview assets
+  // so the package is complete.
+  await Promise.all([esbuild.build(nodeOptions), buildBrowserTarget(), buildWebviewTarget()]);
 }

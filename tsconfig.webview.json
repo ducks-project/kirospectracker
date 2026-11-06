@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2021", "DOM"],
+    "types": []
+  },
+  "include": ["src/webview/**/*.ts", "src/core/model/**/*.ts"],
+  "exclude": ["node_modules", "dist", "out"]
+}

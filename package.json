@@ -26,9 +26,31 @@
     "url": "https://github.com/ducks-project/kirospectracker/issues"
   },
   "homepage": "https://github.com/ducks-project/kirospectracker#readme",
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:kirospectracker.dashboard"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kirospectracker",
+          "title": "Kiro Spec Tracker",
+          "icon": "media/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "kirospectracker": [
+        {
+          "id": "kirospectracker.dashboard",
+          "name": "Specs Dashboard",
+          "type": "webview"
+        }
+      ]
+    }
+  },
   "scripts": {
-    "compile": "tsc --noEmit",
+    "compile": "tsc --noEmit && tsc --noEmit -p tsconfig.webview.json",
     "build": "node esbuild.mjs",
     "build:dev": "node esbuild.mjs --dev",
     "build:prod": "node esbuild.mjs --prod",

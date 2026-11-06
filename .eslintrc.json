@@ -53,6 +53,16 @@
       }
     },
     {
+      "files": ["src/webview/**/*.ts"],
+      "parserOptions": {
+        "project": "./tsconfig.webview.json"
+      },
+      "env": {
+        "browser": true,
+        "node": false
+      }
+    },
+    {
       "files": ["*.mjs"],
       "parserOptions": {
         "project": null

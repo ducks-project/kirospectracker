@@ -6,6 +6,11 @@ dist/
 out/
 *.tsbuildinfo
 
+# Bundled webview assets emitted into media/ by esbuild (icon.png stays tracked)
+media/dashboard.js
+media/dashboard.css
+media/*.map
+
 # Test coverage
 coverage/
 
