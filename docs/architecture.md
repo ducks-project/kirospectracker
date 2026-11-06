@@ -8,7 +8,10 @@ boundary with `vscode`.
 
 - Core (`core/`): pure logic. Never imports `vscode`. Contains the `tasks.md` parser, the
   tolerant meta reader, the status resolver, the progress calculator, the stats and
-  decoration mappers, the HTML escaper and nonce factory, and the immutable value objects.
+  decoration mappers, the dashboard view projectors (card view, stat toggles, layout
+  toggles), the additive status-filter state machine and card-visibility composer, the
+  tree-item context-value builder, the HTML escaper and nonce factory, and the immutable
+  value objects.
 - Ports (`core/ports/` and `adapters/ports/`): interfaces describing what each side needs
   ([IDocumentPolicy](../src/core/ports/IDocumentPolicy.ts),
   [IScheduler](../src/core/ports/IScheduler.ts),
@@ -102,6 +105,33 @@ or a `fullRefresh` the provider sends a `render` message carrying every card; on
 webview keeps a `Map` of mounted card nodes keyed by `folderPath` and replaces only the
 changed node, so a single edit no longer reprocesses or re-renders all N specs.
 
+## Dashboard interactions (filtering, toggles, tree menu)
+
+The dashboard's status filter is a pure, client-side view concern layered over the card
+view-models the webview has already received; it never triggers an extension-host round-trip
+or a full re-render. The clickable statistics are additive toggle filters backed by the
+immutable [SpecStatusFilter](../src/core/status/SpecStatusFilter.ts) state machine (toggle a
+key to add it, toggle again to remove it; an empty set shows everything). Card visibility
+composes that status filter with the free-text search through
+[SpecCardFilter](../src/core/status/SpecCardFilter.ts) (a logical AND). The header toggles,
+their pressed state and the list/grid icon toggles are projected by the pure
+[SpecStatToggleView](../src/core/status/SpecStatToggleView.ts) and
+[SpecLayoutToggleView](../src/core/status/SpecLayoutToggleView.ts); the webview only renders
+the decision and persists the active filter keys and layout in its own `setState`. Keeping
+the state machine and the mappings in `core/` makes the least-covered DOM/CSS layer thin and
+the logic unit- and property-testable without a VS Code host.
+
+The "Specs by Status" tree view contributes a declarative `view/item/context` menu (open
+requirements/design/tasks/notes and run tasks). Each spec tree item carries a `contextValue`
+built by the pure [buildSpecTreeContextValue](../src/core/status/SpecTreeContextValue.ts):
+a `spec` base token, one `doc-<kind>` token per present document, and a `runnable` token for
+a non-malformed spec. The package.json `when` clauses match these tokens with regular
+expressions, so an action whose document is absent is hidden and "Run tasks" is hidden for a
+malformed spec. The menu commands are thin, tree-item-aware wrappers registered in
+`extension.ts`; they resolve the targeted spec from the node argument and reuse the existing
+`OpenDocumentCommand` and `RunTasksCommand` (the latter already refuses a malformed spec), so
+no behaviour is duplicated.
+
 ## Run-tasks flow (MVP)
 
 ```mermaid
@@ -154,6 +184,10 @@ only consumer of the full task tree, which keeps the retained dashboard data lea
   order-preserving worker-pool used by `SpecRepository` discovery to cap the number of
   in-flight spec reads, smoothing cold-scan tail latency and file-handle pressure without
   changing the result.
+- Immutable state machine: [SpecStatusFilter](../src/core/status/SpecStatusFilter.ts) models
+  the additive status-filter selection as an immutable value object (every toggle returns a
+  new instance), composed with the search by [SpecCardFilter](../src/core/status/SpecCardFilter.ts).
+  The pure decision is unit- and property-tested, and the webview DOM only applies it.
 
 ## Security boundary
 

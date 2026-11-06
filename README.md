@@ -31,11 +31,13 @@ or run a spec. It is read-only, fully local, and ships no telemetry and no netwo
   required and optional progress.
 - **Dashboard view** — a dedicated activity-bar webview listing every spec with its status,
   a required-progress bar and percentage, the optional progress shown separately, a search
-  box, aggregate statistics, and list or grid layouts. Completed specs are set apart but
-  stay visible. Each spec links to its `requirements.md`, `design.md`, `tasks.md` and
-  `notes.md` when present.
+  box, and icon-based list or grid layouts. The aggregate statistics are additive toggle
+  filters: click one or more to narrow the list by status, and they compose with the search
+  box. Completed specs are set apart but stay visible. Each spec links to its
+  `requirements.md`, `design.md`, `tasks.md` and `notes.md` when present.
 - **Specs-by-status tree** — a lightweight activity-bar tree grouping specs by status for
-  quick navigation.
+  quick navigation, with a right-click context menu to open a spec's documents or run its
+  tasks.
 - **Run tasks (honest MVP)** — from the dashboard, the explorer context menu on a spec
   folder, or the Command Palette, open a spec's `tasks.md` and, only with your explicit
   consent, copy a ready-to-paste execution prompt to the clipboard.

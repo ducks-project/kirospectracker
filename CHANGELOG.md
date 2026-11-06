@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
+### Added
+
+- Make the dashboard statistics clickable as additive, multi-select toggle filters: each
+  stat (completed, in progress, not started, malformed) is now an accessible button with an
+  `aria-pressed` state. Clicking one narrows the list to that status, clicking another adds
+  its specs, and clicking an active one removes it; with none active every spec is shown. The
+  status filter composes with the existing name search (both apply together) and the active
+  set is persisted in the webview state, so it survives a re-render. The decision lives in a
+  pure, `vscode`-free filter state machine (`SpecStatusFilter` plus `SpecCardFilter`) that is
+  unit- and property-tested; the webview only applies it and performs no extension-host
+  round-trip to filter.
+- Add a right-click context menu on a spec in the "Specs by Status" tree view to open its
+  requirements, design, tasks and notes, and to run its tasks. Entries whose document is
+  absent for that spec are hidden, and "Run tasks" is hidden for a malformed spec, driven by
+  a tree-item context value computed by a pure helper.
+
+### Changed
+
+- Replace the list/grid view text toggles with representative icons (list rows and grid
+  cells). The toggles remain accessible buttons with an `aria-label`, a title tooltip, and an
+  `aria-pressed` state reflecting the active layout; the existing toggle behaviour is
+  unchanged.
+
+### Fixed
+
+- Enlarge the hit area of the search box clear (×) button. The clickable target was too small
+  (it seemed to require hitting a stroke of the cross); the button is now a comfortable target
+  (at least 24x24 CSS px with generous padding), keyboard-focusable with a "Clear search"
+  label, and clicking anywhere in it clears the query and refocuses the input, preserving the
+  v0.1.1 focus behaviour.
+
 ## [0.3.0] - 2026-11-06
 
 ### Changed
@@ -75,7 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ducks-project/kirospectracker/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ducks-project/kirospectracker/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ducks-project/kirospectracker/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/ducks-project/kirospectracker/compare/v0.1.0...v0.1.1
