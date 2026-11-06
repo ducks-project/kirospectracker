@@ -17,6 +17,9 @@ of truth for what has been released. Items use GitHub task lists: `- [ ]` (not d
 - [ ] Add a right-click context menu on a spec in the "Specs by Status" view to open its
       requirements, design, tasks and notes, and to run its tasks.
 - [ ] Replace the list/grid view text toggles with representative icons.
+- [ ] Enlarge the hit area of the search box clear (×) button: the clickable target is
+      currently too small (it seems to require hitting a stroke of the cross), so clearing
+      the query is hard to trigger.
 
 ## v1.0.0 — First stable release [Planned]
 
