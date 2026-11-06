@@ -16,7 +16,7 @@ const TASK_LINE =
   /^(?<indent>[ \t]*)-\s+\[(?<mark>[ xX])\](?<optional>\*?)\s*(?<id>\d+(?:\.\d+)*)?\.?\s*(?<title>.*)$/;
 
 /** Match a `_Requirements: 1.1, 2.3_` metadata line, capturing the list body. */
-const REQUIREMENTS_LINE = /^\s*_Requirements:\s*(?<body>.*?)_\s*$/i;
+const REQUIREMENTS_LINE = /^\s*(?:-\s+)?_Requirements:\s*(?<body>.*?)_\s*$/i;
 
 /** Tab width used to normalise indentation into a comparable column count. */
 const TAB_WIDTH = 2;
