@@ -45,9 +45,6 @@ or run a spec. It is read-only, fully local, and ships no telemetry and no netwo
 
 ## Screenshots
 
-> The images below are placeholders until the first real captures are added. See
-> [media/screenshots/README.md](media/screenshots/README.md) for the capture guide.
-
 The activity-bar dashboard with per-spec status, progress bars and statistics:
 
 ![Kiro Spec Tracker dashboard showing specs grouped by status with required and optional progress bars](media/screenshots/dashboard.png)
