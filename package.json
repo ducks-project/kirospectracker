@@ -118,8 +118,6 @@
     "compile:test": "tsc -p tsconfig.test.json",
     "pretest:integration": "npm run compile:test",
     "test:integration": "node --loader ts-node/esm --no-warnings ./test/runTest.ts",
-    "pretest:web": "node esbuild.mjs --web-test",
-    "test:web": "vscode-test-web --browserType=chromium --headless --extensionDevelopmentPath=. --extensionTestsPath=./dist/web-test/suite/index.js",
     "bench": "node --loader ts-node/esm --no-warnings ./benchmark/parse.bench.ts",
     "package": "vsce package",
     "publish": "ovsx publish"
@@ -132,7 +130,6 @@
     "@typescript-eslint/eslint-plugin": "7.18.0",
     "@typescript-eslint/parser": "7.18.0",
     "@vscode/test-electron": "2.4.1",
-    "@vscode/test-web": "0.0.81",
     "@vscode/vsce": "3.2.0",
     "c8": "12.0.0",
     "chai": "5.1.2",

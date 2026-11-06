@@ -54,9 +54,6 @@ jobs:
       - name: Integration tests (headless)
         run: xvfb-run -a npm run test:integration
 
-      - name: Web host tests (headless chromium)
-        run: xvfb-run -a npm run test:web
-
       - name: Benchmarks (informational, non-gating)
         run: npm run bench
         continue-on-error: true

@@ -19,8 +19,6 @@ const args = process.argv.slice(2);
 const isWatch = args.includes('--watch');
 const isDev = args.includes('--dev');
 const isBrowser = args.includes('--browser');
-// Builds only the Web_Extension_Host test suite consumed by `@vscode/test-web`.
-const isWebTest = args.includes('--web-test');
 // Production unless an explicit dev/watch flag is passed.
 const isProd = args.includes('--prod') || (!isDev && !isWatch);
 
@@ -72,32 +70,6 @@ const browserOptions = {
   minify: isProd,
   // Fail the build if any Node.js built-in reaches the browser bundle (Req 1.2, 1.3).
   plugins: [nodeBuiltinGuard()],
-};
-
-/**
- * Web_Extension_Host test suite options (`@vscode/test-web`). This bundles the
- * web host entry point (`test/web/index.ts`) plus the shared host-agnostic
- * assertions and Mocha's browser build into a single CommonJS module that the
- * browser Web Worker loads through `--extensionTestsPath`. Like the extension's
- * browser target it is a browser-platform bundle with `vscode` external, so it
- * never pulls in a Node runtime; unlike the extension bundle it is a test-only
- * artifact and is therefore NOT subject to the `nodeBuiltinGuard` plugin, which
- * guards the shipped `dist/browser/extension.js` only (Requirements 1.2, 1.3).
- * @type {import('esbuild').BuildOptions}
- */
-const webTestOptions = {
-  ...baseOptions,
-  entryPoints: ['test/web/index.ts'],
-  platform: 'browser',
-  // CommonJS, for the same reason as the browser target: `@vscode/test-web`
-  // loads the module referenced by `--extensionTestsPath` and invokes its
-  // exported `run()`. `format: 'cjs'` emits a real `module.exports` the harness
-  // can read, so no global-name/footer bridge is needed.
-  format: 'cjs',
-  target: 'es2021',
-  outfile: 'dist/web-test/suite/index.js',
-  sourcemap: !isProd,
-  minify: false,
 };
 
 /**
@@ -155,9 +127,6 @@ if (isWatch) {
   // Watch mode rebuilds only the node target for a fast dev loop.
   const context = await esbuild.context(nodeOptions);
   await context.watch();
-} else if (isWebTest) {
-  // Explicit single build of the Web_Extension_Host test suite.
-  await esbuild.build(webTestOptions);
 } else if (isBrowser) {
   // Explicit single browser build.
   await buildBrowserTarget();

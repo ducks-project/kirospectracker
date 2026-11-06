@@ -3,6 +3,9 @@
 
 # Editor, CI, agent and history metadata
 coverage/**
+
+# Screenshots are for the GitHub/Open VSX README, not needed inside the installed VSIX
+media/screenshots/**
 .vscode/**
 .vscode-test/**
 .github/**
