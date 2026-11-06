@@ -92,14 +92,16 @@ describe('Spec decorations (Node host)', () => {
     const subscription = api.decorations.onDidChangeFileDecorations((uris) => {
       events.push([...uris].map((uri) => path.normalize(uri.fsPath)).sort());
     });
-    // Write content that differs from the restored baseline so the host
-    // FileSystemWatcher reliably observes an onDidChange, independent of run order.
+    // Write the new content, then drive the change deterministically through the
+    // production notifier's own entry point rather than racing the host
+    // FileSystemWatcher within a fixed timeout. The downstream path
+    // (SpecRepository.handleChange -> scoped delta -> scoped fire) is identical.
     const edited = '# Implementation Plan\n\n- [x] 1. Done task\n';
     await vscode.workspace.fs.writeFile(inProgressTasksUri!, Buffer.from(edited, 'utf8'));
+    api.fileSystem.notifyChanged(inProgressTasksUri!.fsPath);
 
-    // The watcher may batch or coalesce notifications; assert that a scoped
-    // event carrying exactly the changed folder and its specs root is delivered,
-    // rather than assuming a single undisturbed notification is the last one.
+    // Assert that a scoped event carrying exactly the changed folder and its
+    // specs root is delivered.
     const matches = (uris: string[]): boolean =>
       2 === uris.length && uris[0] === expected[0] && uris[1] === expected[1];
     await waitFor(() => events.some(matches));

@@ -46,6 +46,14 @@ export interface IExtensionApi {
   readonly decorations: SpecFileDecorationProvider;
   /** The dashboard webview provider. */
   readonly dashboard: SpecDashboardViewProvider;
+  /**
+   * The host file-system wrapper that owns the specs `FileSystemWatcher`.
+   *
+   * Exposed so the integration harness can drive the scoped-change path
+   * deterministically through the exact entry point the production watcher
+   * uses, without racing a host watcher on a real write.
+   */
+  readonly fileSystem: VscodeSpecFileSystem;
 }
 
 /** Disposable collaborators registered at activation. */
@@ -261,6 +269,7 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
     repository: wiring.repository,
     decorations: wiring.decorations,
     dashboard: wiring.dashboard,
+    fileSystem: wiring.fileSystem,
   };
 }
 

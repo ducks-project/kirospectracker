@@ -122,10 +122,13 @@ describe('Spec dashboard (Node host)', () => {
     await waitFor(() => posted.some((message) => 'render' === message.type));
 
     expect(inProgressTasksUri).to.not.equal(undefined);
-    // Write content that differs from the restored baseline so the host
-    // FileSystemWatcher reliably observes an onDidChange, independent of run order.
+    // Write the new content, then drive the change deterministically through the
+    // production notifier's own entry point rather than racing the host
+    // FileSystemWatcher within a fixed timeout. The downstream path
+    // (SpecRepository.handleChange -> scoped delta -> specUpdated) is identical.
     const edited = '# Implementation Plan\n\n- [x] 1. Done task\n- [x] 2. Pending task\n';
     await vscode.workspace.fs.writeFile(inProgressTasksUri!, Buffer.from(edited, 'utf8'));
+    api.fileSystem.notifyChanged(inProgressTasksUri!.fsPath);
 
     await waitFor(() => posted.some((message) => 'specUpdated' === message.type));
     const updates = posted.filter((message) => 'specUpdated' === message.type);

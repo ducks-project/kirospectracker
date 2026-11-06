@@ -95,6 +95,19 @@ export class VscodeSpecFileSystem implements ISpecFileSystem, ISpecChangeNotifie
   }
 
   /**
+   * Fire a change for a path through the same emitter the watcher feeds.
+   *
+   * This is the deterministic test seam: it drives the exact entry point the
+   * production `FileSystemWatcher` callback uses, so the integration harness can
+   * assert the scoped-delta path without racing a host watcher within a fixed
+   * timeout. Production code never calls it; only the wiring exposes it.
+   * @param changedPath Absolute path of the changed file.
+   */
+  public notifyChanged(changedPath: string): void {
+    this.emitter.fire(changedPath);
+  }
+
+  /**
    * Register a listener for spec file changes.
    * @param listener Callback receiving the changed file path.
    * @returns A disposer removing the listener.
