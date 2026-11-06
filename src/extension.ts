@@ -8,6 +8,7 @@ import { NonceFactory } from './core/NonceFactory';
 import { RunPromptBuilder } from './core/RunPromptBuilder';
 import { SpecSnapshotFactory } from './core/SpecSnapshotFactory';
 import { SpecProgressCalculator } from './core/status/SpecProgressCalculator';
+import { SpecCardViewMapper } from './core/status/SpecCardViewMapper';
 import { SpecStatsCalculator } from './core/status/SpecStatsCalculator';
 import { SpecStatusResolver } from './core/status/SpecStatusResolver';
 import { SpecDecorationMapper } from './core/status/SpecDecorationMapper';
@@ -152,6 +153,33 @@ function createDashboardActions(
 }
 
 /**
+ * Construct the dashboard webview provider with its collaborators.
+ * @param context The extension context supplying the base URI.
+ * @param repository The spec repository supplying snapshots.
+ * @param stats The pure aggregate-stats calculator.
+ * @param openDocument The open-document command.
+ * @param runTasks The run-tasks command.
+ * @returns The wired dashboard provider.
+ */
+function createDashboard(
+  context: vscode.ExtensionContext,
+  repository: SpecRepository,
+  stats: SpecStatsCalculator,
+  openDocument: OpenDocumentCommand,
+  runTasks: RunTasksCommand,
+): SpecDashboardViewProvider {
+  return new SpecDashboardViewProvider(
+    context.extensionUri,
+    repository,
+    stats,
+    new SpecCardViewMapper(),
+    new DashboardHtmlBuilder(new HtmlEscaper()),
+    new NonceFactory(new WebCryptoRandomSource()),
+    createDashboardActions(openDocument, runTasks),
+  );
+}
+
+/**
  * Construct every collaborator for the given extension context.
  * @param context The extension context supplying the base URI.
  * @returns The fully wired collaborators.
@@ -163,14 +191,7 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   const stats = new SpecStatsCalculator();
   const openDocument = new OpenDocumentCommand(repository, gateway);
   const runTasks = new RunTasksCommand(repository, gateway, new RunPromptBuilder());
-  const dashboard = new SpecDashboardViewProvider(
-    context.extensionUri,
-    repository,
-    stats,
-    new DashboardHtmlBuilder(new HtmlEscaper()),
-    new NonceFactory(new WebCryptoRandomSource()),
-    createDashboardActions(openDocument, runTasks),
-  );
+  const dashboard = createDashboard(context, repository, stats, openDocument, runTasks);
   const decorations = new SpecFileDecorationProvider(repository, new SpecDecorationMapper(), stats);
   const tree = new SpecTreeDataProvider(repository, new SpecGrouper());
   return {

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
+import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
 import type { SpecDecorationColor } from '../core/status/ISpecDecoration';
 import type { SpecDecorationMapper } from '../core/status/SpecDecorationMapper';
 import type { SpecStatsCalculator } from '../core/status/SpecStatsCalculator';
@@ -60,7 +61,9 @@ export class SpecFileDecorationProvider implements vscode.FileDecorationProvider
     this.repository = repository;
     this.mapper = mapper;
     this.stats = stats;
-    this.disposeRepositoryListener = this.repository.onDidChangeSpecs(() => this.fireRefresh());
+    this.disposeRepositoryListener = this.repository.onDidChangeSpecs((delta) =>
+      this.handleDelta(delta),
+    );
   }
 
   /**
@@ -112,6 +115,27 @@ export class SpecFileDecorationProvider implements vscode.FileDecorationProvider
       `Kiro specs — ${counts.completed} completed, ${counts.inProgress} in progress, ` +
       `${counts.notStarted} not started, ${counts.malformed} malformed`;
     return { badge: SUMMARY_BADGE, tooltip };
+  }
+
+  /**
+   * React to a repository change: a full fan-out on refresh, a scoped fire for
+   * only the changed spec folder and its specs root on a scoped change.
+   * @param delta The fine-grained change describing what changed.
+   */
+  private handleDelta(delta: SpecChangeDelta): void {
+    if ('fullRefresh' === delta.type) {
+      this.fireRefresh();
+      return;
+    }
+    const snapshot = this.repository
+      .getSpecs()
+      .find((candidate) => candidate.folderPath === delta.folderPath);
+    if (undefined === snapshot) {
+      this.fireRefresh();
+      return;
+    }
+    const root = SpecFileDecorationProvider.rootUri(snapshot);
+    this.emitter.fire([vscode.Uri.file(delta.folderPath), vscode.Uri.file(root)]);
   }
 
   /**

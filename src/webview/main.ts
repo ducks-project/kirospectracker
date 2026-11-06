@@ -4,7 +4,7 @@ import type {
   DashboardOutboundMessage,
   SpecDocumentKind,
 } from '../core/model/IDashboardMessage';
-import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
+import type { ISpecCardView } from '../core/model/ISpecCardView';
 import type { ISpecStats } from '../core/model/ISpecStats';
 import { planDashboardRender } from './DashboardRenderPlanner';
 
@@ -27,16 +27,25 @@ const vscodeApi = acquireVsCodeApi();
 
 /** Current render state kept between messages. */
 const state: {
-  snapshots: readonly ISpecSnapshot[];
+  cards: readonly ISpecCardView[];
   stats: ISpecStats;
   query: string;
   layout: DashboardLayout;
 } = {
-  snapshots: [],
+  cards: [],
   stats: { total: 0, completed: 0, inProgress: 0, notStarted: 0, malformed: 0 },
   query: '',
   layout: vscodeApi.getState()?.layout ?? 'list',
 };
+
+/**
+ * Mounted card nodes keyed by their spec folder path.
+ *
+ * It lets a scoped `specUpdated` message replace exactly one card node in the
+ * DOM instead of rebuilding every card, and is cleared and repopulated on each
+ * full render.
+ */
+const cardNodes = new Map<string, HTMLElement>();
 
 /**
  * Create an element with optional class and text.
@@ -99,19 +108,19 @@ function renderProgress(label: string, done: number, total: number, ratio: numbe
 
 /**
  * Render the document links for a spec, disabling absent documents.
- * @param snapshot The spec snapshot.
+ * @param card The spec card view.
  * @returns The links container element.
  */
-function renderLinks(snapshot: ISpecSnapshot): HTMLElement {
+function renderLinks(card: ISpecCardView): HTMLElement {
   const links = el('div', 'links');
   DOCUMENT_KINDS.forEach((kind) => {
-    const present = Boolean(snapshot.documents[kind]);
+    const present = Boolean(card.documents[kind]);
     const link = el('button', present ? 'link' : 'link disabled', kind);
     if (present) {
       link.addEventListener('click', () =>
         vscodeApi.postMessage({
           type: 'openDocument',
-          folderPath: snapshot.folderPath,
+          folderPath: card.folderPath,
           document: kind,
         }),
       );
@@ -126,33 +135,33 @@ function renderLinks(snapshot: ISpecSnapshot): HTMLElement {
 
 /**
  * Render the "Run tasks" button for a spec, disabled for a malformed spec.
- * @param snapshot The spec snapshot.
+ * @param card The spec card view.
  * @returns The button element.
  */
-function renderRunButton(snapshot: ISpecSnapshot): HTMLElement {
+function renderRunButton(card: ISpecCardView): HTMLElement {
   const run = el('button', 'run', 'Run tasks');
-  if ('Malformed' === snapshot.status) {
+  if ('Malformed' === card.status) {
     run.setAttribute('disabled', 'true');
     run.title = 'A malformed spec cannot be run';
     return run;
   }
   run.addEventListener('click', () =>
-    vscodeApi.postMessage({ type: 'runTasks', folderPath: snapshot.folderPath }),
+    vscodeApi.postMessage({ type: 'runTasks', folderPath: card.folderPath }),
   );
   return run;
 }
 
 /**
  * Render one spec card.
- * @param snapshot The spec snapshot.
+ * @param card The spec card view.
  * @returns The card element.
  */
-function renderCard(snapshot: ISpecSnapshot): HTMLElement {
-  const card = el('article', `card status-${snapshot.status}`);
-  card.appendChild(el('h2', 'card-title', snapshot.name));
-  card.appendChild(el('span', 'card-status', snapshot.status));
-  const { progress } = snapshot;
-  card.appendChild(
+function renderCard(card: ISpecCardView): HTMLElement {
+  const article = el('article', `card status-${card.status}`);
+  article.appendChild(el('h2', 'card-title', card.name));
+  article.appendChild(el('span', 'card-status', card.status));
+  const { progress } = card;
+  article.appendChild(
     renderProgress(
       'Required',
       progress.requiredDone,
@@ -160,7 +169,7 @@ function renderCard(snapshot: ISpecSnapshot): HTMLElement {
       progress.requiredRatio,
     ),
   );
-  card.appendChild(
+  article.appendChild(
     renderProgress(
       'Optional',
       progress.optionalDone,
@@ -168,53 +177,65 @@ function renderCard(snapshot: ISpecSnapshot): HTMLElement {
       progress.optionalRatio,
     ),
   );
-  card.appendChild(renderLinks(snapshot));
-  card.appendChild(renderRunButton(snapshot));
-  return card;
+  article.appendChild(renderLinks(card));
+  article.appendChild(renderRunButton(card));
+  return article;
 }
 
 /**
- * Filter snapshots by the current search query (case-insensitive name match).
- * @returns The filtered snapshots.
+ * Filter cards by the current search query (case-insensitive name match).
+ * @returns The filtered cards.
  */
-function filtered(): readonly ISpecSnapshot[] {
+function filtered(): readonly ISpecCardView[] {
   const query = state.query.trim().toLowerCase();
   if (0 === query.length) {
-    return state.snapshots;
+    return state.cards;
   }
-  return state.snapshots.filter((snapshot) => snapshot.name.toLowerCase().includes(query));
+  return state.cards.filter((card) => card.name.toLowerCase().includes(query));
 }
 
 /**
- * Split snapshots into active and completed groups, completed kept visible but
- * set apart.
- * @param snapshots The snapshots to split.
- * @returns A tuple of active and completed snapshots.
+ * Whether a status places a card in the completed group.
+ * @param status The spec status string.
+ * @returns `true` for `Completed` or `FullyCompleted`.
+ */
+function isDoneStatus(status: string): boolean {
+  return 'Completed' === status || 'FullyCompleted' === status;
+}
+
+/**
+ * Split cards into active and completed groups, completed kept visible but set
+ * apart.
+ * @param cards The cards to split.
+ * @returns A tuple of active and completed cards.
  */
 function partition(
-  snapshots: readonly ISpecSnapshot[],
-): readonly [readonly ISpecSnapshot[], readonly ISpecSnapshot[]] {
-  const isDone = (status: string): boolean => 'Completed' === status || 'FullyCompleted' === status;
+  cards: readonly ISpecCardView[],
+): readonly [readonly ISpecCardView[], readonly ISpecCardView[]] {
   return [
-    snapshots.filter((snapshot) => !isDone(snapshot.status)),
-    snapshots.filter((snapshot) => isDone(snapshot.status)),
+    cards.filter((card) => !isDoneStatus(card.status)),
+    cards.filter((card) => isDoneStatus(card.status)),
   ];
 }
 
 /**
- * Render a grouped section of spec cards.
+ * Render a grouped section of spec cards, caching each card node by folder path.
  * @param title Section title.
- * @param snapshots Snapshots in the section.
+ * @param cards Cards in the section.
  * @returns The section element, or `undefined` when empty.
  */
-function renderGroup(title: string, snapshots: readonly ISpecSnapshot[]): HTMLElement | undefined {
-  if (0 === snapshots.length) {
+function renderGroup(title: string, cards: readonly ISpecCardView[]): HTMLElement | undefined {
+  if (0 === cards.length) {
     return undefined;
   }
   const section = el('section', `group layout-${state.layout}`);
   section.appendChild(el('h1', 'group-title', title));
   const grid = el('div', `cards layout-${state.layout}`);
-  snapshots.forEach((snapshot) => grid.appendChild(renderCard(snapshot)));
+  cards.forEach((card) => {
+    const node = renderCard(card);
+    cardNodes.set(card.folderPath, node);
+    grid.appendChild(node);
+  });
   section.appendChild(grid);
   return section;
 }
@@ -270,11 +291,13 @@ function syncToggleLabel(app: HTMLElement): void {
 }
 
 /**
- * Build the spec groups for the current filter into the content container.
+ * Build the spec groups for the current filter into the content container,
+ * rebuilding the card-node cache from scratch.
  * @param content The content container to populate.
  */
 function renderContent(content: HTMLElement): void {
   content.replaceChildren();
+  cardNodes.clear();
   const [active, done] = partition(filtered());
   const activeGroup = renderGroup('Active specs', active);
   const doneGroup = renderGroup('Completed specs', done);
@@ -330,12 +353,75 @@ function render(): void {
 
 rerender = render;
 
+/**
+ * Replace the stats region of the live dashboard in place.
+ * @param app The app root hosting the stats region.
+ */
+function replaceStats(app: HTMLElement): void {
+  const stats = app.querySelector('.stats');
+  stats?.replaceWith(renderStats(state.stats));
+}
+
+/**
+ * Replace a single card node in place when it stays in the same group, so a
+ * scoped update avoids rebuilding every card.
+ * @param card The updated card view.
+ * @param previous The currently mounted node for this card.
+ * @returns `true` when the node was swapped in place, `false` otherwise.
+ */
+function swapCardNode(card: ISpecCardView, previous: HTMLElement): boolean {
+  const next = renderCard(card);
+  cardNodes.set(card.folderPath, next);
+  previous.replaceWith(next);
+  return true;
+}
+
+/**
+ * Apply a scoped single-card update without rebuilding the whole dashboard.
+ *
+ * It swaps the one changed card in {@link state.cards} and updates the stats
+ * region. When a status change moves the card between the active and completed
+ * groups (or the card is not currently mounted), the content is rebuilt via
+ * {@link renderContent} so the card lands in the right section; otherwise only
+ * that one node is replaced.
+ * @param card The updated card view.
+ */
+function applySpecUpdate(card: ISpecCardView): void {
+  const previousCard = state.cards.find((existing) => existing.folderPath === card.folderPath);
+  state.cards = state.cards.map((existing) =>
+    existing.folderPath === card.folderPath ? card : existing,
+  );
+  const app = document.getElementById('app');
+  if (null === app) {
+    return;
+  }
+  replaceStats(app);
+  const previousNode = cardNodes.get(card.folderPath);
+  const content = app.querySelector('.content');
+  if (null === content || !(content instanceof HTMLElement)) {
+    render();
+    return;
+  }
+  const movesGroup =
+    undefined === previousCard || isDoneStatus(previousCard.status) !== isDoneStatus(card.status);
+  if (undefined === previousNode || movesGroup) {
+    renderContent(content);
+    return;
+  }
+  swapCardNode(card, previousNode);
+}
+
 window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage>) => {
   const message = event.data;
   if ('render' === message.type) {
-    state.snapshots = message.snapshots;
+    state.cards = message.cards;
     state.stats = message.stats;
     render();
+    return;
+  }
+  if ('specUpdated' === message.type) {
+    state.stats = message.stats;
+    applySpecUpdate(message.card);
     return;
   }
   if ('toggleLayout' === message.type) {

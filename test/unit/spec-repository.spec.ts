@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 
+import type { SpecChangeDelta } from '../../src/core/model/ISpecChangeDelta';
 import { SpecRepository } from '../../src/adapters/SpecRepository';
 import { SpecSnapshotFactory } from '../../src/core/SpecSnapshotFactory';
 import { SpecStatus } from '../../src/core/model/SpecStatus';
@@ -92,9 +93,9 @@ describe('SpecRepository', () => {
     const fs = seededFileSystem();
     const repository = new SpecRepository(fs, makeFactory(), fs);
     await repository.refresh();
-    let notified = 0;
-    repository.onDidChangeSpecs(() => {
-      notified += 1;
+    const deltas: SpecChangeDelta[] = [];
+    repository.onDidChangeSpecs((delta) => {
+      deltas.push(delta);
     });
     // Mutate alpha's tasks.md to fully done, then emit a change on it.
     fs.setFile(`${root}/alpha/tasks.md`, '- [x] 1. Done\n- [x] 2. Done');
@@ -102,7 +103,7 @@ describe('SpecRepository', () => {
     await flush();
     const alpha = repository.getSpecs().find((spec) => 'alpha' === spec.name);
     expect(alpha?.status).to.equal(SpecStatus.FullyCompleted);
-    expect(notified).to.equal(1);
+    expect(deltas).to.deep.equal([{ type: 'specChanged', folderPath: `${root}/alpha` }]);
   });
 
   it('routes a change to the right spec when sibling names share a prefix', async () => {
@@ -136,7 +137,11 @@ describe('SpecRepository', () => {
     const fs = seededFileSystem();
     const repository = new SpecRepository(fs, makeFactory(), fs);
     let rendered: readonly string[] = [];
-    const render = (): void => {
+    const deltas: SpecChangeDelta[] = [];
+    const render = (delta?: SpecChangeDelta): void => {
+      if (undefined !== delta) {
+        deltas.push(delta);
+      }
       rendered = repository
         .getSpecs()
         .map((spec) => spec.name)
@@ -150,6 +155,7 @@ describe('SpecRepository', () => {
     await repository.refresh();
     await flush();
     expect(rendered).to.deep.equal(['alpha', 'beta']);
+    expect(deltas).to.deep.equal([{ type: 'fullRefresh' }]);
   });
 
   it('releases its subscription on dispose', async () => {

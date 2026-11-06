@@ -1,5 +1,6 @@
 import type { ISpecDocuments } from '../core/model/ISpecDocuments';
 import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
+import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
 import type { ISpecRawInput, SpecSnapshotFactory } from '../core/SpecSnapshotFactory';
 import type { ISpecChangeNotifier } from './ports/ISpecChangeNotifier';
 import type { ISpecFileSystem } from './ports/ISpecFileSystem';
@@ -45,7 +46,7 @@ export class SpecRepository {
 
   private readonly cache: Map<string, ISpecSnapshot> = new Map();
 
-  private readonly listeners: Set<() => void> = new Set();
+  private readonly listeners: Set<(delta: SpecChangeDelta) => void> = new Set();
 
   private readonly disposeNotifier: () => void;
 
@@ -73,7 +74,7 @@ export class SpecRepository {
    * @param listener Callback invoked after the cache is refreshed.
    * @returns A disposer removing the listener.
    */
-  public onDidChangeSpecs(listener: () => void): () => void {
+  public onDidChangeSpecs(listener: (delta: SpecChangeDelta) => void): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
@@ -92,7 +93,7 @@ export class SpecRepository {
     const folders = this.fileSystem.workspaceFolders();
     const perFolder = await Promise.all(folders.map((folder) => this.discoverWorkspace(folder)));
     perFolder.flat().forEach((snapshot) => this.cache.set(snapshot.folderPath, snapshot));
-    this.emitChange();
+    this.emitChange({ type: 'fullRefresh' });
     return this.getSpecs();
   }
 
@@ -175,7 +176,7 @@ export class SpecRepository {
       affected.name,
     );
     this.cache.set(snapshot.folderPath, snapshot);
-    this.emitChange();
+    this.emitChange({ type: 'specChanged', folderPath: snapshot.folderPath });
   }
 
   /**
@@ -212,9 +213,10 @@ export class SpecRepository {
   }
 
   /**
-   * Notify every registered listener that the specs changed.
+   * Notify every registered listener of a spec change delta.
+   * @param delta The fine-grained change describing what changed.
    */
-  private emitChange(): void {
-    this.listeners.forEach((listener) => listener());
+  private emitChange(delta: SpecChangeDelta): void {
+    this.listeners.forEach((listener) => listener(delta));
   }
 }

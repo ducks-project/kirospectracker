@@ -1,4 +1,4 @@
-import type { ISpecSnapshot } from './ISpecSnapshot';
+import type { ISpecCardView } from './ISpecCardView';
 import type { ISpecStats } from './ISpecStats';
 
 /** Document keys the webview can request to open. */
@@ -7,10 +7,17 @@ export type SpecDocumentKind = 'requirements' | 'design' | 'tasks' | 'notes';
 /** Layout modes the dashboard can render. */
 export type DashboardLayout = 'list' | 'grid';
 
-/** Outbound message: render the current snapshots and aggregate stats. */
+/** Outbound message: render the current card views and aggregate stats. */
 export interface IRenderMessage {
   readonly type: 'render';
-  readonly snapshots: readonly ISpecSnapshot[];
+  readonly cards: readonly ISpecCardView[];
+  readonly stats: ISpecStats;
+}
+
+/** Outbound message: update a single changed card and the aggregate stats. */
+export interface ISpecUpdatedMessage {
+  readonly type: 'specUpdated';
+  readonly card: ISpecCardView;
   readonly stats: ISpecStats;
 }
 
@@ -39,7 +46,7 @@ export interface ISetLayoutMessage {
 }
 
 /** Union of messages the extension sends to the webview. */
-export type DashboardOutboundMessage = IRenderMessage | IToggleLayoutMessage;
+export type DashboardOutboundMessage = IRenderMessage | IToggleLayoutMessage | ISpecUpdatedMessage;
 
 /** Union of messages the webview sends back to the extension. */
 export type DashboardInboundMessage = IOpenDocumentMessage | IRunTasksMessage | ISetLayoutMessage;

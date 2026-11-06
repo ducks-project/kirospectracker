@@ -1,8 +1,14 @@
 import * as vscode from 'vscode';
 
-import type { DashboardInboundMessage, IRenderMessage } from '../core/model/IDashboardMessage';
+import type {
+  DashboardInboundMessage,
+  IRenderMessage,
+  ISpecUpdatedMessage,
+} from '../core/model/IDashboardMessage';
+import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
 import type { DashboardHtmlBuilder } from '../core/DashboardHtmlBuilder';
 import type { NonceFactory } from '../core/NonceFactory';
+import type { SpecCardViewMapper } from '../core/status/SpecCardViewMapper';
 import type { SpecStatsCalculator } from '../core/status/SpecStatsCalculator';
 import type { IDashboardActions } from './ports/IDashboardActions';
 import type { ILayoutToggleable } from './ports/ILayoutToggleable';
@@ -37,6 +43,8 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
 
   private readonly stats: SpecStatsCalculator;
 
+  private readonly cardMapper: SpecCardViewMapper;
+
   private readonly htmlBuilder: DashboardHtmlBuilder;
 
   private readonly nonceFactory: NonceFactory;
@@ -52,6 +60,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
    * @param extensionUri Base URI used to resolve bundled resources.
    * @param repository The spec repository supplying snapshots.
    * @param stats The pure aggregate-stats calculator.
+   * @param cardMapper The pure snapshot-to-card-view projector.
    * @param htmlBuilder The pure CSP HTML shell builder.
    * @param nonceFactory The per-render nonce factory.
    * @param actions The handler for inbound dashboard intents.
@@ -60,6 +69,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     extensionUri: vscode.Uri,
     repository: SpecRepository,
     stats: SpecStatsCalculator,
+    cardMapper: SpecCardViewMapper,
     htmlBuilder: DashboardHtmlBuilder,
     nonceFactory: NonceFactory,
     actions: IDashboardActions,
@@ -67,6 +77,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     this.extensionUri = extensionUri;
     this.repository = repository;
     this.stats = stats;
+    this.cardMapper = cardMapper;
     this.htmlBuilder = htmlBuilder;
     this.nonceFactory = nonceFactory;
     this.actions = actions;
@@ -83,7 +94,9 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     webview.options = { enableScripts: true, localResourceRoots: [mediaUri] };
     webview.html = this.renderHtml(webview);
     webview.onDidReceiveMessage((message) => this.handleMessage(message));
-    this.disposeRepositoryListener = this.repository.onDidChangeSpecs(() => this.postRender());
+    this.disposeRepositoryListener = this.repository.onDidChangeSpecs((delta) =>
+      this.handleDelta(delta),
+    );
     view.onDidDispose(() => this.handleViewDisposed());
     this.postRender();
   }
@@ -121,7 +134,33 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
   }
 
   /**
-   * Post the current snapshots and stats to the webview.
+   * React to a repository change: a full render on refresh, a single-card
+   * update on a scoped change.
+   * @param delta The fine-grained change describing what changed.
+   */
+  private handleDelta(delta: SpecChangeDelta): void {
+    if ('fullRefresh' === delta.type) {
+      this.postRender();
+      return;
+    }
+    if (undefined === this.view) {
+      return;
+    }
+    const snapshots = this.repository.getSpecs();
+    const snapshot = snapshots.find((spec) => spec.folderPath === delta.folderPath);
+    if (undefined === snapshot) {
+      return;
+    }
+    const message: ISpecUpdatedMessage = {
+      type: 'specUpdated',
+      card: this.cardMapper.map(snapshot),
+      stats: this.stats.calculate(snapshots),
+    };
+    this.view.webview.postMessage(message).then(undefined, undefined);
+  }
+
+  /**
+   * Post the current card views and stats to the webview.
    */
   private postRender(): void {
     if (undefined === this.view) {
@@ -130,7 +169,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     const snapshots = this.repository.getSpecs();
     const message: IRenderMessage = {
       type: 'render',
-      snapshots,
+      cards: this.cardMapper.mapAll(snapshots),
       stats: this.stats.calculate(snapshots),
     };
     this.view.webview.postMessage(message).then(undefined, undefined);

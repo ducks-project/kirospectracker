@@ -67,4 +67,24 @@ describe('Spec decorations (Node host)', () => {
     const uri = vscode.Uri.file(path.join('/tmp', 'unrelated.txt'));
     expect(api.decorations.provideFileDecoration(uri)).to.equal(undefined);
   });
+
+  it('fires only the changed spec URI and its specs root on a scoped change', async () => {
+    const inProgress = api.repository.getSpecs().find((spec) => 'in-progress' === spec.name);
+    expect(inProgress).to.not.equal(undefined);
+    const events: vscode.Uri[][] = [];
+    const subscription = api.decorations.onDidChangeFileDecorations((uris) => {
+      events.push([...uris]);
+    });
+    const tasksUri = vscode.Uri.file(path.join(inProgress!.folderPath, 'tasks.md'));
+    const edited = '# Implementation Plan\n\n- [x] 1. Done task\n';
+    await vscode.workspace.fs.writeFile(tasksUri, Buffer.from(edited, 'utf8'));
+
+    await waitFor(() => 0 < events.length);
+    subscription.dispose();
+    const scoped = events[events.length - 1];
+    expect(scoped).to.have.length(2);
+    const paths = scoped.map((uri) => path.normalize(uri.fsPath)).sort();
+    const root = path.normalize(path.dirname(inProgress!.folderPath));
+    expect(paths).to.deep.equal([path.normalize(inProgress!.folderPath), root].sort());
+  });
 });
