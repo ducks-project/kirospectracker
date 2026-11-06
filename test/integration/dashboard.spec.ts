@@ -47,6 +47,46 @@ function makeWebview(posted: DashboardOutboundMessage[]): vscode.Webview {
   } as unknown as vscode.Webview;
 }
 
+/** Inbound message type handled by the fake booting webview. */
+type InboundMessage = { readonly type: string };
+
+/**
+ * Build a fake webview that models the real webview boot handshake.
+ *
+ * VS Code re-creates the webview whenever the view is hidden and shown again, so
+ * the reopened document boots with a fresh, empty DOM and only wires its message
+ * listener once loaded. The real webview script signals that with a `ready`
+ * message; the host must (re)post the current cached state in response. This
+ * fake captures the host's inbound handler and exposes `boot()`, which delivers
+ * that `ready` handshake exactly as the webview script does, so a test can drive
+ * close+reopen deterministically.
+ * @param posted The sink receiving each outbound message the host posts.
+ * @returns The fake webview and a `boot` trigger simulating the page load.
+ */
+function makeBootingWebview(posted: DashboardOutboundMessage[]): {
+  readonly webview: vscode.Webview;
+  readonly boot: () => void;
+} {
+  let onMessage: ((message: InboundMessage) => void) | undefined;
+  const webview = {
+    cspSource: 'vscode-resource://fixture',
+    html: '',
+    options: {},
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    asWebviewUri: (uri: vscode.Uri) => uri as any,
+    onDidReceiveMessage: (listener: (message: InboundMessage) => void) => {
+      onMessage = listener;
+      return { dispose: () => undefined };
+    },
+    postMessage: async (message: DashboardOutboundMessage) => {
+      posted.push(message);
+      return true;
+    },
+  } as unknown as vscode.Webview;
+  const boot = (): void => onMessage?.({ type: 'ready' });
+  return { webview, boot };
+}
+
 /**
  * Wrap a webview in a minimal {@link vscode.WebviewView} for resolve.
  * @param webview The fake webview to host.
@@ -133,5 +173,41 @@ describe('Spec dashboard (Node host)', () => {
     await waitFor(() => posted.some((message) => 'specUpdated' === message.type));
     const updates = posted.filter((message) => 'specUpdated' === message.type);
     expect(updates).to.have.length(1);
+  });
+
+  it('re-renders the cached specs when the view is closed and reopened', () => {
+    // Regression for the v0.4.1 bug: closing the dashboard and reopening it
+    // showed an empty spec list until a manual Refresh. VS Code disposes and
+    // re-creates the webview on reopen, so the second resolve runs against a
+    // fresh, empty DOM that only replies with its `ready` handshake once its
+    // listener is wired. The host must (re)post the CURRENT cached state in
+    // response to that handshake, WITHOUT any repository change event and
+    // WITHOUT a disk re-scan.
+    //
+    // The assertion is driven synchronously: the `ready` handshake routes
+    // through the provider's message handler, whose `postRender` pushes to the
+    // fake webview in the same tick. A `fullRefresh` repository delta is always
+    // asynchronous, so counting renders immediately before and after `boot()`
+    // isolates the handshake-triggered render from any change-event noise, which
+    // keeps the test deterministic (no watcher race, no sleeps).
+    const cachedCount = api.repository.getSpecs().length;
+    expect(cachedCount).to.be.greaterThan(0);
+
+    // Close + reopen: a brand-new webview document (fresh empty DOM).
+    const posted: DashboardOutboundMessage[] = [];
+    const reopened = makeBootingWebview(posted);
+    api.dashboard.resolveWebviewView(makeView(reopened.webview));
+
+    // Deliver the handshake and capture the render it produces in the same
+    // synchronous tick.
+    const before = posted.length;
+    reopened.boot();
+    const handshakeMessages = posted.slice(before);
+
+    const render = handshakeMessages.find((message) => 'render' === message.type);
+    expect(render, 'the ready handshake must trigger a render on reopen').to.not.equal(undefined);
+    expect(render).to.have.property('cards');
+    const { cards } = render as { readonly cards: readonly unknown[] };
+    expect(cards).to.have.length(cachedCount);
   });
 });
