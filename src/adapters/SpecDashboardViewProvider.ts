@@ -101,6 +101,14 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
       this.handleDelta(delta),
     );
     view.onDidDispose(() => this.handleViewDisposed());
+    // Post the current cached state eagerly for the case where the webview is
+    // already listening (e.g. a host that retains the context). On a normal
+    // (re)open VS Code re-creates the webview, so this eager post races the
+    // script boot and may be dropped; the webview therefore also sends a `ready`
+    // handshake once its listener is wired, and the `ready` branch in
+    // handleMessage re-posts the cached state. That handshake reply is what
+    // makes a reopened view show the specs without a manual Refresh, and it
+    // reuses the cache (no disk re-scan).
     this.postRender();
   }
 
@@ -189,6 +197,14 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     }
     if ('runTasks' === message.type) {
       this.actions.runTasks(message.folderPath).then(undefined, undefined);
+      return;
+    }
+    if ('ready' === message.type) {
+      // The (re)loaded webview has wired its listener: (re)send the current
+      // cached snapshots so a reopened view shows the specs immediately. This
+      // reuses the already-discovered cache via `repository.getSpecs()`; it
+      // never triggers a `repository.refresh()`/disk re-scan.
+      this.postRender();
     }
     // `setLayout` is handled entirely inside the webview (persisted via its
     // own state); the extension needs no server-side action for it.

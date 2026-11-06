@@ -45,8 +45,25 @@ export interface ISetLayoutMessage {
   readonly layout: DashboardLayout;
 }
 
+/**
+ * Inbound message: the webview has mounted and wired its message listener.
+ *
+ * It is posted once on every (re)load of the webview document, which is the
+ * signal the host waits for before posting the first `render`. VS Code disposes
+ * and re-creates the webview when the view is hidden and shown again, so the
+ * reopened document boots with an empty DOM; this handshake lets the host
+ * (re)send the current cached state without racing the script boot.
+ */
+export interface IReadyMessage {
+  readonly type: 'ready';
+}
+
 /** Union of messages the extension sends to the webview. */
 export type DashboardOutboundMessage = IRenderMessage | IToggleLayoutMessage | ISpecUpdatedMessage;
 
 /** Union of messages the webview sends back to the extension. */
-export type DashboardInboundMessage = IOpenDocumentMessage | IRunTasksMessage | ISetLayoutMessage;
+export type DashboardInboundMessage =
+  | IOpenDocumentMessage
+  | IRunTasksMessage
+  | ISetLayoutMessage
+  | IReadyMessage;

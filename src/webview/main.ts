@@ -580,3 +580,11 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
 });
 
 render();
+
+// Signal the host that the listener above is wired. VS Code disposes and
+// re-creates this webview when the view is hidden and shown again, so on every
+// (re)load the document boots with an empty DOM; this handshake tells the host
+// to (re)post the current cached state, which is what makes a reopened view
+// show the specs without a manual Refresh. Posted after the listener is set up
+// so the host's reply can never be missed.
+vscodeApi.postMessage({ type: 'ready' });
