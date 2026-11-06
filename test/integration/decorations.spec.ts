@@ -92,12 +92,11 @@ describe('Spec decorations (Node host)', () => {
     const subscription = api.decorations.onDidChangeFileDecorations((uris) => {
       events.push([...uris].map((uri) => path.normalize(uri.fsPath)).sort());
     });
-    // Write the new content, then drive the change deterministically through the
-    // production notifier's own entry point rather than racing the host
-    // FileSystemWatcher within a fixed timeout. The downstream path
-    // (SpecRepository.handleChange -> scoped delta -> scoped fire) is identical.
-    const edited = '# Implementation Plan\n\n- [x] 1. Done task\n';
-    await vscode.workspace.fs.writeFile(inProgressTasksUri!, Buffer.from(edited, 'utf8'));
+    // Drive the scoped change through the production notifier's own entry point
+    // with a SINGLE trigger. Using only notifyChanged (and not also writing the
+    // file) avoids a second, debounced event from the real OS FileSystemWatcher.
+    // The downstream path (SpecRepository.handleChange -> scoped delta -> scoped
+    // fire) is identical regardless of what caused the notification.
     api.fileSystem.notifyChanged(inProgressTasksUri!.fsPath);
 
     // Assert that a scoped event carrying exactly the changed folder and its

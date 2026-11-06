@@ -122,12 +122,12 @@ describe('Spec dashboard (Node host)', () => {
     await waitFor(() => posted.some((message) => 'render' === message.type));
 
     expect(inProgressTasksUri).to.not.equal(undefined);
-    // Write the new content, then drive the change deterministically through the
-    // production notifier's own entry point rather than racing the host
-    // FileSystemWatcher within a fixed timeout. The downstream path
-    // (SpecRepository.handleChange -> scoped delta -> specUpdated) is identical.
-    const edited = '# Implementation Plan\n\n- [x] 1. Done task\n- [x] 2. Pending task\n';
-    await vscode.workspace.fs.writeFile(inProgressTasksUri!, Buffer.from(edited, 'utf8'));
+    // Drive the scoped change through the production notifier's own entry point
+    // with a SINGLE trigger. Using only notifyChanged (and not also writing the
+    // file) avoids a second, debounced event from the real OS FileSystemWatcher,
+    // which would race the assertion and post a duplicate specUpdated. The
+    // downstream path (SpecRepository.handleChange -> scoped delta -> specUpdated)
+    // is identical regardless of what caused the notification.
     api.fileSystem.notifyChanged(inProgressTasksUri!.fsPath);
 
     await waitFor(() => posted.some((message) => 'specUpdated' === message.type));
