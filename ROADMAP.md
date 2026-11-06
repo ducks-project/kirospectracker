@@ -9,11 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.3.0 — Performance on large workspaces [Planned]
-
-- [ ] Add batching and a strategy for workspaces with a very large number of specs,
-      validated against the parsing benchmark budget.
-
 ## v0.4.0 — Dashboard interactions [Planned]
 
 - [ ] Make the dashboard statistics (completed, in progress, not started, malformed)
