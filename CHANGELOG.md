@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-06
+
+### Fixed
+
+- Show the cached specs immediately when the dashboard view is closed and reopened, instead
+  of an empty list that only filled in after a manual Refresh. VS Code disposes and re-creates
+  the webview when the view is hidden and shown again, so the reopened document booted with an
+  empty DOM and the render posted during resolve raced its script boot and was lost. The
+  webview now sends a `ready` handshake once its message listener is wired, and the provider
+  replies by re-posting the current cached snapshots (reused from the in-memory cache, with no
+  disk re-scan), so a reopened view restores its specs without any manual action. The v0.3.0
+  incremental update protocol, the v0.1.1 persistent-toolbar focus behaviour, and the v0.4.0
+  persisted filter/layout webview state are all preserved.
+
 ## [0.4.0] - 2026-11-06
 
 ### Added
@@ -108,7 +122,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/ducks-project/kirospectracker/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ducks-project/kirospectracker/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ducks-project/kirospectracker/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ducks-project/kirospectracker/compare/v0.1.1...v0.2.0

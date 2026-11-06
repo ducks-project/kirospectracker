@@ -9,14 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.4.1 — Dashboard re-open fix [Planned]
-
-- [ ] Fix the dashboard showing an empty list after the view is closed and reopened (the
-      specs only reappear after clicking Refresh). On re-resolution the webview is recreated
-      empty and waits for a render, but the repository only emits on change, so the current
-      cached specs are never sent. `resolveWebviewView` should post the current cached state
-      immediately on (re)resolve. Confirmed a bug, not an intended behavior.
-
 ## v0.5.0 — Dashboard interaction hardening [Planned]
 
 - [ ] Lock the tree-view context-menu `when` clauses in `package.json` against the pure
