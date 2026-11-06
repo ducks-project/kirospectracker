@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output (esbuild) and TypeScript compilation artifacts
+dist/
+out/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# VS Code extension packaging and integration test runtime
+*.vsix
+.vscode-test/
+.vscode-test-web/
+
+# Linter cache
+.eslintcache
+
+# Local editor history
+.history
+
+# Kiro steering and specs.
+# NOTE: .kiro is ignored for now, so the project steering files are NOT versioned yet.
+# Whether to version them (and which ones) is a decision left to the maintainer later.
+.kiro
+
+# Agent task artifacts (scaffolding plan, FEAT descriptors, verdicts): never versioned.
+.agents
+
+# VS Code multi-root workspace file
+*.code-workspace

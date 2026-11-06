@@ -1,0 +1,83 @@
+{
+  "name": "kirospectracker",
+  "displayName": "Kiro Spec Tracker",
+  "description": "TODO",
+  "version": "0.1.0",
+  "publisher": "ducks-project",
+  "license": "MIT",
+  "author": "ducks-project",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "TODO"
+  ],
+  "keywords": [
+    "TODO"
+  ],
+  "main": "./dist/node/extension.js",
+  "browser": "./dist/browser/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ducks-project/kirospectracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ducks-project/kirospectracker/issues"
+  },
+  "homepage": "https://github.com/ducks-project/kirospectracker#readme",
+  "activationEvents": [],
+  "scripts": {
+    "compile": "tsc --noEmit",
+    "build": "node esbuild.mjs",
+    "build:dev": "node esbuild.mjs --dev",
+    "build:prod": "node esbuild.mjs --prod",
+    "watch": "node esbuild.mjs --watch",
+    "build:browser": "node esbuild.mjs --browser",
+    "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"test/**/*.ts\" \"benchmark/**/*.ts\"",
+    "format": "prettier --write \"**/*.{ts,mjs,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,mjs,json,md,yml,yaml}\"",
+    "test:unit": "mocha",
+    "test:property": "mocha --spec \"test/property/**/*.spec.ts\"",
+    "coverage:core": "c8 --config .c8rc.json mocha",
+    "coverage:adapters": "c8 --config .c8rc.adapters.json mocha",
+    "coverage": "npm run coverage:core && npm run coverage:adapters",
+    "test": "npm run coverage",
+    "compile:test": "tsc -p tsconfig.test.json",
+    "pretest:integration": "npm run compile:test",
+    "test:integration": "node --loader ts-node/esm --no-warnings ./test/runTest.ts",
+    "pretest:web": "node esbuild.mjs --web-test",
+    "test:web": "vscode-test-web --browserType=chromium --headless --extensionDevelopmentPath=. --extensionTestsPath=./dist/web-test/suite/index.js",
+    "bench": "node --loader ts-node/esm --no-warnings ./benchmark/replace.bench.ts",
+    "package": "vsce package",
+    "publish": "ovsx publish"
+  },
+  "devDependencies": {
+    "@types/chai": "5.0.1",
+    "@types/mocha": "10.0.9",
+    "@types/node": "20.17.6",
+    "@types/vscode": "1.85.0",
+    "@typescript-eslint/eslint-plugin": "7.18.0",
+    "@typescript-eslint/parser": "7.18.0",
+    "@vscode/test-electron": "2.4.1",
+    "@vscode/test-web": "0.0.81",
+    "@vscode/vsce": "3.2.0",
+    "c8": "12.0.0",
+    "chai": "5.1.2",
+    "esbuild": "0.24.0",
+    "eslint": "8.57.1",
+    "eslint-config-airbnb-base": "15.0.0",
+    "eslint-config-airbnb-typescript": "18.0.0",
+    "eslint-config-prettier": "9.1.0",
+    "eslint-plugin-import": "2.31.0",
+    "fast-check": "3.23.1",
+    "glob": "11.0.0",
+    "lefthook": "1.8.2",
+    "mitata": "1.0.20",
+    "mocha": "10.8.2",
+    "ovsx": "0.10.1",
+    "prettier": "3.3.3",
+    "ts-node": "10.9.2",
+    "typescript": "5.6.3"
+  }
+}

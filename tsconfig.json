@@ -1,0 +1,28 @@
+{
+  "ts-node": {
+    "transpileOnly": true,
+    "experimentalResolver": true,
+    "experimentalSpecifierResolution": "node",
+    "moduleTypes": {
+      "**/*.ts": "esm"
+    }
+  },
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2021"],
+    "rootDir": ".",
+    "strict": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "benchmark/**/*.ts"],
+  "exclude": ["node_modules", "dist", "out"]
+}

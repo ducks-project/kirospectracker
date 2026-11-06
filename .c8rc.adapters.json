@@ -1,0 +1,26 @@
+{
+  "_comment": "Secondary coverage gate for the Adapter_Layer (src/adapters/**, including CommandRunner.ts and CommandController.ts) at >=85% statements; branches are not gated for this layer per the design threshold table. This is a separate config because c8 check-coverage applies a single threshold set per invocation and cannot express the Core_Layer (>=95%/>=90%, see .c8rc.json) and this Adapter_Layer gate simultaneously from one flat config. Task 8.2 runs the unit+property suite under c8 once per config so each layer is gated against its own thresholds. The gate measures in-process runtime adapters only. Excluded from the gated scope, all evidenced behaviourally by the host harnesses rather than by this metric: src/extension.ts (composition root); src/adapters/ports/** (type-only `export interface` port declarations that emit zero runtime JS); and the host-only wrappers src/adapters/Vscode*.ts (thin shells over the `vscode` API that run only inside the VS Code host process and are exercised by the @vscode/test-electron and @vscode/test-web harnesses, not by the in-process unit+property suite). Because `all: true` instruments every non-excluded source file, the type-only ports and host-only wrappers must be excluded explicitly or they would report 0% and drag the aggregate below threshold despite carrying no in-process-testable runtime logic.",
+  "check-coverage": true,
+  "reporter": ["text", "lcov", "json"],
+  "all": true,
+  "src": "./src",
+  "include": ["src/adapters/**"],
+  "exclude": [
+    "src/extension.ts",
+    "src/adapters/ports/**",
+    "src/adapters/Vscode*.ts",
+    "src/core/**",
+    "src/data/**",
+    "src/build/**",
+    "test/**",
+    "benchmark/**",
+    "out/**",
+    "dist/**",
+    "**/*.mjs",
+    "node_modules/**"
+  ],
+  "statements": 85,
+  "branches": 0,
+  "functions": 0,
+  "lines": 0
+}

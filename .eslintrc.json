@@ -1,0 +1,63 @@
+{
+  "root": true,
+  "env": {
+    "node": true,
+    "es2021": true
+  },
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["@typescript-eslint", "import"],
+  "extends": [
+    "airbnb-base",
+    "airbnb-typescript/base",
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "rules": {
+    "eqeqeq": ["error", "always"],
+    "yoda": ["error", "always", { "onlyEquality": true }],
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-console": "warn",
+    "@typescript-eslint/no-explicit-any": "error",
+    "max-lines-per-function": ["warn", { "max": 30, "skipBlankLines": true, "skipComments": true }],
+    "import/prefer-default-export": "off",
+    "import/extensions": ["error", "ignorePackages", { "ts": "never", "js": "never" }]
+  },
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".ts", ".js", ".json"]
+      }
+    }
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.ts"],
+      "rules": {
+        "import/no-commonjs": ["error", { "allowConditionalRequire": false }],
+        "@typescript-eslint/no-require-imports": "error",
+        "@typescript-eslint/no-var-requires": "error"
+      }
+    },
+    {
+      "files": ["test/**/*.ts", "benchmark/**/*.ts"],
+      "rules": {
+        "import/no-extraneous-dependencies": ["error", { "devDependencies": true }],
+        "@typescript-eslint/no-unused-expressions": "off",
+        "max-lines-per-function": "off"
+      }
+    },
+    {
+      "files": ["*.mjs"],
+      "parserOptions": {
+        "project": null
+      }
+    }
+  ],
+  "ignorePatterns": ["dist/", "out/", "node_modules/", "coverage/", "*.mjs"]
+}

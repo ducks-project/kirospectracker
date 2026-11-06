@@ -1,0 +1,23 @@
+# Git hooks managed by lefthook (https://github.com/evilmartians/lefthook).
+# Install the hooks once with: npx lefthook install
+# All commands are non-interactive so they run cleanly in CI and headless shells.
+
+pre-commit:
+  parallel: true
+  commands:
+    eslint:
+      glob: '*.{ts,tsx}'
+      run: npx eslint {staged_files}
+    prettier:
+      glob: '*.{ts,tsx,json,md,yml,yaml}'
+      run: npx prettier --check {staged_files}
+    typecheck:
+      # Type-check the whole project: a staged change can break untouched files.
+      # Skip cleanly when the project has no TypeScript source yet (tsc emits
+      # TS18003 "No inputs found" on an empty project, which is not a type error).
+      run: 'if [ -n "$(find src test benchmark -name ''*.ts'' 2>/dev/null)" ] ; then npx tsc --noEmit ; else echo "no .ts sources yet, skipping type-check" ; fi'
+
+pre-push:
+  commands:
+    unit-tests:
+      run: npm run test:unit

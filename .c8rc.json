@@ -1,0 +1,24 @@
+{
+  "_comment": "Primary coverage gate for the Core_Layer (src/core/**, src/data/**) at >=95% statements / >=90% branches. c8 check-coverage applies a single threshold set per invocation and cannot express two different per-layer gates from one flat config, so the Adapter_Layer gate (>=85% statements) lives in .c8rc.adapters.json. Task 8.2 runs the unit+property suite twice under c8 (once per config) so each layer is gated against its own thresholds; an unmet threshold exits non-zero and names the failing metric. The gate measures executable runtime modules only. src/extension.ts (composition root) and src/core/ports/** (type-only `export interface` port declarations that emit zero runtime JS) are excluded from the gated scope: both are evidenced behaviourally by the host harnesses, not by the gated metric. Because `all: true` instruments every non-excluded source file, the type-only ports must be excluded explicitly or they would report 0% and drag the aggregate below threshold despite having no runtime code to cover.",
+  "check-coverage": true,
+  "reporter": ["text", "lcov", "json"],
+  "all": true,
+  "src": "./src",
+  "include": ["src/core/**", "src/data/**"],
+  "exclude": [
+    "src/extension.ts",
+    "src/core/ports/**",
+    "src/adapters/**",
+    "src/build/**",
+    "test/**",
+    "benchmark/**",
+    "out/**",
+    "dist/**",
+    "**/*.mjs",
+    "node_modules/**"
+  ],
+  "statements": 95,
+  "branches": 90,
+  "functions": 0,
+  "lines": 0
+}
