@@ -282,6 +282,12 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
     state.snapshots = message.snapshots;
     state.stats = message.stats;
     render();
+    return;
+  }
+  if ('toggleLayout' === message.type) {
+    state.layout = 'list' === state.layout ? 'grid' : 'list';
+    vscodeApi.setState({ layout: state.layout });
+    render();
   }
 });
 

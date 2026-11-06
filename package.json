@@ -27,9 +27,49 @@
   },
   "homepage": "https://github.com/ducks-project/kirospectracker#readme",
   "activationEvents": [
-    "onView:kirospectracker.dashboard"
+    "onView:kirospectracker.dashboard",
+    "onCommand:kirospectracker.refresh",
+    "onCommand:kirospectracker.runTasks",
+    "onCommand:kirospectracker.toggleLayout",
+    "onCommand:kirospectracker.openDocument"
   ],
   "contributes": {
+    "commands": [
+      {
+        "command": "kirospectracker.refresh",
+        "title": "Kiro Spec Tracker: Refresh Specs",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kirospectracker.runTasks",
+        "title": "Kiro Spec Tracker: Run Spec Tasks"
+      },
+      {
+        "command": "kirospectracker.toggleLayout",
+        "title": "Kiro Spec Tracker: Toggle Dashboard Layout"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "kirospectracker.runTasks",
+          "when": "explorerResourceIsFolder && resourcePath =~ /.*[\\\\/]\\.kiro[\\\\/]specs[\\\\/][^\\\\/]+$/",
+          "group": "kirospectracker@1"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "kirospectracker.refresh",
+          "when": "view == kirospectracker.dashboard",
+          "group": "navigation"
+        },
+        {
+          "command": "kirospectracker.toggleLayout",
+          "when": "view == kirospectracker.dashboard",
+          "group": "navigation"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {

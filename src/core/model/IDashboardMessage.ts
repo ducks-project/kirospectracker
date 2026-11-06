@@ -14,6 +14,11 @@ export interface IRenderMessage {
   readonly stats: ISpecStats;
 }
 
+/** Outbound message: toggle the dashboard layout (list <-> grid). */
+export interface IToggleLayoutMessage {
+  readonly type: 'toggleLayout';
+}
+
 /** Inbound message: open one document of a spec. */
 export interface IOpenDocumentMessage {
   readonly type: 'openDocument';
@@ -34,7 +39,7 @@ export interface ISetLayoutMessage {
 }
 
 /** Union of messages the extension sends to the webview. */
-export type DashboardOutboundMessage = IRenderMessage;
+export type DashboardOutboundMessage = IRenderMessage | IToggleLayoutMessage;
 
 /** Union of messages the webview sends back to the extension. */
 export type DashboardInboundMessage = IOpenDocumentMessage | IRunTasksMessage | ISetLayoutMessage;

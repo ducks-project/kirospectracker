@@ -5,6 +5,7 @@ import type { DashboardHtmlBuilder } from '../core/DashboardHtmlBuilder';
 import type { NonceFactory } from '../core/NonceFactory';
 import type { SpecStatsCalculator } from '../core/status/SpecStatsCalculator';
 import type { IDashboardActions } from './ports/IDashboardActions';
+import type { ILayoutToggleable } from './ports/ILayoutToggleable';
 import type { SpecRepository } from './SpecRepository';
 
 /** View id contributed in package.json for the dashboard webview. */
@@ -29,7 +30,7 @@ const STYLE_FILE = 'dashboard.css';
  * to the injected {@link IDashboardActions}; the render payload is rebuilt from
  * the repository whenever specs change.
  */
-export class SpecDashboardViewProvider implements vscode.WebviewViewProvider {
+export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, ILayoutToggleable {
   private readonly extensionUri: vscode.Uri;
 
   private readonly repository: SpecRepository;
@@ -85,6 +86,14 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider {
     this.disposeRepositoryListener = this.repository.onDidChangeSpecs(() => this.postRender());
     view.onDidDispose(() => this.handleViewDisposed());
     this.postRender();
+  }
+
+  /**
+   * Ask the live webview to toggle its layout (list <-> grid). No-op when the
+   * view is not currently resolved.
+   */
+  public toggleLayout(): void {
+    this.view?.webview.postMessage({ type: 'toggleLayout' }).then(undefined, undefined);
   }
 
   /**
