@@ -6,6 +6,7 @@ import type {
 } from '../core/model/IDashboardMessage';
 import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
 import type { ISpecStats } from '../core/model/ISpecStats';
+import { planDashboardRender } from './DashboardRenderPlanner';
 
 /** Minimal shape of the VS Code webview API injected into the global scope. */
 interface IWebviewApi {
@@ -226,7 +227,11 @@ function renderGroup(title: string, snapshots: readonly ISpecSnapshot[]): HTMLEl
 let rerender: () => void = () => undefined;
 
 /**
- * Build the toolbar (search box + layout toggle).
+ * Build the persistent toolbar (search box + layout toggle).
+ *
+ * This element is created once on the initial mount and then reused across
+ * every subsequent render, so the live search input keeps its focus and caret
+ * position even when a render arrives mid-typing (e.g. a spec file changed).
  * @returns The toolbar element.
  */
 function renderToolbar(): HTMLElement {
@@ -253,24 +258,73 @@ function renderToolbar(): HTMLElement {
 }
 
 /**
- * Render the whole dashboard into the app root.
+ * Update the label of the persistent layout toggle to match the current layout.
+ * @param app The app root hosting the toolbar.
+ */
+function syncToggleLabel(app: HTMLElement): void {
+  const toggle = app.querySelector('.toolbar .toggle');
+  if (null === toggle) {
+    return;
+  }
+  toggle.textContent = 'list' === state.layout ? 'Grid view' : 'List view';
+}
+
+/**
+ * Build the spec groups for the current filter into the content container.
+ * @param content The content container to populate.
+ */
+function renderContent(content: HTMLElement): void {
+  content.replaceChildren();
+  const [active, done] = partition(filtered());
+  const activeGroup = renderGroup('Active specs', active);
+  const doneGroup = renderGroup('Completed specs', done);
+  if (undefined !== activeGroup) {
+    content.appendChild(activeGroup);
+  }
+  if (undefined !== doneGroup) {
+    content.appendChild(doneGroup);
+  }
+}
+
+/**
+ * Build the whole dashboard shell on the initial mount: stats, the persistent
+ * toolbar and an empty content container, in that order.
+ * @param app The app root to populate.
+ * @returns The content container the subsequent renders rewrite.
+ */
+function mount(app: HTMLElement): HTMLElement {
+  app.replaceChildren();
+  app.appendChild(renderStats(state.stats));
+  app.appendChild(renderToolbar());
+  const content = el('section', 'content');
+  app.appendChild(content);
+  return content;
+}
+
+/**
+ * Render the dashboard into the app root.
+ *
+ * On the initial mount the full shell is built. On every later pass the
+ * {@link DashboardRenderPlanner} keeps the toolbar (and its live search input)
+ * in place and rewrites only the stats and content regions, so typing is never
+ * interrupted by a render.
  */
 function render(): void {
   const app = document.getElementById('app');
   if (null === app) {
     return;
   }
-  app.replaceChildren();
-  app.appendChild(renderStats(state.stats));
-  app.appendChild(renderToolbar());
-  const [active, done] = partition(filtered());
-  const activeGroup = renderGroup('Active specs', active);
-  const doneGroup = renderGroup('Completed specs', done);
-  if (undefined !== activeGroup) {
-    app.appendChild(activeGroup);
+  const plan = planDashboardRender(null === app.querySelector('.toolbar'));
+  if (true === plan.buildsToolbar) {
+    renderContent(mount(app));
+    return;
   }
-  if (undefined !== doneGroup) {
-    app.appendChild(doneGroup);
+  const stats = app.querySelector('.stats');
+  stats?.replaceWith(renderStats(state.stats));
+  syncToggleLabel(app);
+  const content = app.querySelector('.content');
+  if (null !== content && content instanceof HTMLElement) {
+    renderContent(content);
   }
 }
 
