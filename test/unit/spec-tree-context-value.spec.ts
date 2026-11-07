@@ -5,6 +5,8 @@ import { SpecStatus } from '../../src/core/model/SpecStatus';
 import {
   buildSpecTreeContextValue,
   documentContextToken,
+  SPEC_TREE_CONTEXT_TOKENS,
+  SPEC_TREE_MENU_GATING_TOKENS,
 } from '../../src/core/status/SpecTreeContextValue';
 
 /** All documents present. */
@@ -61,5 +63,25 @@ describe('buildSpecTreeContextValue', () => {
   it('does not mark a malformed spec as runnable', () => {
     const value = buildSpecTreeContextValue(TASKS_ONLY, SpecStatus.Malformed);
     expect(value.split(' ')).to.not.include('runnable');
+  });
+
+  it('emits only tokens declared in the canonical vocabulary', () => {
+    const emitted = buildSpecTreeContextValue(ALL_DOCS, SpecStatus.FullyCompleted).split(' ');
+    emitted.forEach((token) => {
+      expect(SPEC_TREE_CONTEXT_TOKENS).to.include(token);
+    });
+  });
+
+  it('can emit every token of the canonical vocabulary (all docs, runnable)', () => {
+    const emitted = buildSpecTreeContextValue(ALL_DOCS, SpecStatus.Completed).split(' ');
+    SPEC_TREE_CONTEXT_TOKENS.forEach((token) => {
+      expect(emitted).to.include(token);
+    });
+  });
+
+  it('keeps the gating set as the vocabulary minus the bare spec base token', () => {
+    expect(SPEC_TREE_MENU_GATING_TOKENS).to.deep.equal(
+      SPEC_TREE_CONTEXT_TOKENS.filter((token) => 'spec' !== token),
+    );
   });
 });
