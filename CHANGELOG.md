@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-07
+
+### Changed
+
+- Harden the dashboard interaction surfaces without any user-facing behaviour change. The
+  tree context-value tokens are now defined once in a pure, `vscode`-free vocabulary that both
+  the builder and a new manifest assertion derive from, so renaming a token fails a test
+  instead of silently breaking the "Specs by Status" right-click menu; the assertion reads
+  `package.json` and checks that every tree-view `when` clause references only canonical
+  tokens and that every menu-gating token has exactly one correctly anchored clause.
+  `SpecStatToggleView` now reads each stat count through an explicit, compile-time-checked
+  `Record<SpecFilterKey, keyof ISpecStats>` map rather than relying on the filter keys
+  happening to equal the stats field names, so a future rename on either side fails the build.
+  The `resolveSpecNodeFolderPath` guard is narrowed to validate that the resolved `folderPath`
+  is actually a string before use, so a malformed tree node can no longer flow a non-string
+  value downstream; the pure resolver moved to its own `vscode`-free module for isolated unit
+  testing. The v0.3.0 incremental update protocol, the v0.1.1 persistent-toolbar focus
+  behaviour, the v0.4.0 persisted filter/layout state, and the v0.4.1 ready handshake are all
+  preserved.
+
 ## [0.4.1] - 2026-11-06
 
 ### Fixed
@@ -122,7 +142,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.4.1...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ducks-project/kirospectracker/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/ducks-project/kirospectracker/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ducks-project/kirospectracker/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ducks-project/kirospectracker/compare/v0.2.0...v0.3.0
