@@ -1,36 +1,15 @@
 import * as vscode from 'vscode';
 
-import type { ISpecGroup, SpecGrouper } from '../core/status/SpecGrouper';
-import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
+import type { SpecGrouper } from '../core/status/SpecGrouper';
 import type { SpecRepository } from './SpecRepository';
+import type { SpecTreeNode } from './SpecTreeNode';
 import { buildSpecTreeContextValue } from '../core/status/SpecTreeContextValue';
+
+export { resolveSpecNodeFolderPath } from './SpecTreeNode';
+export type { SpecTreeNode } from './SpecTreeNode';
 
 /** View id contributed in package.json for the tree fallback. */
 export const TREE_VIEW_ID = 'kirospectracker.tree';
-
-/** A tree node: either a status group or a spec leaf. */
-export type SpecTreeNode =
-  | { readonly kind: 'group'; readonly group: ISpecGroup }
-  | { readonly kind: 'spec'; readonly spec: ISpecSnapshot };
-
-/**
- * Resolve the spec folder path from a context-menu command argument.
- *
- * The tree's `view/item/context` menu passes the underlying {@link SpecTreeNode}
- * as the command argument; only a spec leaf carries a folder path.
- * @param argument The raw command argument.
- * @returns The spec folder path, or `undefined` when the argument is not a spec leaf.
- */
-export function resolveSpecNodeFolderPath(argument: unknown): string | undefined {
-  if (null === argument || 'object' !== typeof argument) {
-    return undefined;
-  }
-  const node = argument as Partial<SpecTreeNode>;
-  if ('spec' !== node.kind || undefined === node.spec) {
-    return undefined;
-  }
-  return node.spec.folderPath;
-}
 
 /**
  * Lightweight activity-bar {@link vscode.TreeDataProvider} grouping specs by

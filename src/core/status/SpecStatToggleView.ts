@@ -24,13 +24,31 @@ const STAT_LABELS: Readonly<Record<SpecFilterKey, string>> = {
 };
 
 /**
- * Read the aggregate count for one filter key off the stats.
+ * Explicit, compile-time-checked mapping from each filter key to the
+ * {@link ISpecStats} field it reads its count from.
+ *
+ * Making the dependency a typed `Record<SpecFilterKey, keyof ISpecStats>`
+ * (rather than relying on the filter keys happening to equal stat field names)
+ * means a future rename of either side fails `tsc` instead of silently
+ * mis-indexing: a renamed `ISpecStats` field breaks the value type, a renamed
+ * filter key breaks the record key.
+ */
+const STAT_FIELD_BY_KEY: Readonly<Record<SpecFilterKey, keyof ISpecStats>> = {
+  completed: 'completed',
+  inProgress: 'inProgress',
+  notStarted: 'notStarted',
+  malformed: 'malformed',
+};
+
+/**
+ * Read the aggregate count for one filter key off the stats through the
+ * explicit {@link STAT_FIELD_BY_KEY} mapping.
  * @param key The filter key.
  * @param stats The aggregate statistics.
  * @returns The matching count.
  */
 function valueFor(key: SpecFilterKey, stats: ISpecStats): number {
-  return stats[key];
+  return stats[STAT_FIELD_BY_KEY[key]];
 }
 
 /**
