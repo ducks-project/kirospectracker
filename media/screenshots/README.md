@@ -6,10 +6,10 @@ extension. This guide lists what to capture and how, so the images stay consiste
 
 ## Files expected
 
-| File                       | Shows                                                     |
-| -------------------------- | --------------------------------------------------------- |
-| `dashboard.png`            | The activity-bar dashboard (status, progress bars, stats) |
-| `explorer-decorations.png` | Spec folders in the file explorer with status badges      |
+| File                       | Shows                                                               |
+| -------------------------- | ------------------------------------------------------------------- |
+| `dashboard.png`            | The dashboard: clickable cards, colored status badges, owner folder |
+| `explorer-decorations.png` | Spec folders in the file explorer with status badges                |
 
 ## How to capture
 

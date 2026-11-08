@@ -113,13 +113,29 @@ or a full re-render. The clickable statistics are additive toggle filters backed
 immutable [SpecStatusFilter](../src/core/status/SpecStatusFilter.ts) state machine (toggle a
 key to add it, toggle again to remove it; an empty set shows everything). Card visibility
 composes that status filter with the free-text search through
-[SpecCardFilter](../src/core/status/SpecCardFilter.ts) (a logical AND). The header toggles,
-their pressed state and the list/grid icon toggles are projected by the pure
-[SpecStatToggleView](../src/core/status/SpecStatToggleView.ts) and
-[SpecLayoutToggleView](../src/core/status/SpecLayoutToggleView.ts); the webview only renders
-the decision and persists the active filter keys and layout in its own `setState`. Keeping
-the state machine and the mappings in `core/` makes the least-covered DOM/CSS layer thin and
-the logic unit- and property-testable without a VS Code host.
+[SpecCardFilter](../src/core/status/SpecCardFilter.ts) (a logical AND). The header toggles
+and their pressed state are projected by the pure
+[SpecStatToggleView](../src/core/status/SpecStatToggleView.ts), and the single flipping
+list/grid layout button by [SpecLayoutToggleView](../src/core/status/SpecLayoutToggleView.ts)
+(`describeToggle` returns the glyph of the layout the button switches to, its label and its
+pressed state). The webview only renders the decision and persists the active filter keys and
+layout in its own `setState`. Keeping the state machine and the mappings in `core/` makes the
+least-covered DOM/CSS layer thin and the logic unit- and property-testable without a VS Code
+host.
+
+Each spec card is itself a view over the card view-model: its body is a keyboard-accessible
+button reusing the existing `openDocument` intent to open `requirements.md` (a disabled no-op
+when that document is absent), and its inner controls stop click propagation so only the card
+background is the open gesture. The status shown on the card is a clickable badge that toggles
+the same [SpecStatusFilter](../src/core/status/SpecStatusFilter.ts) as its matching toolbar
+stat toggle, so the two surfaces stay in sync. The state-representative badge colors come from
+the single [SpecStatusColor](../src/core/status/SpecStatusColor.ts) mapping (keyed by filter
+key and shared by both surfaces), bound to VS Code theme color variables in CSS so they
+respect light and dark themes. The discreet owning-folder label on each card is derived by the
+pure [deriveSpecOwnerLabel](../src/core/status/SpecOwnerLabel.ts) helper and rendered as
+escaped plain text. All of these are client-side over the received view-models: they trigger
+no extension-host round-trip beyond the existing openDocument intent and no full re-render
+beyond the existing filter re-render.
 
 The "Specs by Status" tree view contributes a declarative `view/item/context` menu (open
 requirements/design/tasks/notes and run tasks). Each spec tree item carries a `contextValue`
@@ -179,7 +195,8 @@ only consumer of the full task tree, which keeps the retained dashboard data lea
 - DTO / view-model projection: [SpecCardViewMapper](../src/core/status/SpecCardViewMapper.ts)
   projects a full [ISpecSnapshot](../src/core/model/ISpecSnapshot.ts) onto the lean
   [ISpecCardView](../src/core/model/ISpecCardView.ts) the webview consumes, dropping the task
-  tree so each `postMessage` payload stays small.
+  tree so each `postMessage` payload stays small and deriving the card's owner label via
+  [deriveSpecOwnerLabel](../src/core/status/SpecOwnerLabel.ts).
 - Bounded-concurrency iterator: [mapWithLimit](../src/core/BoundedMap.ts) is a pure,
   order-preserving worker-pool used by `SpecRepository` discovery to cap the number of
   in-flight spec reads, smoothing cold-scan tail latency and file-handle pressure without

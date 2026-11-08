@@ -58,7 +58,8 @@
       },
       {
         "command": "kirospectracker.toggleLayout",
-        "title": "Kiro Spec Tracker: Toggle Dashboard Layout"
+        "title": "Kiro Spec Tracker: Toggle Dashboard Layout",
+        "icon": "$(layout)"
       },
       {
         "command": "kirospectracker.tree.openRequirements",

@@ -9,17 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.6.0 — Richer spec cards (UI, no external dependency) [Planned]
-
-- [ ] Make each spec card clickable: clicking the card body opens the spec's
-      `requirements.md`.
-- [ ] Make the status shown on each spec card a clickable badge that toggles the status
-      filter for that status (filter/unfilter specs with the same status), with a distinct,
-      state-representative color per status.
-- [ ] Replace the "Toggle Dashboard Layout" command text with a single button that switches
-      between a grid icon and a list icon (one toggling button, not two side-by-side buttons).
-- [ ] Show, on each spec card, the folder (or project) that owns the spec.
-
 ## v0.7.0 — Agent-driven task actions (best-effort, isolated behind a port) [Planned]
 
 The three agent actions below have no stable Kiro API; they are wired through an

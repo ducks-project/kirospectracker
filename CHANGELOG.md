@@ -6,6 +6,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-08
+
+### Added
+
+- Make each spec card body clickable to open the spec's `requirements.md`, reusing the
+  existing openDocument intent. The card body is a keyboard-accessible button (role, tab
+  stop, Enter/Space, an `aria-label` naming the spec); its inner controls (document links,
+  the run button, and the new status badge) stop click propagation, so clicking them never
+  also opens the card, and the open gesture is a disabled no-op when `requirements.md` is
+  absent.
+- Make the status shown on each spec card a clickable, state-colored badge that toggles the
+  status filter for that status. A card badge and the matching toolbar stat toggle drive the
+  same additive `SpecStatusFilter`, so they stay in sync; the badge is an accessible button
+  with an `aria-pressed` state reflecting whether that status filter is active. Each status
+  gets a distinct, theme-aware color (completed green, in progress orange, not started blue,
+  malformed red) bound to VS Code theme color variables, resolved through a single
+  `SpecStatusColor` mapping keyed by filter key and shared by both surfaces.
+- Show the owning workspace folder on each spec card as a discreet label, derived by the pure
+  `deriveSpecOwnerLabel` helper (the folder basename, computed filesystem-agnostically). It is
+  display-only and rendered as escaped plain text.
+
+### Changed
+
+- Replace the two side-by-side list/grid layout toggles with a single flipping icon button
+  that shows the glyph of the layout it will switch to and updates its `aria-label`,
+  tooltip and `aria-pressed` on toggle (grid modelled as the pressed state). The decision
+  moves to the pure `SpecLayoutToggleView.describeToggle`, and the Command Palette entry
+  keeps its text title while the view title-bar command is now icon-driven. The existing
+  `setLayout` behaviour and webview persistence are unchanged.
+
+All four items are pure, client-side UI over the card view-models the webview already
+receives: no new extension-host round-trip beyond the existing openDocument intent, and no
+new full re-render on a card click or badge toggle. The v0.3.0 incremental update protocol,
+the v0.1.1 persistent-toolbar focus behaviour, the v0.4.0 persisted filter/layout state and
+the v0.4.1 ready handshake are all preserved.
+
 ## [0.5.0] - 2026-11-07
 
 ### Changed
@@ -142,7 +178,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ducks-project/kirospectracker/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ducks-project/kirospectracker/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/ducks-project/kirospectracker/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ducks-project/kirospectracker/compare/v0.3.0...v0.4.0
