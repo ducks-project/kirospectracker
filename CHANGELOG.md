@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add an observability diagnostic for the agent actions: each action appends a line to a
+  "Kiro Spec Tracker" output channel naming the detected `kiroAgent.*` command ids, whether
+  the generic chat-open command was found, and which dispatch path was taken (`queue`,
+  `paste`, `chat-open` or `none`). The pure path-selection decision (`selectDispatchPath`)
+  stays unit-tested in the `vscode`-free adapter; only the output channel lives in a thin,
+  host-only `Vscode*` wrapper. Read it via View → Output → "Kiro Spec Tracker" to see what
+  your Kiro host actually exposes.
+
+### Fixed
+
+- Agent actions (Sync Files, Run required tasks, Run required and optional tasks), from both
+  the dashboard split button and the tree context menu, now always give honest, visible
+  feedback instead of appearing to do nothing. Each taken path raises a tailored
+  `window.showInformationMessage` toast through an injected `IAgentNotifier`: the
+  direct-argument queue path confirms the prompt was sent to the Kiro chat; the focus +
+  clipboard-paste path says the message was pasted and the user must press Enter (because that
+  path does not truly submit); the generic chat-open fallback says the chat was opened and may
+  still need to be sent; and when no usable command exists the error toast fires. A failed
+  send never masquerades as a success. The error and success channels are the same real,
+  host-backed `VscodeWorkspaceGateway` instance (both wired to `window.show*Message`), never a
+  disconnected no-op.
+
 ## [0.7.0] - 2026-11-08
 
 ### Added

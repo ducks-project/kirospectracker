@@ -98,6 +98,14 @@ Two things are not achievable through a stable contract and are approximated: at
 spec as structured chat context, and guaranteeing a brand-new chat session. The spec name is
 interpolated into the message text as the best available disambiguator.
 
+Every action gives honest, visible feedback: a confirmation toast when the prompt is sent
+directly, a "pasted — press Enter to run it" toast when only the focus + clipboard-paste
+workaround is available, an "opened the chat — you may need to send it" toast for the generic
+chat fallback, and an error toast when no usable command exists. Each action also writes a
+diagnostic line to the **"Kiro Spec Tracker" output channel** (View → Output → "Kiro Spec
+Tracker") naming the detected `kiroAgent.*` command ids and which dispatch path was taken; use
+it to see what your editor actually exposes when an action behaves unexpectedly.
+
 On first activation (while the integration is enabled) a one-time, non-modal notice explains
 this and lets you keep it enabled, disable it, or open the settings. You can enable or disable
 the integration at any time with the `kirospectracker.agentIntegration.enabled` setting; when
