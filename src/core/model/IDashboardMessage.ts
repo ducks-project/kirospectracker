@@ -1,3 +1,4 @@
+import type { RunScope } from '../ports/ISpecAgentGateway';
 import type { ISpecCardView } from './ISpecCardView';
 import type { ISpecStats } from './ISpecStats';
 
@@ -33,9 +34,16 @@ export interface IOpenDocumentMessage {
   readonly document: SpecDocumentKind;
 }
 
-/** Inbound message: run the tasks of a spec. */
+/** Inbound message: run the tasks of a spec for the given scope. */
 export interface IRunTasksMessage {
   readonly type: 'runTasks';
+  readonly folderPath: string;
+  readonly scope: RunScope;
+}
+
+/** Inbound message: sync/update the tasks files of a spec. */
+export interface ISyncFilesMessage {
+  readonly type: 'syncFiles';
   readonly folderPath: string;
 }
 
@@ -65,5 +73,6 @@ export type DashboardOutboundMessage = IRenderMessage | IToggleLayoutMessage | I
 export type DashboardInboundMessage =
   | IOpenDocumentMessage
   | IRunTasksMessage
+  | ISyncFilesMessage
   | ISetLayoutMessage
   | IReadyMessage;
