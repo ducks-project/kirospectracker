@@ -17,6 +17,7 @@ or run a spec. It is read-only, fully local, and ships no telemetry and no netwo
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [How progress is computed](#how-progress-is-computed)
+- [Agent actions (beta)](#agent-actions-beta)
 - [Usage](#usage)
 - [Settings](#settings)
 - [Security and privacy](#security-and-privacy)
@@ -38,9 +39,13 @@ or run a spec. It is read-only, fully local, and ships no telemetry and no netwo
 - **Specs-by-status tree** — a lightweight activity-bar tree grouping specs by status for
   quick navigation, with a right-click context menu to open a spec's documents or run its
   tasks.
-- **Run tasks (honest MVP)** — from the dashboard, the explorer context menu on a spec
-  folder, or the Command Palette, open a spec's `tasks.md` and, only with your explicit
-  consent, copy a ready-to-paste execution prompt to the clipboard.
+- **Run tasks (honest MVP)** — from the explorer context menu on a spec folder or the
+  Command Palette, open a spec's `tasks.md` and, only with your explicit consent, copy a
+  ready-to-paste execution prompt to the clipboard.
+- **Agent actions (beta, best-effort)** — from the dashboard cards (a "Sync Files" button and
+  a "Run tasks" split button) and the "Specs by Status" tree context menu, ask the editor's
+  chat agent to update or run a spec's tasks. See
+  [Agent actions (beta)](#agent-actions-beta) for scope and limitations.
 
 ## Screenshots
 
@@ -74,6 +79,30 @@ total`). Each spec resolves to one of five states:
 
 The full model is documented in the project steering file `kiro-spec-format.md`.
 
+## Agent actions (beta)
+
+The dashboard cards and the "Specs by Status" tree context menu offer three agent actions
+that ask the editor's chat agent (such as Kiro) to act on a spec:
+
+- **Sync Files** — sends `Update the tasks for the {spec name}` to the chat.
+- **Run required tasks** — sends `Run all required tasks`.
+- **Run required and optional tasks** — sends `Run required and optional tasks`.
+
+These actions are **best-effort and in beta**. There is no official, stable editor command
+for driving a chat agent, so the integration uses non-official command surfaces and may
+change or stop working on an editor update. It degrades gracefully: when no usable command
+surface is detected (or when you disable the integration), the same actions fall back to the
+honest MVP, opening the spec's `tasks.md` and offering a consented, ready-to-paste prompt.
+
+Two things are not achievable through a stable contract and are approximated: attaching the
+spec as structured chat context, and guaranteeing a brand-new chat session. The spec name is
+interpolated into the message text as the best available disambiguator.
+
+On first activation (while the integration is enabled) a one-time, non-modal notice explains
+this and lets you keep it enabled, disable it, or open the settings. You can enable or disable
+the integration at any time with the `kirospectracker.agentIntegration.enabled` setting; when
+disabled, the actions use the honest fallback described above.
+
 ## Usage
 
 1. Open a workspace that contains one or more `.kiro/specs/<name>/` folders.
@@ -84,8 +113,15 @@ The full model is documented in the project steering file `kiro-spec-format.md`.
 
 ## Settings
 
-The extension works with no configuration. Settings that tune which documents make a spec
-`Malformed` and other behaviors are documented in the extension's contribution points.
+The extension works with no configuration.
+
+- `kirospectracker.agentIntegration.enabled` (boolean, default `true`) — enable the
+  best-effort agent integration driving the Sync Files and Run tasks actions through the
+  editor's chat agent. When disabled, those actions degrade to opening `tasks.md` and offering
+  a consented, ready-to-paste prompt. See [Agent actions (beta)](#agent-actions-beta).
+
+Other behaviors, such as which documents make a spec `Malformed`, are documented in the
+extension's contribution points.
 
 ## Security and privacy
 

@@ -16,8 +16,11 @@ boundary with `vscode`.
   ([IDocumentPolicy](../src/core/ports/IDocumentPolicy.ts),
   [IScheduler](../src/core/ports/IScheduler.ts),
   [IRandomSource](../src/core/ports/IRandomSource.ts),
+  [ISpecAgentGateway](../src/core/ports/ISpecAgentGateway.ts),
   [ISpecFileSystem](../src/adapters/ports/ISpecFileSystem.ts),
-  [IWorkspaceGateway](../src/adapters/ports/IWorkspaceGateway.ts)).
+  [IWorkspaceGateway](../src/adapters/ports/IWorkspaceGateway.ts),
+  [ICommandGateway](../src/adapters/ports/ICommandGateway.ts),
+  [IAgentErrorReporter](../src/adapters/ports/IAgentErrorReporter.ts)).
 - Adapters (`adapters/`): the only layer that imports `vscode`. Implements the ports, reads
   the file system, decorates the explorer, hosts the dashboard webview and the tree view,
   and registers the commands.
@@ -40,12 +43,16 @@ flowchart TD
     CMD["commands/*"]
     VFS["VscodeSpecFileSystem"]
     VWG["VscodeWorkspaceGateway"]
+    AGT["agent/* (Kiro / Null / Factory)"]
+    VCG["VscodeCommandGateway"]
   end
 
   subgraph Ports["ports (type-only)"]
     ISFS["ISpecFileSystem"]
     IWG["IWorkspaceGateway"]
     IDP["IDocumentPolicy"]
+    ISAG["ISpecAgentGateway"]
+    ICG["ICommandGateway"]
   end
 
   subgraph Core["core/ (pure, no vscode)"]
@@ -67,6 +74,10 @@ flowchart TD
   REPO --> FACT
   VFS -. implements .-> ISFS
   VWG -. implements .-> IWG
+  AGT -. implements .-> ISAG
+  VCG -. implements .-> ICG
+  EXT --> AGT
+  AGT --> VCG
   FACT --> PARSE
   FACT --> META
   FACT --> RES
@@ -138,15 +149,17 @@ no extension-host round-trip beyond the existing openDocument intent and no full
 beyond the existing filter re-render.
 
 The "Specs by Status" tree view contributes a declarative `view/item/context` menu (open
-requirements/design/tasks/notes and run tasks). Each spec tree item carries a `contextValue`
-built by the pure [buildSpecTreeContextValue](../src/core/status/SpecTreeContextValue.ts):
-a `spec` base token, one `doc-<kind>` token per present document, and a `runnable` token for
-a non-malformed spec. The package.json `when` clauses match these tokens with regular
-expressions, so an action whose document is absent is hidden and "Run tasks" is hidden for a
-malformed spec. The menu commands are thin, tree-item-aware wrappers registered in
-`extension.ts`; they resolve the targeted spec from the node argument and reuse the existing
-`OpenDocumentCommand` and `RunTasksCommand` (the latter already refuses a malformed spec), so
-no behaviour is duplicated.
+requirements/design/tasks/notes, plus the agent actions Sync Files / Run required tasks / Run
+required and optional tasks). Each spec tree item carries a `contextValue` built by the pure
+[buildSpecTreeContextValue](../src/core/status/SpecTreeContextValue.ts): a `spec` base token,
+one `doc-<kind>` token per present document, and the three agent-action tokens (`agent-sync`,
+`agent-run-required`, `agent-run-optional`) for a non-malformed spec. The package.json `when`
+clauses match these tokens with regular expressions, so an action whose document is absent is
+hidden and the task actions are hidden for a malformed spec; a separator keeps the document
+actions apart from the task actions. The open commands are thin, tree-item-aware wrappers over
+the existing `OpenDocumentCommand`, while the three task-action commands call the SAME
+[SpecAgentActions](../src/adapters/SpecAgentActions.ts) the dashboard buttons use, so no
+behaviour is duplicated.
 
 ## Run-tasks flow (MVP)
 
@@ -173,6 +186,85 @@ Since 0.3.0 the snapshot no longer caches the parsed task tree, so `RunTasksComm
 `tasks.md` on demand through the `ISpecFileSystem` port and `TasksMarkdownParser` when the
 user actually runs a spec, then derives the pending leaf titles for the prompt. It is the
 only consumer of the full task tree, which keeps the retained dashboard data lean.
+
+## Agent actions flow (Sync Files / Run tasks)
+
+The agent-driven Sync Files and Run tasks actions are modelled as an intent-level, pure port
+[ISpecAgentGateway](../src/core/ports/ISpecAgentGateway.ts) with three members
+(`availability`, `syncTasks`, `runTasks`). The core and the webview depend only on this port
+and on the fixed message templates in
+[SpecAgentMessages](../src/core/SpecAgentMessages.ts) (only the spec name is interpolated, a
+security property: no instruction is built from untrusted free text). They never reference
+any `kiroAgent.*` command, the clipboard, or focus timing.
+
+Both UI entry points route through one shared implementation
+[SpecAgentActions](../src/adapters/SpecAgentActions.ts): the dashboard delegates its typed
+`syncFiles` / `runTasks` (with a scope) `postMessage` intents through
+[IDashboardActions](../src/adapters/ports/IDashboardActions.ts), and the tree context-menu
+commands (`kirospectracker.tree.syncFiles`, `.runRequired`, `.runRequiredAndOptional`) resolve
+the targeted spec from the node argument. Each entry point resolves a `folderPath`, looks the
+cached [ISpecSnapshot](../src/core/model/ISpecSnapshot.ts) up from `SpecRepository`, and calls
+exactly one gateway method (DRY).
+
+```mermaid
+flowchart TD
+  DASH["Dashboard split button + Sync Files"] --> ACT["SpecAgentActions (shared)"]
+  TREE["Tree context menu"] --> ACT
+  ACT --> PORT["ISpecAgentGateway (port)"]
+  PORT -. Strategy .-> KIRO["KiroChatAgentGateway (best-effort)"]
+  PORT -. Strategy .-> NULL["UnavailableAgentGateway (Null Object)"]
+  KIRO --> VCG["VscodeCommandGateway (thin, vscode)"]
+  NULL --> RTC["RunTasksCommand (honest MVP)"]
+  FACT["SpecAgentGatewayFactory"] -. selects .-> KIRO
+  FACT -. selects .-> NULL
+```
+
+The concrete gateway is chosen once in the composition root by
+[SpecAgentGatewayFactory](../src/adapters/agent/SpecAgentGatewayFactory.ts): it probes
+`getCommands(true)` through the thin
+[VscodeCommandGateway](../src/adapters/VscodeCommandGateway.ts) and, when the integration is
+enabled and a `kiroAgent.*` (or the generic `workbench.action.chat.open`) surface is present,
+builds [KiroChatAgentGateway](../src/adapters/agent/KiroChatAgentGateway.ts); otherwise, or
+when the integration is disabled, it binds the Null-Object
+[UnavailableAgentGateway](../src/adapters/agent/UnavailableAgentGateway.ts). The gateway starts
+on the always-valid Null Object and is upgraded once detection resolves, so the UI works from
+the first tick and never needs an `if (gateway)` guard.
+
+`KiroChatAgentGateway` is the single containment point for all fragility: it knows the
+undocumented `kiroAgent.*` ids, the generic chat-open fallback, the focus/paste timing and the
+clipboard. For each send it builds the fixed message, then picks the most robust available
+path — prefer the direct-argument `kiroAgent.executions.queueUserMessage`; else the focus +
+clipboard-paste workaround (`kiroAgent.focusContinueInput` → paste →
+`kiroAgent.sendMainUserInput`) that **saves and always restores the prior clipboard**, even on
+failure; else the generic `workbench.action.chat.open`. A failure is surfaced through the
+[IAgentErrorReporter](../src/adapters/ports/IAgentErrorReporter.ts) channel and never thrown to
+the UI. The selection/sequencing logic lives in this adapter and is unit-tested against a fake
+[ICommandGateway](../src/adapters/ports/ICommandGateway.ts); only the raw `vscode` calls live
+in the excluded thin wrapper.
+
+Two capabilities are not achievable through a stable contract and are approximated:
+attaching the spec as structured chat context (no API), and guaranteeing a brand-new chat
+session (focus commands do not start a fresh session). The spec name interpolated into the
+message is the best available disambiguator; these limits are documented here and in the
+README rather than faked.
+
+A future official Kiro API or another spec-driven IDE becomes just another adapter plus a
+factory branch, with no change to the core, the UI wiring, the message templates, or the DRY
+action path.
+
+## Agent integration beta notice
+
+On activation, when the integration is enabled and not yet acknowledged, the extension shows a
+one-time, non-modal `window.showInformationMessage` toast (the native, stable API — the notice
+itself is not fragile, only the Sync/Run actions it describes are best-effort). The pure
+[AgentBetaNoticeDecider](../src/core/AgentBetaNoticeDecider.ts) owns the decision logic (given
+`enabled?` and `acknowledged?`, whether to show; and which effect a choice maps to), while the
+thin [VscodeAgentBetaNotice](../src/adapters/VscodeAgentBetaNotice.ts) adapter reads the
+setting and the `globalState` flag, shows the toast, and applies the effect: "Keep enabled"
+persists the acknowledgement (never shows again), "Disable" turns off the
+`kirospectracker.agentIntegration.enabled` setting (the Null Object takes over), "Settings"
+opens the extension settings, and dismissing with the close affordance persists nothing (the
+notice reappears next launch while the integration stays enabled).
 
 ## Patterns
 
@@ -205,6 +297,16 @@ only consumer of the full task tree, which keeps the retained dashboard data lea
   the additive status-filter selection as an immutable value object (every toggle returns a
   new instance), composed with the search by [SpecCardFilter](../src/core/status/SpecCardFilter.ts).
   The pure decision is unit- and property-tested, and the webview DOM only applies it.
+- Strategy / Adapter / Null Object / Factory for the agent actions:
+  [ISpecAgentGateway](../src/core/ports/ISpecAgentGateway.ts) is the strategy interface;
+  [KiroChatAgentGateway](../src/adapters/agent/KiroChatAgentGateway.ts) adapts the messy
+  command/clipboard surface and is the single containment point for fragility;
+  [UnavailableAgentGateway](../src/adapters/agent/UnavailableAgentGateway.ts) is the Null
+  Object that removes `if (gateway)` guards from the UI and degrades to the honest MVP; and
+  [SpecAgentGatewayFactory](../src/adapters/agent/SpecAgentGatewayFactory.ts) selects the
+  strategy at runtime by capability detection, honoring the disable setting. The three fixed
+  message strings live once in [SpecAgentMessages](../src/core/SpecAgentMessages.ts) (data
+  table + DRY).
 
 ## Security boundary
 
@@ -212,3 +314,10 @@ only consumer of the full task tree, which keeps the retained dashboard data lea
 - The dashboard webview uses a strict Content Security Policy with a per-render nonce, loads
   only local bundled resources, and renders untrusted spec text as plain text.
 - No network, no telemetry, no evaluation of spec or configuration content as code.
+- The agent actions invoke only host commands discovered via `getCommands`, and only with
+  fixed message templates whose sole interpolated value is the already-trusted spec folder
+  name. Any clipboard-paste path saves and restores the prior clipboard, and the honest
+  fallback keeps its explicit consent prompt. The new `vscode`-touching surfaces are the thin
+  [VscodeCommandGateway](../src/adapters/VscodeCommandGateway.ts) and
+  [VscodeAgentBetaNotice](../src/adapters/VscodeAgentBetaNotice.ts) wrappers; the beta notice
+  uses the native, stable `window.showInformationMessage` API.

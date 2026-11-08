@@ -6,6 +6,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-08
+
+### Added
+
+- Drive the agent-driven Sync Files and Run tasks actions from the dashboard cards and the
+  "Specs by Status" tree context menu, wired through an intent-level `ISpecAgentGateway` port
+  (pure, in core) so the core and UI never reference any editor command. A
+  `KiroChatAgentGateway` adapter confines every fragile detail (the undocumented `kiroAgent.*`
+  commands, the generic chat-open fallback, the focus/paste timing, and the clipboard
+  workaround) and always restores the prior clipboard around a paste; an
+  `UnavailableAgentGateway` Null-Object fallback degrades both actions to the honest MVP (open
+  `tasks.md` and offer a consented, ready-to-paste prompt); and a capability-detection factory
+  (`getCommands(true)`) selects the adapter at runtime. "Sync Files" sends
+  `Update the tasks for the {spec name}`, "Run required tasks" sends `Run all required tasks`,
+  and "Run required and optional tasks" sends `Run required and optional tasks`; the fixed
+  message templates interpolate only the spec name. Both UI entry points call one shared
+  implementation behind the port (DRY). The integration relies on non-official, unstable
+  editor command surfaces and degrades gracefully when they are absent; there is no stable way
+  to attach the spec as structured chat context or to guarantee a new chat session, so the
+  spec name is interpolated into the message text as the best available approximation.
+- Surface a one-time beta notice on activation (when the integration is enabled and not yet
+  acknowledged) through the native, stable `window.showInformationMessage` toast with three
+  buttons: "Keep enabled" (persist the acknowledgement in global state so the notice never
+  shows again; integration stays on), "Disable" (turn the integration off; the Null-Object
+  fallback takes over), and "Settings" (open the extension settings). Dismissing the toast
+  with the close affordance persists nothing, so the notice reappears on the next launch while
+  the integration stays enabled. The pure decision logic lives in a `vscode`-free, unit-tested
+  helper; only the toast and global-state access live in a thin adapter.
+- Add the `kirospectracker.agentIntegration.enabled` setting (default `true`) to enable or
+  disable the best-effort agent integration. When disabled, the factory always binds the
+  Null-Object fallback regardless of detected capability.
+
+### Changed
+
+- Evolve the dashboard "Run tasks" control into a split button (a primary "Run tasks" action
+  with a keyboard-accessible dropdown exposing "Run required tasks" and "Run required and
+  optional tasks") and add a "Sync Files" button next to it, matching the reference layout.
+  The webview dispatches typed `postMessage` intents (a `syncFiles` intent and a `runTasks`
+  carrying a scope); the CSP/nonce, `textContent`-only DOM building, accessible buttons
+  (`aria-label`, `aria-expanded`, `role`), the v0.1.1 persistent-toolbar focus and the v0.3.0
+  incremental protocol are all preserved. The tree context menu replaces its single "Run
+  tasks" entry with Sync Files / Run required tasks / Run required and optional tasks, keeping
+  the separator between the document actions and the task actions.
+
 ## [0.6.0] - 2026-11-08
 
 ### Added
@@ -178,7 +222,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.6.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ducks-project/kirospectracker/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ducks-project/kirospectracker/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ducks-project/kirospectracker/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/ducks-project/kirospectracker/compare/v0.4.0...v0.4.1

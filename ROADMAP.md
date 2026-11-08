@@ -9,42 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.7.0 — Agent-driven task actions (best-effort, isolated behind a port) [Planned]
-
-The three agent actions below have no stable Kiro API; they are wired through an
-intent-level `ISpecAgentGateway` port (pure, in core) with a concrete `KiroChatAgentGateway`
-adapter confining all fragility (undocumented `kiroAgent.*` commands, clipboard fallback,
-focus timing), an `UnavailableAgentGateway` Null-Object fallback degrading to the honest MVP
-(open `tasks.md` + consented clipboard copy), and a capability-detection factory
-(`getCommands(true)`) selecting the adapter at runtime. Patterns: Strategy, Adapter, Null
-Object, Factory. A future official Kiro API or another IDE becomes just another adapter with
-no change to core or UI. Design recorded in `.agents/tasks/kiro-agent-api/findings.md`.
-
-- [ ] Add a "Sync Files" button and evolve the "Run tasks" control into a split button with
-      a dropdown ("Run required tasks" / "Run required and optional tasks"), matching the
-      reference screenshot. Intended behavior: "Sync Files" sends
-      `Update the tasks for the {spec name}` to the Kiro chat; "Run required tasks" opens a
-      new Kiro chat with `Run all required tasks` and the spec as context; "Run required and
-      optional tasks" does the same with `Run required and optional tasks`.
-- [ ] Evolve the "Specs by Status" right-click context menu to the same actions, keeping the
-      separator between the document actions (requirements / design / tasks) and the task
-      actions (run). To respect DRY, the context menu and the dashboard card buttons share
-      the same single implementation behind the port (differing menu labels are acceptable).
-- [ ] Keep the agent actions enabled by default and surface a beta notice through the native,
-      stable `window.showInformationMessage` API (the notice itself has nothing fragile; only
-      the Sync/Run actions it describes are best-effort). Suggested message: "Kiro Spec
-      Tracker's Sync Files and Run tasks actions adapt on a best-effort basis to the editor
-      and are in beta: they may change and can be disabled at any time." Offer three buttons:
-      "Keep enabled" (persist acknowledgement in global state so the notice never shows
-      again; integration stays on), "Disable" (set the disable setting; the Null-Object
-      fallback takes over), and "Settings" (open the extension settings via
-      `workbench.action.openSettings` with `@ext:ducks-project.kirospectracker`). Dismissing
-      with the close affordance (the API returns `undefined`) persists nothing, so the notice
-      reappears on the next launch while the integration stays enabled. Use a non-modal
-      toast, not a modal dialog. Provide a setting to disable the agent integration.
-- [ ] Document the integration as relying on non-official, unstable editor command surfaces
-      with graceful degradation (README, architecture, PRIVACY note on the clipboard path).
-
 ## v0.8.0 — Task-level statistics and extended task states [Planned]
 
 - [ ] Add discreet global statistics counted over tasks (not specs): total tasks done, in
