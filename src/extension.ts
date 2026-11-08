@@ -27,6 +27,7 @@ import { DASHBOARD_VIEW_ID, SpecDashboardViewProvider } from './adapters/SpecDas
 import { VscodeSpecFileSystem } from './adapters/VscodeSpecFileSystem';
 import { VscodeWorkspaceGateway } from './adapters/VscodeWorkspaceGateway';
 import { VscodeCommandGateway } from './adapters/VscodeCommandGateway';
+import { VscodeOutputChannelDiagnosticSink } from './adapters/VscodeOutputChannelDiagnosticSink';
 import { VscodeAgentBetaNotice } from './adapters/VscodeAgentBetaNotice';
 import { WebCryptoRandomSource } from './adapters/WebCryptoRandomSource';
 import { SpecAgentActions } from './adapters/SpecAgentActions';
@@ -103,6 +104,7 @@ interface IWiring {
   readonly agentActions: SpecAgentActions;
   readonly agentFallback: UnavailableAgentGateway;
   readonly commandGateway: VscodeCommandGateway;
+  readonly agentDiagnostics: VscodeOutputChannelDiagnosticSink;
   readonly toggleLayout: ToggleLayoutCommand;
   readonly refresh: RefreshCommand;
   readonly gateway: VscodeWorkspaceGateway;
@@ -260,7 +262,6 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   const stats = new SpecStatsCalculator();
   const openDocument = new OpenDocumentCommand(repository, gateway);
   const runTasks = buildRunTasksCommand(repository, fileSystem, gateway);
-  const commandGateway = new VscodeCommandGateway();
   const agentFallback = new UnavailableAgentGateway(runTasks);
   // Start on the always-valid Null Object; capability detection may upgrade it
   // to the Kiro best-effort adapter once activation resolves the command surface.
@@ -278,7 +279,8 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
     runTasks,
     agentActions,
     agentFallback,
-    commandGateway,
+    commandGateway: new VscodeCommandGateway(),
+    agentDiagnostics: new VscodeOutputChannelDiagnosticSink(),
     toggleLayout: new ToggleLayoutCommand(dashboard),
     refresh: new RefreshCommand(repository),
     gateway,
@@ -355,6 +357,7 @@ function registerDisposables(context: vscode.ExtensionContext, wiring: IWiring):
     wiring.decorations,
     wiring.dashboard,
     wiring.tree,
+    wiring.agentDiagnostics,
     vscode.window.registerWebviewViewProvider(DASHBOARD_VIEW_ID, wiring.dashboard),
     vscode.window.registerFileDecorationProvider(wiring.decorations),
     vscode.window.registerTreeDataProvider(TREE_VIEW_ID, wiring.tree),
@@ -402,7 +405,10 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
  *
  * The actions start on the always-valid Null Object, so the UI works from the
  * first tick; this upgrades it to the Kiro adapter when a usable command surface
- * is present and the integration is enabled. Any failure is surfaced through the
+ * is present and the integration is enabled. The real {@link VscodeWorkspaceGateway}
+ * is passed as BOTH the error reporter and the success/affordance notifier (so
+ * every path is visibly backed by `vscode.window`), and the output-channel sink
+ * carries the observability diagnostic. Any failure is surfaced through the
  * gateway without leaking.
  * @param context The extension context (global state, settings).
  * @param wiring The constructed collaborators.
@@ -414,6 +420,8 @@ function setUpAgentIntegration(context: vscode.ExtensionContext, wiring: IWiring
     const resolved = await createSpecAgentGateway(
       wiring.commandGateway,
       wiring.gateway,
+      wiring.gateway,
+      wiring.agentDiagnostics,
       wiring.agentFallback,
       enabled,
     );

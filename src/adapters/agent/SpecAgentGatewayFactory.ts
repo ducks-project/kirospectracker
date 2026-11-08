@@ -1,5 +1,7 @@
 import type { ISpecAgentGateway } from '../../core/ports/ISpecAgentGateway';
+import type { IAgentDiagnosticSink } from '../ports/IAgentDiagnosticSink';
 import type { IAgentErrorReporter } from '../ports/IAgentErrorReporter';
+import type { IAgentNotifier } from '../ports/IAgentNotifier';
 import type { ICommandGateway } from '../ports/ICommandGateway';
 import { KiroChatAgentGateway } from './KiroChatAgentGateway';
 import { UnavailableAgentGateway } from './UnavailableAgentGateway';
@@ -15,6 +17,8 @@ import { UnavailableAgentGateway } from './UnavailableAgentGateway';
  * the single adapter decision in the composition root (Dependency Inversion).
  * @param commands The thin command/clipboard gateway (probed once).
  * @param reporter The error channel passed to the Kiro adapter.
+ * @param notifier The success/affordance channel passed to the Kiro adapter.
+ * @param diagnostics The observability sink passed to the Kiro adapter.
  * @param fallback The Null-Object fallback (already wired over the honest MVP).
  * @param enabled Whether the agent integration is enabled (the setting).
  * @returns The selected gateway.
@@ -22,6 +26,8 @@ import { UnavailableAgentGateway } from './UnavailableAgentGateway';
 export async function createSpecAgentGateway(
   commands: ICommandGateway,
   reporter: IAgentErrorReporter,
+  notifier: IAgentNotifier,
+  diagnostics: IAgentDiagnosticSink,
   fallback: UnavailableAgentGateway,
   enabled: boolean,
 ): Promise<ISpecAgentGateway> {
@@ -30,7 +36,7 @@ export async function createSpecAgentGateway(
   }
   const ids = await commands.getCommands();
   if (KiroChatAgentGateway.isSupported(ids)) {
-    return new KiroChatAgentGateway(commands, reporter);
+    return new KiroChatAgentGateway(commands, reporter, notifier, diagnostics);
   }
   return fallback;
 }

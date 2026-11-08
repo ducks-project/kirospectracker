@@ -1,17 +1,25 @@
 import * as vscode from 'vscode';
 
+import type { IAgentErrorReporter } from './ports/IAgentErrorReporter';
+import type { IAgentNotifier } from './ports/IAgentNotifier';
 import type { IWorkspaceGateway } from './ports/IWorkspaceGateway';
 
 /**
  * Thin host wrapper implementing {@link IWorkspaceGateway} over the real
  * `vscode` window/workspace/clipboard API.
  *
- * It is the only command-side component importing `vscode`; it holds no logic
- * beyond the direct API calls, so the command classes stay unit-testable and
- * this wrapper is evidenced by the integration harness rather than the
- * in-process gate (its name matches the `Vscode*` coverage exclusion).
+ * It also satisfies {@link IAgentErrorReporter} (via {@link showError}) and
+ * {@link IAgentNotifier} (via {@link notifyInfo}), so the agent adapter's error
+ * and success channels are the SAME real, host-backed instance in production —
+ * never a no-op or disconnected stub. It is the only command-side component
+ * importing `vscode`; it holds no logic beyond the direct API calls, so the
+ * command classes stay unit-testable and this wrapper is evidenced by the
+ * integration harness rather than the in-process gate (its name matches the
+ * `Vscode*` coverage exclusion).
  */
-export class VscodeWorkspaceGateway implements IWorkspaceGateway {
+export class VscodeWorkspaceGateway
+  implements IWorkspaceGateway, IAgentErrorReporter, IAgentNotifier
+{
   /**
    * Open a document in the active editor group.
    * @param filePath Absolute path of the file to open.
@@ -53,6 +61,17 @@ export class VscodeWorkspaceGateway implements IWorkspaceGateway {
    */
   // eslint-disable-next-line class-methods-use-this
   public showInfo(message: string): void {
+    vscode.window.showInformationMessage(message).then(undefined, undefined);
+  }
+
+  /**
+   * Surface an informational message, satisfying {@link IAgentNotifier} so the
+   * agent adapter's success/affordance channel is this real, host-backed
+   * instance rather than a no-op.
+   * @param message The message to show.
+   */
+  // eslint-disable-next-line class-methods-use-this
+  public notifyInfo(message: string): void {
     vscode.window.showInformationMessage(message).then(undefined, undefined);
   }
 
