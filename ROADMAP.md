@@ -38,6 +38,10 @@ of truth for what has been released. Items use GitHub task lists: `- [ ]` (not d
 ## v1.0.0 — First stable release [Planned]
 
 - [ ] Publish to Open VSX and stabilize the public contribution points and settings.
+- [ ] Resolve the agent-gateway availability loose ends from v0.7.0: either surface the
+      three-state `availability()` in the UI (an honest integrated / degraded / unavailable
+      affordance on the agent actions) or simplify the `SpecAgentAvailability` union to the
+      states actually produced, so no discriminant stays dead.
 
 ## to analyse — Dashboard list virtualization [Planned]
 
