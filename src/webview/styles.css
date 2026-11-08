@@ -193,15 +193,103 @@ body {
   padding: var(--gap);
 }
 
+/* The card body is a button opening requirements.md; keep inner controls above
+   it so their own click (which stops propagation) reads as the inner action. */
+.card-clickable {
+  cursor: pointer;
+}
+
+.card-clickable:hover {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-hoverBackground);
+}
+
+.card-clickable:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
 .card-title {
   font-size: 1rem;
   margin: 0;
 }
 
-.card-status {
+.card-owner {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-top: 0.1rem;
+}
+
+/* The status badge is a clickable toggle filter, colored by state. Reset the
+   native button look and inherit the card palette for a compact pill. */
+.card-status.badge {
+  font: inherit;
   font-size: 0.7rem;
   text-transform: uppercase;
-  opacity: 0.7;
+  cursor: pointer;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: var(--vscode-foreground);
+  white-space: nowrap;
+}
+
+.card-status.badge:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.card-status.badge[aria-pressed='true'] {
+  color: var(--vscode-foreground);
+  font-weight: 600;
+}
+
+/* State-representative, theme-aware colors driven by VS Code chart/validation
+   theme variables so they respect light and dark themes (no raw hex). Each
+   token mirrors the status group shared with the toolbar stat toggles. */
+.badge-completed {
+  color: var(--vscode-charts-green, var(--vscode-testing-iconPassed, var(--vscode-foreground)));
+}
+
+.badge-completed[aria-pressed='true'] {
+  background: var(--vscode-charts-green, var(--vscode-testing-iconPassed));
+  color: var(--vscode-editor-background, var(--vscode-foreground));
+}
+
+.badge-inProgress {
+  color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground, var(--vscode-foreground)));
+}
+
+.badge-inProgress[aria-pressed='true'] {
+  background: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground));
+  color: var(--vscode-editor-background, var(--vscode-foreground));
+}
+
+.badge-notStarted {
+  color: var(--vscode-charts-blue, var(--vscode-textLink-foreground, var(--vscode-foreground)));
+}
+
+.badge-notStarted[aria-pressed='true'] {
+  background: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+  color: var(--vscode-editor-background, var(--vscode-foreground));
+}
+
+.badge-malformed {
+  color: var(--vscode-charts-red, var(--vscode-editorError-foreground, var(--vscode-foreground)));
+}
+
+.badge-malformed[aria-pressed='true'] {
+  background: var(--vscode-charts-red, var(--vscode-editorError-foreground));
+  color: var(--vscode-editor-background, var(--vscode-foreground));
 }
 
 .progress {

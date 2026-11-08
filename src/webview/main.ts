@@ -7,13 +7,15 @@ import type {
 import type { ISpecCardView } from '../core/model/ISpecCardView';
 import type { ISpecStats } from '../core/model/ISpecStats';
 import type { SpecFilterKey } from '../core/model/SpecFilterKey';
-import type { ISpecLayoutOptionView } from '../core/status/SpecLayoutToggleView';
+import type { ISpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
 import type { ISpecStatToggleView } from '../core/status/SpecStatToggleView';
 import { planDashboardRender } from './DashboardRenderPlanner';
 import { SpecCardFilter } from '../core/status/SpecCardFilter';
 import { SpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
 import { SpecStatToggleView } from '../core/status/SpecStatToggleView';
 import { SpecStatusFilter } from '../core/status/SpecStatusFilter';
+import { colorTokenForStatus } from '../core/status/SpecStatusColor';
+import { statusToFilterKey } from '../core/model/SpecFilterKey';
 
 /** Persisted webview state surviving re-renders and view reloads. */
 interface IWebviewState {
@@ -206,13 +208,15 @@ function renderLinks(card: ISpecCardView): HTMLElement {
     const present = Boolean(card.documents[kind]);
     const link = el('button', present ? 'link' : 'link disabled', kind);
     if (present) {
-      link.addEventListener('click', () =>
+      link.addEventListener('click', (event) => {
+        // Inner control: do not also trigger the card-body open gesture.
+        event.stopPropagation();
         vscodeApi.postMessage({
           type: 'openDocument',
           folderPath: card.folderPath,
           document: kind,
-        }),
-      );
+        });
+      });
     } else {
       link.setAttribute('disabled', 'true');
       link.title = 'Document not present';
@@ -220,6 +224,34 @@ function renderLinks(card: ISpecCardView): HTMLElement {
     links.appendChild(link);
   });
   return links;
+}
+
+/**
+ * Render the clickable status badge for a spec.
+ *
+ * The badge is a real button toggling the status filter for its status, exactly
+ * as the matching toolbar stat toggle does (both call {@link toggleStatusFilter}
+ * over the same {@link SpecStatusFilter}, so they stay in sync). Its color class
+ * comes from the shared {@link colorTokenForStatus} mapping, and `aria-pressed`
+ * reflects whether that status filter is currently active.
+ * @param card The spec card view.
+ * @returns The badge button element.
+ */
+function renderStatusBadge(card: ISpecCardView): HTMLElement {
+  const key = statusToFilterKey(card.status);
+  const pressed = state.filter.isActive(key);
+  const badge = el('button', `card-status badge ${colorTokenForStatus(card.status)}`, card.status);
+  badge.setAttribute('type', 'button');
+  badge.setAttribute('aria-pressed', String(pressed));
+  badge.setAttribute('aria-label', `Filter by ${card.status} status`);
+  badge.title = `Filter by ${card.status} status`;
+  badge.addEventListener('click', (event) => {
+    // The badge is an inner control: stop the click from also triggering the
+    // card-body open gesture.
+    event.stopPropagation();
+    toggleStatusFilter(key);
+  });
+  return badge;
 }
 
 /**
@@ -234,10 +266,59 @@ function renderRunButton(card: ISpecCardView): HTMLElement {
     run.title = 'A malformed spec cannot be run';
     return run;
   }
-  run.addEventListener('click', () =>
-    vscodeApi.postMessage({ type: 'runTasks', folderPath: card.folderPath }),
-  );
+  run.addEventListener('click', (event) => {
+    // Inner control: do not also trigger the card-body open gesture.
+    event.stopPropagation();
+    vscodeApi.postMessage({ type: 'runTasks', folderPath: card.folderPath });
+  });
   return run;
+}
+
+/** Keys that activate the card-body open gesture from the keyboard. */
+const ACTIVATION_KEYS: ReadonlySet<string> = new Set(['Enter', ' ']);
+
+/**
+ * Open a spec's `requirements.md` through the existing openDocument intent.
+ * @param card The spec card view.
+ */
+function openCardRequirements(card: ISpecCardView): void {
+  vscodeApi.postMessage({
+    type: 'openDocument',
+    folderPath: card.folderPath,
+    document: 'requirements',
+  });
+}
+
+/**
+ * Make the card body a keyboard-accessible button opening the spec's
+ * `requirements.md`.
+ *
+ * Only the card background is the open gesture: inner controls (document links,
+ * run button, status badge) stop click propagation, so a click on them never
+ * also opens the card. When `requirements.md` is absent the card-body open is a
+ * disabled no-op (no role, no tabstop, no handler). The actual open reuses the
+ * existing openDocument postMessage path.
+ * @param article The card element.
+ * @param card The spec card view.
+ */
+function wireCardBody(article: HTMLElement, card: ISpecCardView): void {
+  if (!card.documents.requirements) {
+    article.classList.add('card-disabled');
+    return;
+  }
+  article.classList.add('card-clickable');
+  article.setAttribute('role', 'button');
+  article.setAttribute('tabindex', '0');
+  article.setAttribute('aria-label', `Open requirements for ${card.name}`);
+  article.addEventListener('click', () => openCardRequirements(card));
+  article.addEventListener('keydown', (event) => {
+    if (!ACTIVATION_KEYS.has(event.key)) {
+      return;
+    }
+    // Prevent the space key from scrolling and activate the open gesture.
+    event.preventDefault();
+    openCardRequirements(card);
+  });
 }
 
 /**
@@ -247,8 +328,11 @@ function renderRunButton(card: ISpecCardView): HTMLElement {
  */
 function renderCard(card: ISpecCardView): HTMLElement {
   const article = el('article', `card status-${card.status}`);
-  article.appendChild(el('h2', 'card-title', card.name));
-  article.appendChild(el('span', 'card-status', card.status));
+  const header = el('div', 'card-header');
+  header.appendChild(el('h2', 'card-title', card.name));
+  header.appendChild(renderStatusBadge(card));
+  article.appendChild(header);
+  article.appendChild(el('span', 'card-owner', card.ownerLabel));
   const { progress } = card;
   article.appendChild(
     renderProgress(
@@ -268,6 +352,7 @@ function renderCard(card: ISpecCardView): HTMLElement {
   );
   article.appendChild(renderLinks(card));
   article.appendChild(renderRunButton(card));
+  wireCardBody(article, card);
   return article;
 }
 
@@ -348,20 +433,36 @@ function selectLayout(layout: DashboardLayout): void {
 }
 
 /**
- * Render one icon layout toggle as an accessible pressed-state button.
- * @param option The layout option (layout, codicon glyph, label).
- * @returns The button element.
+ * Apply a single layout toggle view to a button element: its flipping glyph,
+ * labels and pressed state.
+ * @param button The toggle button to update.
+ * @param toggle The current single-toggle view from the core mapper.
  */
-function renderLayoutToggle(option: ISpecLayoutOptionView): HTMLElement {
-  const pressed = layoutToggleView.isPressed(option, state.layout);
-  const button = el('button', pressed ? 'toggle pressed' : 'toggle');
+function applyLayoutToggle(button: HTMLElement, toggle: ISpecLayoutToggleView): void {
+  button.setAttribute('data-next-layout', toggle.nextLayout);
+  button.setAttribute('aria-pressed', String(toggle.pressed));
+  button.setAttribute('aria-label', toggle.label);
+  button.title = toggle.label;
+  button.classList.toggle('pressed', toggle.pressed);
+  button.replaceChildren(icon(toggle.glyph));
+}
+
+/**
+ * Render the single, flipping icon layout toggle as an accessible button.
+ *
+ * One button replaces the former two side-by-side toggles: it shows the glyph
+ * of the layout a click will switch TO and flips on every click. The pure
+ * {@link SpecLayoutToggleView} decides the glyph, label and pressed state.
+ * @returns The toggle button element.
+ */
+function renderLayoutToggle(): HTMLElement {
+  const button = el('button', 'toggle');
   button.setAttribute('type', 'button');
-  button.setAttribute('data-layout', option.layout);
-  button.setAttribute('aria-pressed', String(pressed));
-  button.setAttribute('aria-label', option.label);
-  button.title = option.label;
-  button.appendChild(icon(option.glyph));
-  button.addEventListener('click', () => selectLayout(option.layout));
+  const toggle = layoutToggleView.describeToggle(state.layout);
+  applyLayoutToggle(button, toggle);
+  button.addEventListener('click', () =>
+    selectLayout(layoutToggleView.describeToggle(state.layout).nextLayout),
+  );
   return button;
 }
 
@@ -414,28 +515,23 @@ function renderToolbar(): HTMLElement {
   const toggles = el('div', 'layout-toggles');
   toggles.setAttribute('role', 'group');
   toggles.setAttribute('aria-label', 'Dashboard layout');
-  layoutToggleView.listOptions().forEach((option) => {
-    toggles.appendChild(renderLayoutToggle(option));
-  });
+  toggles.appendChild(renderLayoutToggle());
   toolbar.appendChild(toggles);
   return toolbar;
 }
 
 /**
- * Refresh the pressed state of the persistent layout toggles to match the
- * current layout, without rebuilding the toolbar (which hosts the search input).
+ * Refresh the single layout toggle (its flipping glyph, labels and pressed
+ * state) to match the current layout, without rebuilding the toolbar (which
+ * hosts the search input).
  * @param app The app root hosting the toolbar.
  */
 function syncToggleLabel(app: HTMLElement): void {
-  const toggles = app.querySelectorAll('.toolbar .layout-toggles .toggle');
-  toggles.forEach((node) => {
-    if (!(node instanceof HTMLElement)) {
-      return;
-    }
-    const pressed = node.getAttribute('data-layout') === state.layout;
-    node.setAttribute('aria-pressed', String(pressed));
-    node.classList.toggle('pressed', pressed);
-  });
+  const node = app.querySelector('.toolbar .layout-toggles .toggle');
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+  applyLayoutToggle(node, layoutToggleView.describeToggle(state.layout));
 }
 
 /**
