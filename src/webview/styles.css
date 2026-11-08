@@ -332,3 +332,92 @@ body {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.run:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* The task-action row holds the Sync Files button and the Run tasks split
+   button side by side, matching the reference layout. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: stretch;
+  margin-top: 0.3rem;
+}
+
+.sync {
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+}
+
+.sync:hover {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+}
+
+/* Split button: a primary action joined to a dropdown toggle, with the menu
+   anchored below it. */
+.run-split {
+  position: relative;
+  display: inline-flex;
+  margin-top: 0.3rem;
+}
+
+.run-split .run {
+  margin-top: 0;
+}
+
+.run-primary {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-toggle {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid var(--vscode-button-separator, var(--vscode-contrastBorder, transparent));
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+
+.run-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 100%;
+  padding: 0.2rem;
+  background: var(--vscode-menu-background, var(--vscode-dropdown-background, var(--vscode-editor-background)));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  border-radius: var(--radius);
+}
+
+.run-menu[hidden] {
+  display: none;
+}
+
+.run-menu-item {
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  padding: 0.35rem 0.6rem;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+.run-menu-item:hover {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
+}
+
+.run-menu-item:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}

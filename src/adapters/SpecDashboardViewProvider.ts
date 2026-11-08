@@ -196,7 +196,11 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
       return;
     }
     if ('runTasks' === message.type) {
-      this.actions.runTasks(message.folderPath).then(undefined, undefined);
+      this.actions.runTasks(message.folderPath, message.scope).then(undefined, undefined);
+      return;
+    }
+    if ('syncFiles' === message.type) {
+      this.actions.syncTasks(message.folderPath).then(undefined, undefined);
       return;
     }
     if ('ready' === message.type) {

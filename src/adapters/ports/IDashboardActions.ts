@@ -1,4 +1,5 @@
 import type { SpecDocumentKind } from '../../core/model/IDashboardMessage';
+import type { RunScope } from '../../core/ports/ISpecAgentGateway';
 
 /**
  * Port the dashboard webview delegates its inbound intents to.
@@ -16,8 +17,15 @@ export interface IDashboardActions {
   openDocument(folderPath: string, document: SpecDocumentKind): Promise<void>;
 
   /**
-   * Run the tasks of a spec (MVP: open `tasks.md`, optional consented copy).
+   * Run the tasks of a spec for the given scope, through the agent gateway.
+   * @param folderPath Absolute path of the spec folder.
+   * @param scope The run scope.
+   */
+  runTasks(folderPath: string, scope: RunScope): Promise<void>;
+
+  /**
+   * Sync/update the tasks files of a spec, through the agent gateway.
    * @param folderPath Absolute path of the spec folder.
    */
-  runTasks(folderPath: string): Promise<void>;
+  syncTasks(folderPath: string): Promise<void>;
 }

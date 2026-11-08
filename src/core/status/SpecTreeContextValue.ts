@@ -5,8 +5,27 @@ import { SpecStatus } from '../model/SpecStatus';
 /** Base token marking a tree node as a spec leaf (always present). */
 const SPEC_TOKEN = 'spec';
 
-/** Token appended when the spec is runnable (i.e. not malformed). */
-const RUNNABLE_TOKEN = 'runnable';
+/**
+ * Tokens gating the agent task actions (Sync Files, Run required, Run required
+ * and optional). They are present together under one condition (the spec is not
+ * malformed), but each gates a distinct `view/item/context` entry, so each has
+ * its own token to keep the "exactly one anchored clause per gating token"
+ * contract the manifest assertion enforces.
+ */
+const AGENT_SYNC_TOKEN = 'agent-sync';
+
+/** Token gating the "Run required tasks" agent action. */
+const AGENT_RUN_REQUIRED_TOKEN = 'agent-run-required';
+
+/** Token gating the "Run required and optional tasks" agent action. */
+const AGENT_RUN_OPTIONAL_TOKEN = 'agent-run-optional';
+
+/** The agent-action tokens, present together for a non-malformed spec. */
+const AGENT_ACTION_TOKENS: readonly string[] = [
+  AGENT_SYNC_TOKEN,
+  AGENT_RUN_REQUIRED_TOKEN,
+  AGENT_RUN_OPTIONAL_TOKEN,
+];
 
 /** Per-document presence token prefix (e.g. `doc-requirements`). */
 const DOCUMENT_TOKEN_PREFIX = 'doc-';
@@ -42,19 +61,20 @@ export function documentContextToken(kind: SpecDocumentKind): string {
 export const SPEC_TREE_CONTEXT_TOKENS: readonly string[] = [
   SPEC_TOKEN,
   ...CONTEXT_DOCUMENT_KINDS.map(documentContextToken),
-  RUNNABLE_TOKEN,
+  ...AGENT_ACTION_TOKENS,
 ];
 
 /**
  * Subset of {@link SPEC_TREE_CONTEXT_TOKENS} that gates a `view/item/context`
- * menu entry: the four `doc-<kind>` tokens (one per "Open" action) and the
- * `runnable` token ("Run tasks"). The `spec` base token gates nothing on its
- * own, so it is deliberately absent. Each listed token MUST have a matching,
- * word-anchored `when` clause in the manifest; the assertion checks both ways.
+ * menu entry: the four `doc-<kind>` tokens (one per "Open" action) and the three
+ * agent-action tokens (Sync Files, Run required, Run required and optional). The
+ * `spec` base token gates nothing on its own, so it is deliberately absent. Each
+ * listed token MUST have a matching, word-anchored `when` clause in the manifest;
+ * the assertion checks both ways.
  */
 export const SPEC_TREE_MENU_GATING_TOKENS: readonly string[] = [
   ...CONTEXT_DOCUMENT_KINDS.map(documentContextToken),
-  RUNNABLE_TOKEN,
+  ...AGENT_ACTION_TOKENS,
 ];
 
 /**
@@ -62,10 +82,10 @@ export const SPEC_TREE_MENU_GATING_TOKENS: readonly string[] = [
  * `view/item/context` menu can show or hide each entry with a `when` clause.
  *
  * The value is a space-joined token list: the `spec` base token, one
- * `doc-<kind>` token per present document, and a `runnable` token when the spec
- * is not malformed. The package.json menu matches these tokens with
- * `viewItem =~ /.../` regular expressions, hiding an action whose document is
- * absent and refusing "Run tasks" on a malformed spec. Being pure and
+ * `doc-<kind>` token per present document, and the three agent-action tokens
+ * when the spec is not malformed. The package.json menu matches these tokens
+ * with `viewItem =~ /.../` regular expressions, hiding an action whose document
+ * is absent and refusing the task actions on a malformed spec. Being pure and
  * `vscode`-free, the token contract is unit-testable in the core.
  * @param documents The spec's document presence flags.
  * @param status The resolved spec status.
@@ -79,7 +99,7 @@ export function buildSpecTreeContextValue(documents: ISpecDocuments, status: Spe
     }
   });
   if (SpecStatus.Malformed !== status) {
-    tokens.push(RUNNABLE_TOKEN);
+    tokens.push(...AGENT_ACTION_TOKENS);
   }
   return tokens.join(' ');
 }

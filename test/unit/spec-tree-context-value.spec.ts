@@ -30,7 +30,8 @@ const TASKS_ONLY: ISpecDocuments = {
  *
  * The token contract backs the declarative `view/item/context` `when` clauses:
  * a document action is shown only when its `doc-<kind>` token is present, and
- * "Run tasks" only when the `runnable` token is present (non-malformed spec).
+ * the agent task actions only when the agent-action tokens are present
+ * (non-malformed spec).
  */
 describe('buildSpecTreeContextValue', () => {
   it('starts with the spec base token', () => {
@@ -55,14 +56,18 @@ describe('buildSpecTreeContextValue', () => {
     expect(tokens).to.include(documentContextToken('notes'));
   });
 
-  it('marks a non-malformed spec as runnable', () => {
-    const value = buildSpecTreeContextValue(ALL_DOCS, SpecStatus.InProgress);
-    expect(value.split(' ')).to.include('runnable');
+  it('marks a non-malformed spec with the agent-action tokens', () => {
+    const tokens = buildSpecTreeContextValue(ALL_DOCS, SpecStatus.InProgress).split(' ');
+    expect(tokens).to.include('agent-sync');
+    expect(tokens).to.include('agent-run-required');
+    expect(tokens).to.include('agent-run-optional');
   });
 
-  it('does not mark a malformed spec as runnable', () => {
-    const value = buildSpecTreeContextValue(TASKS_ONLY, SpecStatus.Malformed);
-    expect(value.split(' ')).to.not.include('runnable');
+  it('does not mark a malformed spec with the agent-action tokens', () => {
+    const tokens = buildSpecTreeContextValue(TASKS_ONLY, SpecStatus.Malformed).split(' ');
+    expect(tokens).to.not.include('agent-sync');
+    expect(tokens).to.not.include('agent-run-required');
+    expect(tokens).to.not.include('agent-run-optional');
   });
 
   it('emits only tokens declared in the canonical vocabulary', () => {
@@ -72,7 +77,7 @@ describe('buildSpecTreeContextValue', () => {
     });
   });
 
-  it('can emit every token of the canonical vocabulary (all docs, runnable)', () => {
+  it('can emit every token of the canonical vocabulary (all docs, non-malformed)', () => {
     const emitted = buildSpecTreeContextValue(ALL_DOCS, SpecStatus.Completed).split(' ');
     SPEC_TREE_CONTEXT_TOKENS.forEach((token) => {
       expect(emitted).to.include(token);

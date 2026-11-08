@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { SpecDocumentKind } from './core/model/IDashboardMessage';
+import type { RunScope } from './core/ports/ISpecAgentGateway';
 import type { IDashboardActions } from './adapters/ports/IDashboardActions';
 import { DashboardHtmlBuilder } from './core/DashboardHtmlBuilder';
 import { HtmlEscaper } from './core/HtmlEscaper';
@@ -25,7 +26,12 @@ import {
 import { DASHBOARD_VIEW_ID, SpecDashboardViewProvider } from './adapters/SpecDashboardViewProvider';
 import { VscodeSpecFileSystem } from './adapters/VscodeSpecFileSystem';
 import { VscodeWorkspaceGateway } from './adapters/VscodeWorkspaceGateway';
+import { VscodeCommandGateway } from './adapters/VscodeCommandGateway';
+import { VscodeAgentBetaNotice } from './adapters/VscodeAgentBetaNotice';
 import { WebCryptoRandomSource } from './adapters/WebCryptoRandomSource';
+import { SpecAgentActions } from './adapters/SpecAgentActions';
+import { UnavailableAgentGateway } from './adapters/agent/UnavailableAgentGateway';
+import { createSpecAgentGateway } from './adapters/agent/SpecAgentGatewayFactory';
 import { OpenDocumentCommand } from './adapters/commands/OpenDocumentCommand';
 import { RefreshCommand, REFRESH_COMMAND_ID } from './adapters/commands/RefreshCommand';
 import { RunTasksCommand, RUN_TASKS_COMMAND_ID } from './adapters/commands/RunTasksCommand';
@@ -50,8 +56,17 @@ const TREE_OPEN_COMMAND_IDS: Readonly<Record<SpecDocumentKind, string>> = {
   notes: 'kirospectracker.tree.openNotes',
 };
 
-/** Tree context-menu command id running the targeted spec's tasks. */
-const TREE_RUN_TASKS_COMMAND_ID = 'kirospectracker.tree.runTasks';
+/** Tree context-menu command id syncing the targeted spec's task files. */
+const TREE_SYNC_FILES_COMMAND_ID = 'kirospectracker.tree.syncFiles';
+
+/** Tree context-menu command id running the targeted spec's required tasks. */
+const TREE_RUN_REQUIRED_COMMAND_ID = 'kirospectracker.tree.runRequired';
+
+/**
+ * Tree context-menu command id running the targeted spec's required and
+ * optional tasks.
+ */
+const TREE_RUN_REQUIRED_AND_OPTIONAL_COMMAND_ID = 'kirospectracker.tree.runRequiredAndOptional';
 
 /**
  * Public API the extension returns from {@link activate}.
@@ -85,6 +100,9 @@ interface IWiring {
   readonly tree: SpecTreeDataProvider;
   readonly openDocument: OpenDocumentCommand;
   readonly runTasks: RunTasksCommand;
+  readonly agentActions: SpecAgentActions;
+  readonly agentFallback: UnavailableAgentGateway;
+  readonly commandGateway: VscodeCommandGateway;
   readonly toggleLayout: ToggleLayoutCommand;
   readonly refresh: RefreshCommand;
   readonly gateway: VscodeWorkspaceGateway;
@@ -184,19 +202,22 @@ function createSnapshotFactory(): SpecSnapshotFactory {
 }
 
 /**
- * Bundle the open-document and run-tasks commands into the dashboard actions.
+ * Bundle the open-document command and the shared agent actions into the
+ * dashboard action handler.
  * @param openDocument The open-document command.
- * @param runTasks The run-tasks command.
+ * @param agentActions The shared agent task actions (sync / run).
  * @returns The dashboard action handler.
  */
 function createDashboardActions(
   openDocument: OpenDocumentCommand,
-  runTasks: RunTasksCommand,
+  agentActions: SpecAgentActions,
 ): IDashboardActions {
   return {
     openDocument: (folderPath: string, document: SpecDocumentKind): Promise<void> =>
       openDocument.execute(folderPath, document),
-    runTasks: (folderPath: string): Promise<void> => runTasks.execute(folderPath),
+    runTasks: (folderPath: string, scope: RunScope): Promise<void> =>
+      agentActions.runTasks(folderPath, scope),
+    syncTasks: (folderPath: string): Promise<void> => agentActions.syncTasks(folderPath),
   };
 }
 
@@ -206,7 +227,7 @@ function createDashboardActions(
  * @param repository The spec repository supplying snapshots.
  * @param stats The pure aggregate-stats calculator.
  * @param openDocument The open-document command.
- * @param runTasks The run-tasks command.
+ * @param agentActions The shared agent task actions.
  * @returns The wired dashboard provider.
  */
 function createDashboard(
@@ -214,7 +235,7 @@ function createDashboard(
   repository: SpecRepository,
   stats: SpecStatsCalculator,
   openDocument: OpenDocumentCommand,
-  runTasks: RunTasksCommand,
+  agentActions: SpecAgentActions,
 ): SpecDashboardViewProvider {
   return new SpecDashboardViewProvider(
     context.extensionUri,
@@ -223,7 +244,7 @@ function createDashboard(
     new SpecCardViewMapper(),
     new DashboardHtmlBuilder(new HtmlEscaper()),
     new NonceFactory(new WebCryptoRandomSource()),
-    createDashboardActions(openDocument, runTasks),
+    createDashboardActions(openDocument, agentActions),
   );
 }
 
@@ -238,14 +259,13 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   const gateway = new VscodeWorkspaceGateway();
   const stats = new SpecStatsCalculator();
   const openDocument = new OpenDocumentCommand(repository, gateway);
-  const runTasks = new RunTasksCommand(
-    repository,
-    gateway,
-    new RunPromptBuilder(),
-    fileSystem,
-    new TasksMarkdownParser(),
-  );
-  const dashboard = createDashboard(context, repository, stats, openDocument, runTasks);
+  const runTasks = buildRunTasksCommand(repository, fileSystem, gateway);
+  const commandGateway = new VscodeCommandGateway();
+  const agentFallback = new UnavailableAgentGateway(runTasks);
+  // Start on the always-valid Null Object; capability detection may upgrade it
+  // to the Kiro best-effort adapter once activation resolves the command surface.
+  const agentActions = new SpecAgentActions(repository, agentFallback, gateway);
+  const dashboard = createDashboard(context, repository, stats, openDocument, agentActions);
   const decorations = new SpecFileDecorationProvider(repository, new SpecDecorationMapper(), stats);
   const tree = new SpecTreeDataProvider(repository, new SpecGrouper());
   return {
@@ -256,6 +276,9 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
     tree,
     openDocument,
     runTasks,
+    agentActions,
+    agentFallback,
+    commandGateway,
     toggleLayout: new ToggleLayoutCommand(dashboard),
     refresh: new RefreshCommand(repository),
     gateway,
@@ -263,12 +286,33 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
 }
 
 /**
+ * Build the honest-MVP run-tasks command over its collaborators.
+ * @param repository The spec repository.
+ * @param fileSystem The host file-system wrapper (also the parser's reader).
+ * @param gateway The workspace gateway.
+ * @returns The wired run-tasks command.
+ */
+function buildRunTasksCommand(
+  repository: SpecRepository,
+  fileSystem: VscodeSpecFileSystem,
+  gateway: VscodeWorkspaceGateway,
+): RunTasksCommand {
+  return new RunTasksCommand(
+    repository,
+    gateway,
+    new RunPromptBuilder(),
+    fileSystem,
+    new TasksMarkdownParser(),
+  );
+}
+
+/**
  * Register the tree context-menu commands as disposables.
  *
  * Each open command is a thin, tree-item-aware wrapper over the shared
- * {@link OpenDocumentCommand}; the run command reuses {@link RunTasksCommand}
- * (which already refuses a malformed spec). All resolve the targeted spec from
- * the context-menu node argument.
+ * {@link OpenDocumentCommand}; the three task-action commands reuse the SAME
+ * {@link SpecAgentActions} the dashboard buttons call (DRY), so no behaviour is
+ * duplicated. All resolve the targeted spec from the context-menu node argument.
  * @param context The extension context owning the disposables.
  * @param wiring The constructed collaborators.
  */
@@ -283,8 +327,18 @@ function registerTreeCommands(context: vscode.ExtensionContext, wiring: IWiring)
     );
   });
   context.subscriptions.push(
-    vscode.commands.registerCommand(TREE_RUN_TASKS_COMMAND_ID, (node: unknown) =>
-      runWithNode(wiring.gateway, node, (folderPath) => wiring.runTasks.execute(folderPath)),
+    vscode.commands.registerCommand(TREE_SYNC_FILES_COMMAND_ID, (node: unknown) =>
+      runWithNode(wiring.gateway, node, (folderPath) => wiring.agentActions.syncTasks(folderPath)),
+    ),
+    vscode.commands.registerCommand(TREE_RUN_REQUIRED_COMMAND_ID, (node: unknown) =>
+      runWithNode(wiring.gateway, node, (folderPath) =>
+        wiring.agentActions.runTasks(folderPath, 'required'),
+      ),
+    ),
+    vscode.commands.registerCommand(TREE_RUN_REQUIRED_AND_OPTIONAL_COMMAND_ID, (node: unknown) =>
+      runWithNode(wiring.gateway, node, (folderPath) =>
+        wiring.agentActions.runTasks(folderPath, 'required-and-optional'),
+      ),
     ),
   );
 }
@@ -333,12 +387,39 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
   const wiring = buildWiring(context);
   registerDisposables(context, wiring);
   wiring.repository.refresh().then(undefined, (error) => reportError(wiring.gateway, error));
+  setUpAgentIntegration(context, wiring);
   return {
     repository: wiring.repository,
     decorations: wiring.decorations,
     dashboard: wiring.dashboard,
     fileSystem: wiring.fileSystem,
   };
+}
+
+/**
+ * Resolve the agent gateway by capability detection (honoring the disable
+ * setting) and surface the beta notice, both best-effort and non-blocking.
+ *
+ * The actions start on the always-valid Null Object, so the UI works from the
+ * first tick; this upgrades it to the Kiro adapter when a usable command surface
+ * is present and the integration is enabled. Any failure is surfaced through the
+ * gateway without leaking.
+ * @param context The extension context (global state, settings).
+ * @param wiring The constructed collaborators.
+ */
+function setUpAgentIntegration(context: vscode.ExtensionContext, wiring: IWiring): void {
+  const betaNotice = new VscodeAgentBetaNotice(context);
+  const enabled = betaNotice.isEnabled();
+  guard(wiring.gateway, async () => {
+    const resolved = await createSpecAgentGateway(
+      wiring.commandGateway,
+      wiring.gateway,
+      wiring.agentFallback,
+      enabled,
+    );
+    wiring.agentActions.setGateway(resolved);
+  }).then(undefined, (error) => reportError(wiring.gateway, error));
+  betaNotice.maybeShow().then(undefined, (error) => reportError(wiring.gateway, error));
 }
 
 /**

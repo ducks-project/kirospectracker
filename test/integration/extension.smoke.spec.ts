@@ -16,7 +16,9 @@ const EXPECTED_COMMANDS: readonly string[] = [
   'kirospectracker.tree.openDesign',
   'kirospectracker.tree.openTasks',
   'kirospectracker.tree.openNotes',
-  'kirospectracker.tree.runTasks',
+  'kirospectracker.tree.syncFiles',
+  'kirospectracker.tree.runRequired',
+  'kirospectracker.tree.runRequiredAndOptional',
 ];
 
 /**

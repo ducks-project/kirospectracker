@@ -43,7 +43,9 @@
     "onCommand:kirospectracker.tree.openDesign",
     "onCommand:kirospectracker.tree.openTasks",
     "onCommand:kirospectracker.tree.openNotes",
-    "onCommand:kirospectracker.tree.runTasks"
+    "onCommand:kirospectracker.tree.syncFiles",
+    "onCommand:kirospectracker.tree.runRequired",
+    "onCommand:kirospectracker.tree.runRequiredAndOptional"
   ],
   "contributes": {
     "commands": [
@@ -82,9 +84,19 @@
         "icon": "$(note)"
       },
       {
-        "command": "kirospectracker.tree.runTasks",
-        "title": "Run Tasks",
+        "command": "kirospectracker.tree.syncFiles",
+        "title": "Sync Files",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "kirospectracker.tree.runRequired",
+        "title": "Run Required Tasks",
         "icon": "$(play)"
+      },
+      {
+        "command": "kirospectracker.tree.runRequiredAndOptional",
+        "title": "Run Required and Optional Tasks",
+        "icon": "$(run-all)"
       }
     ],
     "menus": {
@@ -129,11 +141,31 @@
           "group": "navigation@4"
         },
         {
-          "command": "kirospectracker.tree.runTasks",
-          "when": "view == kirospectracker.tree && viewItem =~ /(^| )runnable( |$)/",
+          "command": "kirospectracker.tree.syncFiles",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )agent-sync( |$)/",
           "group": "run@1"
+        },
+        {
+          "command": "kirospectracker.tree.runRequired",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )agent-run-required( |$)/",
+          "group": "run@2"
+        },
+        {
+          "command": "kirospectracker.tree.runRequiredAndOptional",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )agent-run-optional( |$)/",
+          "group": "run@3"
         }
       ]
+    },
+    "configuration": {
+      "title": "Kiro Spec Tracker",
+      "properties": {
+        "kirospectracker.agentIntegration.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable the best-effort agent integration driving the Sync Files and Run tasks actions through the editor's chat agent (Kiro). The integration relies on non-official, unstable editor commands and is in beta; when disabled, those actions degrade to opening `tasks.md` and offering a consented, ready-to-paste prompt."
+        }
+      }
     },
     "viewsContainers": {
       "activitybar": [

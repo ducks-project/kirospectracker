@@ -88,7 +88,7 @@ describe('Tree context menu (Node host)', () => {
     const spec = api.repository.getSpecs().find((candidate) => 'malformed' === candidate.name);
     expect(spec).to.not.equal(undefined);
     await vscode.commands.executeCommand(
-      'kirospectracker.tree.runTasks',
+      'kirospectracker.tree.runRequired',
       specNode(spec as ISpecSnapshot),
     );
     // A malformed spec is refused before any document is opened.
