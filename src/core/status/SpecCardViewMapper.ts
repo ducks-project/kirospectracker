@@ -1,14 +1,15 @@
 import type { ISpecCardView } from '../model/ISpecCardView';
 import type { ISpecSnapshot } from '../model/ISpecSnapshot';
+import { deriveSpecOwnerLabel } from './SpecOwnerLabel';
 
 /**
  * Pure projector turning a full {@link ISpecSnapshot} into the lean
  * {@link ISpecCardView} the dashboard webview consumes.
  *
- * It drops the parsed task tree and keeps only the five fields a card renders,
- * so the `postMessage` payload stays small. Being pure and `vscode`-free, it is
- * unit- and property-testable and reusable for both the full render and a
- * single scoped update.
+ * It drops the parsed task tree and keeps only the fields a card renders (plus
+ * the derived owner label), so the `postMessage` payload stays small. Being
+ * pure and `vscode`-free, it is unit- and property-testable and reusable for
+ * both the full render and a single scoped update.
  */
 export class SpecCardViewMapper {
   /**
@@ -21,6 +22,7 @@ export class SpecCardViewMapper {
     return {
       name: snapshot.name,
       folderPath: snapshot.folderPath,
+      ownerLabel: deriveSpecOwnerLabel(snapshot.workspacePath),
       documents: snapshot.documents,
       status: snapshot.status,
       progress: snapshot.progress,

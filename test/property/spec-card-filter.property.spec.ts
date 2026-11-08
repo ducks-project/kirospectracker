@@ -14,6 +14,7 @@ const keyArb = fc.constantFrom<SpecFilterKey>('completed', 'inProgress', 'notSta
 const cardArb: fc.Arbitrary<ISpecCardView> = fc.record({
   name: fc.string(),
   folderPath: fc.string(),
+  ownerLabel: fc.string(),
   status: fc.constantFrom(...Object.values(SpecStatus)),
   documents: fc.constant({ tasks: true, requirements: false, design: false, notes: false }),
   progress: fc.constant({

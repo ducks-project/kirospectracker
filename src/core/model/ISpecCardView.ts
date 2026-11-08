@@ -17,6 +17,13 @@ export interface ISpecCardView {
   /** Absolute path of the spec folder, as a string (filesystem-agnostic). */
   readonly folderPath: string;
 
+  /**
+   * Concise, human-readable label of the owning workspace folder (its
+   * basename), shown discreetly on the card. Derived by a pure core helper so
+   * it stays testable and reusable by the later folder-filtering milestone.
+   */
+  readonly ownerLabel: string;
+
   /** Presence flags of the spec's canonical and annex documents. */
   readonly documents: ISpecDocuments;
 

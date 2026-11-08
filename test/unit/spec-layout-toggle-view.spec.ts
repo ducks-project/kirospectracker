@@ -8,17 +8,24 @@ const view = new SpecLayoutToggleView();
  * Behaviour specification for {@link SpecLayoutToggleView}.
  */
 describe('SpecLayoutToggleView', () => {
-  it('lists the list and grid options with glyphs and labels', () => {
-    const options = view.listOptions();
-    expect(options.map((option) => option.layout)).to.deep.equal(['list', 'grid']);
-    expect(options.map((option) => option.glyph)).to.deep.equal(['list', 'grid']);
-    expect(options.map((option) => option.label)).to.deep.equal(['List view', 'Grid view']);
+  it('shows the grid glyph and switches to grid when the list layout is active', () => {
+    const toggle = view.describeToggle('list');
+    expect(toggle.nextLayout).to.equal('grid');
+    expect(toggle.glyph).to.equal('grid');
+    expect(toggle.label).to.equal('Switch to grid view');
+    expect(toggle.pressed).to.equal(false);
   });
 
-  it('marks only the active layout as pressed', () => {
-    const [listOption, gridOption] = view.listOptions();
-    expect(view.isPressed(listOption, 'list')).to.equal(true);
-    expect(view.isPressed(gridOption, 'list')).to.equal(false);
-    expect(view.isPressed(gridOption, 'grid')).to.equal(true);
+  it('shows the list glyph and switches to list when the grid layout is active', () => {
+    const toggle = view.describeToggle('grid');
+    expect(toggle.nextLayout).to.equal('list');
+    expect(toggle.glyph).to.equal('list');
+    expect(toggle.label).to.equal('Switch to list view');
+    expect(toggle.pressed).to.equal(true);
+  });
+
+  it('shows the glyph of the layout it switches to (single flipping button)', () => {
+    expect(view.describeToggle('list').glyph).to.equal(view.describeToggle('list').nextLayout);
+    expect(view.describeToggle('grid').glyph).to.equal(view.describeToggle('grid').nextLayout);
   });
 });

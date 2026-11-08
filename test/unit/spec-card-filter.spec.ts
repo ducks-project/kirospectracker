@@ -15,6 +15,7 @@ function cardOf(name: string, status: SpecStatus): ISpecCardView {
   return {
     name,
     folderPath: `/ws/.kiro/specs/${name}`,
+    ownerLabel: 'ws',
     documents: { tasks: true, requirements: false, design: false, notes: false },
     status,
     progress: {

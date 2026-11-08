@@ -43,6 +43,7 @@ describe('SpecCardViewMapper', () => {
     expect(card).to.deep.equal({
       name: 'alpha',
       folderPath: '/ws/.kiro/specs/alpha',
+      ownerLabel: 'ws',
       documents: snapshot.documents,
       status: SpecStatus.InProgress,
       progress: PROGRESS,

@@ -4,6 +4,7 @@ import * as fc from 'fast-check';
 import type { ISpecSnapshot } from '../../src/core/model/ISpecSnapshot';
 import { SpecStatus } from '../../src/core/model/SpecStatus';
 import { SpecCardViewMapper } from '../../src/core/status/SpecCardViewMapper';
+import { deriveSpecOwnerLabel } from '../../src/core/status/SpecOwnerLabel';
 
 const mapper = new SpecCardViewMapper();
 
@@ -45,6 +46,7 @@ describe('SpecCardViewMapper (properties)', () => {
         const card = mapper.map(snapshot);
         expect(card.status).to.equal(snapshot.status);
         expect(card.progress).to.deep.equal(snapshot.progress);
+        expect(card.ownerLabel).to.equal(deriveSpecOwnerLabel(snapshot.workspacePath));
       }),
     );
   });
