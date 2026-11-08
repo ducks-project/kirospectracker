@@ -1,6 +1,8 @@
 import { expect } from 'chai';
 
 import type { IAgentErrorReporter } from '../../src/adapters/ports/IAgentErrorReporter';
+import type { IAgentNotifier } from '../../src/adapters/ports/IAgentNotifier';
+import type { IAgentDiagnosticSink } from '../../src/adapters/ports/IAgentDiagnosticSink';
 import { KiroChatAgentGateway } from '../../src/adapters/agent/KiroChatAgentGateway';
 import { UnavailableAgentGateway } from '../../src/adapters/agent/UnavailableAgentGateway';
 import { RunTasksCommand } from '../../src/adapters/commands/RunTasksCommand';
@@ -18,6 +20,12 @@ import { FakeWorkspaceGateway } from '../helpers/fake-workspace-gateway';
 
 /** Silent error reporter conforming to the full contract. */
 const reporter: IAgentErrorReporter = { showError: () => undefined };
+
+/** Silent success/affordance notifier conforming to the full contract. */
+const notifier: IAgentNotifier = { notifyInfo: () => undefined };
+
+/** Silent diagnostic sink conforming to the full contract. */
+const diagnostics: IAgentDiagnosticSink = { append: () => undefined };
 
 /** Build a Null-Object fallback over a minimal real run-tasks command. */
 async function buildFallback(): Promise<UnavailableAgentGateway> {
@@ -46,27 +54,55 @@ async function buildFallback(): Promise<UnavailableAgentGateway> {
 describe('createSpecAgentGateway', () => {
   it('selects the Kiro adapter when a kiroAgent command is present and enabled', async () => {
     const commands = new FakeCommandGateway(['kiroAgent.executions.queueUserMessage']);
-    const gateway = await createSpecAgentGateway(commands, reporter, await buildFallback(), true);
+    const gateway = await createSpecAgentGateway(
+      commands,
+      reporter,
+      notifier,
+      diagnostics,
+      await buildFallback(),
+      true,
+    );
     expect(gateway).to.be.instanceOf(KiroChatAgentGateway);
   });
 
   it('selects the Kiro adapter when only the generic chat-open command is present', async () => {
     const commands = new FakeCommandGateway(['workbench.action.chat.open']);
-    const gateway = await createSpecAgentGateway(commands, reporter, await buildFallback(), true);
+    const gateway = await createSpecAgentGateway(
+      commands,
+      reporter,
+      notifier,
+      diagnostics,
+      await buildFallback(),
+      true,
+    );
     expect(gateway).to.be.instanceOf(KiroChatAgentGateway);
   });
 
   it('selects the Null Object when no usable command surface exists', async () => {
     const commands = new FakeCommandGateway(['some.unrelated.command']);
     const fallback = await buildFallback();
-    const gateway = await createSpecAgentGateway(commands, reporter, fallback, true);
+    const gateway = await createSpecAgentGateway(
+      commands,
+      reporter,
+      notifier,
+      diagnostics,
+      fallback,
+      true,
+    );
     expect(gateway).to.equal(fallback);
   });
 
   it('always binds the Null Object when the integration is disabled', async () => {
     const commands = new FakeCommandGateway(['kiroAgent.executions.queueUserMessage']);
     const fallback = await buildFallback();
-    const gateway = await createSpecAgentGateway(commands, reporter, fallback, false);
+    const gateway = await createSpecAgentGateway(
+      commands,
+      reporter,
+      notifier,
+      diagnostics,
+      fallback,
+      false,
+    );
     expect(gateway).to.equal(fallback);
   });
 });
