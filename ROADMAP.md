@@ -30,11 +30,18 @@ no change to core or UI. Design recorded in `.agents/tasks/kiro-agent-api/findin
       separator between the document actions (requirements / design / tasks) and the task
       actions (run). To respect DRY, the context menu and the dashboard card buttons share
       the same single implementation behind the port (differing menu labels are acceptable).
-- [ ] Keep the agent actions enabled by default, and show a one-time VS Code notice
-      informing the user that these features adapt best-effort to the editor in beta, are
-      subject to change, and can be disabled; once the user acknowledges it, never show it
-      again (persist the acknowledgement in global state). Provide a setting to disable the
-      agent integration.
+- [ ] Keep the agent actions enabled by default and surface a beta notice through the native,
+      stable `window.showInformationMessage` API (the notice itself has nothing fragile; only
+      the Sync/Run actions it describes are best-effort). Suggested message: "Kiro Spec
+      Tracker's Sync Files and Run tasks actions adapt on a best-effort basis to the editor
+      and are in beta: they may change and can be disabled at any time." Offer three buttons:
+      "Keep enabled" (persist acknowledgement in global state so the notice never shows
+      again; integration stays on), "Disable" (set the disable setting; the Null-Object
+      fallback takes over), and "Settings" (open the extension settings via
+      `workbench.action.openSettings` with `@ext:ducks-project.kirospectracker`). Dismissing
+      with the close affordance (the API returns `undefined`) persists nothing, so the notice
+      reappears on the next launch while the integration stays enabled. Use a non-modal
+      toast, not a modal dialog. Provide a setting to disable the agent integration.
 - [ ] Document the integration as relying on non-official, unstable editor command surfaces
       with graceful degradation (README, architecture, PRIVACY note on the clipboard path).
 
