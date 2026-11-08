@@ -50,9 +50,10 @@ export class UnavailableAgentGateway implements ISpecAgentGateway {
    * The scope is irrelevant to the fallback, which always offers the same
    * prompt; it is part of the signature only to honor the port contract.
    * @param spec The spec snapshot.
-   * @param _scope The run scope (ignored by the fallback).
+   * @param _scope The run scope (ignored by the fallback; required to match the
+   *   {@link ISpecAgentGateway} contract exactly).
    */
-  public async runTasks(spec: ISpecSnapshot, _scope?: RunScope): Promise<void> {
+  public async runTasks(spec: ISpecSnapshot, _scope: RunScope): Promise<void> {
     await this.runTasksCommand.execute(spec.folderPath);
   }
 }
