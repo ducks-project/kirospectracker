@@ -10,17 +10,31 @@ import type { IAgentNotifier } from '../ports/IAgentNotifier';
 import type { ICommandGateway } from '../ports/ICommandGateway';
 import { runMessageForScope, SPEC_AGENT_MESSAGES } from '../../core/SpecAgentMessages';
 
-/** Undocumented Kiro command taking the prompt directly as an argument. */
-const QUEUE_USER_MESSAGE = 'kiroAgent.executions.queueUserMessage';
+/**
+ * Undocumented Kiro command creating a chat session and returning its id.
+ *
+ * Reverse-engineered, non-documented and subject to change across Kiro builds.
+ * Signature: `(): Promise<{ sessionId: string }>`.
+ */
+const SESSIONS_CREATE = 'kiroAgent.sessions.create';
 
-/** Undocumented Kiro command focusing the chat input (precedes a paste). */
-const FOCUS_CONTINUE_INPUT = 'kiroAgent.focusContinueInput';
+/**
+ * Undocumented Kiro command truly submitting a prompt into a given session.
+ *
+ * Reverse-engineered, non-documented and subject to change across Kiro builds.
+ * Signature: `(sessionId: string, prompt: string): Promise<void>` (POSITIONAL
+ * args, NOT an options object); it starts the agent run.
+ */
+const SESSIONS_SEND_PROMPT = 'kiroAgent.sessions.sendPrompt';
 
-/** Undocumented Kiro command sending the text already in the chat input. */
-const SEND_MAIN_USER_INPUT = 'kiroAgent.sendMainUserInput';
-
-/** Generic VS Code command pasting the clipboard into the focused control. */
-const CLIPBOARD_PASTE = 'editor.action.clipboardPasteAction';
+/**
+ * Undocumented Kiro command filling the chat input, submitting when
+ * `submit: true`.
+ *
+ * Reverse-engineered, non-documented and subject to change across Kiro builds.
+ * Signature: `(opts: { prompt?, submit?, newSession?, ... }): Promise<void>`.
+ */
+const FOCUS_CHAT_INPUT = 'kiroAgent.focusChatInput';
 
 /** Generic VS Code chat-open command used as the last-resort fallback. */
 const GENERIC_CHAT_OPEN = 'workbench.action.chat.open';
@@ -28,78 +42,81 @@ const GENERIC_CHAT_OPEN = 'workbench.action.chat.open';
 /** Prefix identifying the undocumented Kiro agent command surface. */
 const KIRO_AGENT_PREFIX = 'kiroAgent.';
 
-/** Delay (ms) after focusing the chat input before writing+pasting. */
-const FOCUS_DELAY_MS = 300;
-
-/** Delay (ms) after pasting before asking Kiro to send the input. */
-const PASTE_DELAY_MS = 200;
-
 /**
- * The send path selected for a given command surface.
- *
- * It is a discriminated union so the pure decision ({@link selectDispatchPath})
- * can be unit-tested in isolation and the caller can both drive the right side
- * effect AND tailor an honest notification to the path actually taken:
- * - `queue`: the direct-argument queue command truly submits the prompt.
- * - `paste`: the focus + clipboard-paste workaround, which does NOT reliably
- *   submit (the user may need to press Enter).
- * - `chat-open`: the generic host chat is opened pre-filled; it may need to be
- *   sent, and it is not Kiro's spec engine.
+ * The send path actually taken for a given action, as a discriminated union so
+ * the caller can drive honest, path-specific feedback and the diagnostic sink
+ * can record exactly how the prompt was delivered on the user's host:
+ * - `create+sendPrompt`: a fresh session was created and the prompt truly
+ *   submitted (the agent run started).
+ * - `focusInput-submit`: the chat input was filled and submitted in a (new)
+ *   session (best-effort, depends on the chat webview being rendered).
+ * - `focusInput-fill`: the chat input was only filled; the user must press
+ *   Enter to run it.
+ * - `chat-open`: the generic host chat was opened pre-filled; it may still need
+ *   to be sent, and it is not Kiro's spec engine.
  * - `none`: no usable command surface exists.
  */
-export type DispatchPath = 'queue' | 'paste' | 'chat-open' | 'none';
+export type DispatchPath =
+  | 'create+sendPrompt'
+  | 'focusInput-submit'
+  | 'focusInput-fill'
+  | 'chat-open'
+  | 'none';
 
 /**
- * A pausing function, injected so the focus/paste timing can be a no-op in unit
- * tests and a real timer in production.
+ * The shape returned by `kiroAgent.sessions.create`: an object carrying the new
+ * session id. Modelled as an `interface` so the type guard narrows an `unknown`
+ * result against a stable contract rather than a loose `any`.
  */
-export type SleepFn = (ms: number) => Promise<void>;
-
-/** Real-timer sleep used in production. */
-function realSleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+interface ISessionCreateResult {
+  readonly sessionId: string;
 }
 
 /**
- * Pure selection rule: pick the most robust send path for a command surface.
+ * Type guard narrowing an unknown `sessions.create` result to a usable session.
  *
- * It holds NO side effect so it is exhaustively unit-testable, and it is the
- * single place the path order is decided (prefer the direct-argument queue
- * command, else the focus + clipboard-paste workaround, else the generic
- * chat-open fallback, else none), keeping the rule DRY.
- * @param ids The registered command ids.
- * @returns The selected {@link DispatchPath}.
+ * `sessions.sendPrompt` silently no-ops unless the session id is a non-empty
+ * string, so the preferred path must verify the id before submitting and fall
+ * through otherwise. This is the single place that contract is enforced (DRY).
+ * @param value The unknown result returned by `kiroAgent.sessions.create`.
+ * @returns `true` when `value` carries a non-empty string `sessionId`.
  */
-export function selectDispatchPath(ids: readonly string[]): DispatchPath {
-  if (ids.includes(QUEUE_USER_MESSAGE)) {
-    return 'queue';
+function hasSessionId(value: unknown): value is ISessionCreateResult {
+  if (null === value || 'object' !== typeof value) {
+    return false;
   }
-  if (ids.includes(SEND_MAIN_USER_INPUT) || ids.includes(FOCUS_CONTINUE_INPUT)) {
-    return 'paste';
-  }
-  if (ids.includes(GENERIC_CHAT_OPEN)) {
-    return 'chat-open';
-  }
-  return 'none';
+  const candidate = (value as { sessionId?: unknown }).sessionId;
+  return 'string' === typeof candidate && 0 < candidate.length;
 }
 
 /**
  * Best-effort adapter driving the Kiro agent, confining ALL fragility (the
- * undocumented `kiroAgent.*` command ids, the generic chat-open fallback, the
- * focus/paste timing, and the clipboard workaround) to this single class.
+ * undocumented `kiroAgent.*` command ids and the generic chat-open fallback) to
+ * this single class.
  *
  * It probes the command surface to report an honest {@link availability}, builds
- * every message from the fixed {@link SPEC_AGENT_MESSAGES} templates, then picks
- * the most robust available path via the pure {@link selectDispatchPath}. EVERY
- * taken path produces user-visible feedback: the direct-argument queue confirms
- * the prompt was sent; the paste workaround tells the user it was pasted and may
- * need Enter; the generic chat-open says the chat was opened and may need to be
- * sent; and when no command is usable the error reporter fires. Each action also
- * writes an observability line (the detected ids and the chosen path) to the
+ * every message from the fixed {@link SPEC_AGENT_MESSAGES} templates, then runs
+ * a capability-probed, cascading try/catch dispatch chain ordered by robustness:
+ * 1. `sessions.create` + `sessions.sendPrompt` — open a NEW session and truly
+ *    submit the prompt (the preferred path; proceeds only when `create` returns
+ *    a non-empty string session id, else it falls through);
+ * 2. `focusChatInput({ submit: true, newSession: true })` — UI submit in a new
+ *    session (best-effort, depends on the chat webview being rendered);
+ * 3. `focusChatInput({ prompt })` — fill only; the user presses Enter;
+ * 4. `workbench.action.chat.open` — the generic host fallback;
+ * 5. none → the error reporter path.
+ *
+ * Each step is guarded by a `getCommands(true)` membership check AND wrapped so
+ * any throw falls through to the next step. EVERY taken path produces honest,
+ * path-specific feedback (a submitting path says "sent"; a fill-only path says
+ * "press Enter"; the generic fallback says "you may need to send it"), and each
+ * action writes one observability line (detected ids + path taken) to the
  * injected {@link IAgentDiagnosticSink}. A failure is surfaced through the error
  * reporter and NEVER thrown to the caller, so the UI never hard-fails.
+ *
+ * Context attach (`kiroAgent.selectFilesAsContext`) is intentionally NOT
+ * implemented here: it is reserved for the v0.7.0 step-2 objective. See
+ * `.kiro/steering/kiro-agent-commands.md` for the command reference.
  */
 export class KiroChatAgentGateway implements ISpecAgentGateway {
   private readonly commands: ICommandGateway;
@@ -110,28 +127,23 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
 
   private readonly diagnostics: IAgentDiagnosticSink;
 
-  private readonly sleep: SleepFn;
-
   /**
    * Build the adapter over its command gateway, feedback channels and sink.
-   * @param commands The thin command/clipboard gateway.
+   * @param commands The thin command gateway.
    * @param reporter The channel surfacing a best-effort failure.
    * @param notifier The channel confirming an honest success/affordance.
    * @param diagnostics The observability sink for the detected ids and path.
-   * @param sleep The pausing function (defaults to a real timer).
    */
   public constructor(
     commands: ICommandGateway,
     reporter: IAgentErrorReporter,
     notifier: IAgentNotifier,
     diagnostics: IAgentDiagnosticSink,
-    sleep: SleepFn = realSleep,
   ) {
     this.commands = commands;
     this.reporter = reporter;
     this.notifier = notifier;
     this.diagnostics = diagnostics;
-    this.sleep = sleep;
   }
 
   /**
@@ -183,9 +195,8 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
   private async send(message: string): Promise<void> {
     try {
       const ids = await this.commands.getCommands();
-      const path = selectDispatchPath(ids);
+      const path = await this.dispatch(message, ids);
       this.logDiagnostic(ids, path);
-      await this.dispatch(message, ids, path);
       this.notify(message, path);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -196,45 +207,118 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
   }
 
   /**
-   * Run the side effect for the already-selected path. The `none` path takes no
-   * command; its user feedback is raised by {@link notify}.
-   * @param message The message to send.
+   * Run the cascading, capability-probed dispatch chain and report the path
+   * actually taken. Each step is guarded by an id-membership check AND wrapped
+   * in try/catch so any throw (or an unusable result) falls through to the next.
+   * @param message The fixed-template message to send.
    * @param ids The registered command ids.
-   * @param path The path chosen by {@link selectDispatchPath}.
+   * @returns The {@link DispatchPath} actually taken.
    */
-  private async dispatch(
-    message: string,
-    ids: readonly string[],
-    path: DispatchPath,
-  ): Promise<void> {
-    if ('queue' === path) {
-      await this.commands.executeCommand(QUEUE_USER_MESSAGE, message);
-      return;
+  private async dispatch(message: string, ids: readonly string[]): Promise<DispatchPath> {
+    if (await this.tryCreateAndSend(message, ids)) {
+      return 'create+sendPrompt';
     }
-    if ('paste' === path) {
-      await this.pasteAndSend(message, ids);
-      return;
+    if (await this.tryFocusInput(message, ids, true)) {
+      return 'focusInput-submit';
     }
-    if ('chat-open' === path) {
-      await this.commands.executeCommand(GENERIC_CHAT_OPEN, message);
+    if (await this.tryFocusInput(message, ids, false)) {
+      return 'focusInput-fill';
+    }
+    if (await this.tryChatOpen(message, ids)) {
+      return 'chat-open';
+    }
+    return 'none';
+  }
+
+  /**
+   * PREFERRED path: create a NEW session and truly submit the prompt. Proceeds
+   * only when both ids are present AND `create` returns a non-empty string
+   * session id (otherwise `sendPrompt` would silently no-op), falling through
+   * on any missing id, bad result or throw.
+   * @param message The prompt to submit.
+   * @param ids The registered command ids.
+   * @returns `true` when the prompt was submitted; `false` to fall through.
+   */
+  private async tryCreateAndSend(message: string, ids: readonly string[]): Promise<boolean> {
+    if (!ids.includes(SESSIONS_CREATE) || !ids.includes(SESSIONS_SEND_PROMPT)) {
+      return false;
+    }
+    try {
+      const result = await this.commands.executeCommand<unknown>(SESSIONS_CREATE);
+      if (!hasSessionId(result)) {
+        return false;
+      }
+      // POSITIONAL (sessionId, prompt) — NOT an options object.
+      await this.commands.executeCommand(SESSIONS_SEND_PROMPT, result.sessionId, message);
+      return true;
+    } catch {
+      return false;
     }
   }
 
   /**
-   * Raise the honest, path-specific user feedback. Only `queue` claims a real
-   * submission; `paste` and `chat-open` say what the user must still do, and
-   * `none` surfaces the error so the action is never silent.
+   * UI path through `focusChatInput`: when `submit` is set, fill a NEW session
+   * and submit; otherwise fill only. Guarded by the id check and wrapped so any
+   * throw falls through.
+   * @param message The prompt to fill into the chat input.
+   * @param ids The registered command ids.
+   * @param submit Whether to submit (new session) or only fill the input.
+   * @returns `true` when the call ran; `false` to fall through.
+   */
+  private async tryFocusInput(
+    message: string,
+    ids: readonly string[],
+    submit: boolean,
+  ): Promise<boolean> {
+    if (!ids.includes(FOCUS_CHAT_INPUT)) {
+      return false;
+    }
+    try {
+      const options = submit
+        ? { prompt: message, submit: true, newSession: true }
+        : { prompt: message };
+      await this.commands.executeCommand(FOCUS_CHAT_INPUT, options);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Generic last-resort path: open the host chat pre-filled with the message.
+   * Guarded by the id check and wrapped so any throw falls through.
+   * @param message The query to open the chat with.
+   * @param ids The registered command ids.
+   * @returns `true` when the chat was opened; `false` to fall through.
+   */
+  private async tryChatOpen(message: string, ids: readonly string[]): Promise<boolean> {
+    if (!ids.includes(GENERIC_CHAT_OPEN)) {
+      return false;
+    }
+    try {
+      await this.commands.executeCommand(GENERIC_CHAT_OPEN, message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Raise the honest, path-specific user feedback. Only the submitting paths
+   * claim a real submission; the fill-only path says the user must press Enter,
+   * the generic fallback says the chat was opened, and `none` surfaces the error
+   * so the action is never silent.
    * @param message The message that was (attempted to be) sent.
-   * @param path The path chosen by {@link selectDispatchPath}.
+   * @param path The path actually taken by {@link dispatch}.
    */
   private notify(message: string, path: DispatchPath): void {
-    if ('queue' === path) {
+    if ('create+sendPrompt' === path || 'focusInput-submit' === path) {
       this.notifier.notifyInfo(`Kiro Spec Tracker: sent to Kiro chat \u2014 "${message}".`);
       return;
     }
-    if ('paste' === path) {
+    if ('focusInput-fill' === path) {
       this.notifier.notifyInfo(
-        `Kiro Spec Tracker: pasted "${message}" into the Kiro chat \u2014 press Enter to run it.`,
+        `Kiro Spec Tracker: filled the chat with "${message}" \u2014 press Enter to run it.`,
       );
       return;
     }
@@ -253,7 +337,7 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
    * Write one observability line naming the detected Kiro/chat command ids and
    * the chosen dispatch path, so a tester can report what their host exposes.
    * @param ids The registered command ids.
-   * @param path The path chosen by {@link selectDispatchPath}.
+   * @param path The path actually taken by {@link dispatch}.
    */
   private logDiagnostic(ids: readonly string[], path: DispatchPath): void {
     const kiroIds = ids.filter((id) => id.startsWith(KIRO_AGENT_PREFIX));
@@ -262,29 +346,5 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
     this.diagnostics.append(
       `agent action: path=${path}; kiroAgent ids=[${detected}]; generic chat-open=${genericChat}`,
     );
-  }
-
-  /**
-   * Focus + clipboard-paste workaround, saving and ALWAYS restoring the prior
-   * clipboard content around the paste (even if a step fails).
-   * @param message The message to paste into the chat input.
-   * @param ids The registered command ids.
-   */
-  private async pasteAndSend(message: string, ids: readonly string[]): Promise<void> {
-    const previousClipboard = await this.commands.readClipboard();
-    try {
-      if (ids.includes(FOCUS_CONTINUE_INPUT)) {
-        await this.commands.executeCommand(FOCUS_CONTINUE_INPUT);
-        await this.sleep(FOCUS_DELAY_MS);
-      }
-      await this.commands.writeClipboard(message);
-      await this.commands.executeCommand(CLIPBOARD_PASTE);
-      await this.sleep(PASTE_DELAY_MS);
-      if (ids.includes(SEND_MAIN_USER_INPUT)) {
-        await this.commands.executeCommand(SEND_MAIN_USER_INPUT);
-      }
-    } finally {
-      await this.commands.writeClipboard(previousClipboard);
-    }
   }
 }

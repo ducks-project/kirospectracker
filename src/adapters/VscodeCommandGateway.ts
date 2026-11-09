@@ -4,7 +4,7 @@ import type { ICommandGateway } from './ports/ICommandGateway';
 
 /**
  * Thin host wrapper implementing {@link ICommandGateway} over the real `vscode`
- * commands and clipboard API.
+ * commands API.
  *
  * It is the only new `vscode`-touching surface for the agent integration; it
  * holds NO selection or sequencing logic (that lives in
@@ -23,30 +23,14 @@ export class VscodeCommandGateway implements ICommandGateway {
   }
 
   /**
-   * Execute a registered command with optional arguments.
+   * Execute a registered command with optional arguments, returning its result.
+   * @typeParam T The expected result type (defaults to `void`).
    * @param id The command identifier.
    * @param args The command arguments.
+   * @returns The command's result, typed as `T`.
    */
   // eslint-disable-next-line class-methods-use-this
-  public async executeCommand(id: string, ...args: readonly unknown[]): Promise<void> {
-    await vscode.commands.executeCommand(id, ...args);
-  }
-
-  /**
-   * Read the current clipboard text.
-   * @returns The clipboard text.
-   */
-  // eslint-disable-next-line class-methods-use-this
-  public async readClipboard(): Promise<string> {
-    return vscode.env.clipboard.readText();
-  }
-
-  /**
-   * Write text to the clipboard.
-   * @param text The text to write.
-   */
-  // eslint-disable-next-line class-methods-use-this
-  public async writeClipboard(text: string): Promise<void> {
-    await vscode.env.clipboard.writeText(text);
+  public async executeCommand<T = void>(id: string, ...args: readonly unknown[]): Promise<T> {
+    return vscode.commands.executeCommand<T>(id, ...args);
   }
 }
