@@ -6,29 +6,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The agent actions (Sync Files, Run required tasks, Run required and optional tasks) now open
+  a new Kiro chat session and submit the templated prompt on supported builds, instead of only
+  opening the chat for a manual send. `KiroChatAgentGateway` runs a capability-probed,
+  cascading try/catch dispatch chain ordered by robustness: it first creates a fresh session
+  with `kiroAgent.sessions.create` and truly submits the prompt with
+  `kiroAgent.sessions.sendPrompt` (positional `sessionId, prompt`), which starts the agent run;
+  it proceeds only when `create` returns a non-empty session id, otherwise it falls through. The
+  graceful fallbacks are, in order: `kiroAgent.focusChatInput({ submit: true, newSession: true })`
+  (UI submit in a new session), `kiroAgent.focusChatInput({ prompt })` (fill only — the user
+  presses Enter), and the generic `workbench.action.chat.open`. Feedback stays honest per path:
+  a submitting path confirms the prompt was sent; the fill-only path says to press Enter; the
+  generic fallback says the chat was opened and may still need to be sent; and when no usable
+  command exists the error toast fires. The legacy, absent-on-target-builds command ids
+  (`kiroAgent.executions.queueUserMessage`, `kiroAgent.sendMainUserInput`,
+  `kiroAgent.focusContinueInput`) and the clipboard-paste workaround were removed as dead code.
+  Attaching the spec as structured chat context is deferred to a later step and is not yet
+  implemented.
+
 ### Added
 
 - Add an observability diagnostic for the agent actions: each action appends a line to a
   "Kiro Spec Tracker" output channel naming the detected `kiroAgent.*` command ids, whether
-  the generic chat-open command was found, and which dispatch path was taken (`queue`,
-  `paste`, `chat-open` or `none`). The pure path-selection decision (`selectDispatchPath`)
-  stays unit-tested in the `vscode`-free adapter; only the output channel lives in a thin,
-  host-only `Vscode*` wrapper. Read it via View → Output → "Kiro Spec Tracker" to see what
-  your Kiro host actually exposes.
-
-### Fixed
-
-- Agent actions (Sync Files, Run required tasks, Run required and optional tasks), from both
-  the dashboard split button and the tree context menu, now always give honest, visible
-  feedback instead of appearing to do nothing. Each taken path raises a tailored
-  `window.showInformationMessage` toast through an injected `IAgentNotifier`: the
-  direct-argument queue path confirms the prompt was sent to the Kiro chat; the focus +
-  clipboard-paste path says the message was pasted and the user must press Enter (because that
-  path does not truly submit); the generic chat-open fallback says the chat was opened and may
-  still need to be sent; and when no usable command exists the error toast fires. A failed
-  send never masquerades as a success. The error and success channels are the same real,
-  host-backed `VscodeWorkspaceGateway` instance (both wired to `window.show*Message`), never a
-  disconnected no-op.
+  the generic chat-open command was found, and which dispatch path was taken
+  (`create+sendPrompt`, `focusInput-submit`, `focusInput-fill`, `chat-open` or `none`). The
+  dispatch logic stays unit-tested in the `vscode`-free adapter; only the output channel lives
+  in a thin, host-only `Vscode*` wrapper. Read it via View → Output → "Kiro Spec Tracker" to
+  see what your Kiro host actually exposes and which path your build took.
 
 ## [0.7.0] - 2026-11-08
 

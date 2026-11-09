@@ -231,22 +231,32 @@ on the always-valid Null Object and is upgraded once detection resolves, so the 
 the first tick and never needs an `if (gateway)` guard.
 
 `KiroChatAgentGateway` is the single containment point for all fragility: it knows the
-undocumented `kiroAgent.*` ids, the generic chat-open fallback, the focus/paste timing and the
-clipboard. For each send it builds the fixed message, then picks the most robust available
-path — prefer the direct-argument `kiroAgent.executions.queueUserMessage`; else the focus +
-clipboard-paste workaround (`kiroAgent.focusContinueInput` → paste →
-`kiroAgent.sendMainUserInput`) that **saves and always restores the prior clipboard**, even on
-failure; else the generic `workbench.action.chat.open`. A failure is surfaced through the
-[IAgentErrorReporter](../src/adapters/ports/IAgentErrorReporter.ts) channel and never thrown to
-the UI. The selection/sequencing logic lives in this adapter and is unit-tested against a fake
-[ICommandGateway](../src/adapters/ports/ICommandGateway.ts); only the raw `vscode` calls live
-in the excluded thin wrapper.
+undocumented `kiroAgent.*` ids and the generic chat-open fallback. For each send it builds the
+fixed message, then runs a capability-probed, cascading try/catch chain ordered by robustness,
+each step guarded by a `getCommands(true)` membership check and wrapped so any throw falls
+through to the next:
 
-Two capabilities are not achievable through a stable contract and are approximated:
-attaching the spec as structured chat context (no API), and guaranteeing a brand-new chat
-session (focus commands do not start a fresh session). The spec name interpolated into the
-message is the best available disambiguator; these limits are documented here and in the
-README rather than faked.
+1. `kiroAgent.sessions.create` + `kiroAgent.sessions.sendPrompt` — open a NEW session and
+   **truly submit** the prompt (starts the agent run). It proceeds only when `create` returns a
+   non-empty string `sessionId` (otherwise `sendPrompt` silently no-ops), falling through
+   otherwise. → notify "sent".
+2. `kiroAgent.focusChatInput({ prompt, submit: true, newSession: true })` — UI submit in a new
+   session (best-effort; depends on the chat webview being rendered). → notify "sent".
+3. `kiroAgent.focusChatInput({ prompt })` — fill only, no submit. → notify "press Enter".
+4. `workbench.action.chat.open` — the generic host fallback. → notify "you may need to send it".
+5. none → the error reporter path.
+
+A failure is surfaced through the
+[IAgentErrorReporter](../src/adapters/ports/IAgentErrorReporter.ts) channel and never thrown to
+the UI. The dispatch logic lives in this adapter and is unit-tested against a fake
+[ICommandGateway](../src/adapters/ports/ICommandGateway.ts) (whose `executeCommand<T>` returns
+the `sessions.create` result the preferred path narrows with a type guard); only the raw
+`vscode` calls live in the excluded thin wrapper.
+
+Context attach (`kiroAgent.selectFilesAsContext`) is **not** implemented: it is reserved for the
+v0.7.0 step-2 objective (see `.kiro/steering/kiro-agent-commands.md`). Guaranteeing a brand-new
+chat session now holds through the `sessions.create` path; the spec name interpolated into the
+message remains the disambiguator for the UI-level fallbacks.
 
 A future official Kiro API or another spec-driven IDE becomes just another adapter plus a
 factory branch, with no change to the core, the UI wiring, the message templates, or the DRY
@@ -316,8 +326,8 @@ notice reappears next launch while the integration stays enabled).
 - No network, no telemetry, no evaluation of spec or configuration content as code.
 - The agent actions invoke only host commands discovered via `getCommands`, and only with
   fixed message templates whose sole interpolated value is the already-trusted spec folder
-  name. Any clipboard-paste path saves and restores the prior clipboard, and the honest
-  fallback keeps its explicit consent prompt. The new `vscode`-touching surfaces are the thin
+  name (plus the session id returned by `sessions.create`). The honest fallback keeps its
+  explicit consent prompt. The new `vscode`-touching surfaces are the thin
   [VscodeCommandGateway](../src/adapters/VscodeCommandGateway.ts) and
   [VscodeAgentBetaNotice](../src/adapters/VscodeAgentBetaNotice.ts) wrappers; the beta notice
   uses the native, stable `window.showInformationMessage` API.
