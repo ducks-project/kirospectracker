@@ -16,6 +16,8 @@ import type { IScheduler, ScheduleHandle } from '../core/ports/IScheduler';
 import { planDashboardRender } from './DashboardRenderPlanner';
 import { HoverIntroductionController } from './HoverIntroductionController';
 import type { IHoverPanelView } from './IHoverPanelView';
+import { DomHoverPanelView } from './DomHoverPanelView';
+import type { IHoverAnchor, IHoverDom, IHoverPanelElement } from './DomHoverPanelView';
 import { SpecCardFilter } from '../core/status/SpecCardFilter';
 import { SpecFolderFilter } from '../core/status/SpecFolderFilter';
 import { SpecFolderToggleView } from '../core/status/SpecFolderToggleView';
@@ -106,9 +108,6 @@ function persistState(): void {
  * full render.
  */
 const cardNodes = new Map<string, HTMLElement>();
-
-/** The single floating preview panel, created lazily on first hover. */
-let hoverPanel: HTMLElement | undefined;
 
 /**
  * Create an element with optional class and text.
@@ -626,70 +625,21 @@ function wireCardBody(article: HTMLElement, card: ISpecCardView): void {
   });
 }
 
-/** Viewport margin, in pixels, kept between the panel and the window edges. */
-const PANEL_VIEWPORT_MARGIN = 8;
-
 /**
- * Lazily create the single floating preview panel, appended to the document.
- * @returns The panel element.
+ * DOM environment for the hover panel, backed by the real document and the
+ * mounted card nodes.
  */
-function ensureHoverPanel(): HTMLElement {
-  if (undefined === hoverPanel) {
-    hoverPanel = el('div', 'card-hover-panel');
-    hoverPanel.setAttribute('role', 'tooltip');
-    hoverPanel.hidden = true;
-    document.body.appendChild(hoverPanel);
-  }
-  return hoverPanel;
-}
-
-/**
- * Position the panel just below a card, clamped within the viewport so it never
- * overflows the right or bottom edges.
- * @param panel The panel element.
- * @param article The hovered card element.
- */
-function positionHoverPanel(panel: HTMLElement, article: HTMLElement): void {
-  const rect = article.getBoundingClientRect();
-  const maxLeft = window.innerWidth - panel.offsetWidth - PANEL_VIEWPORT_MARGIN;
-  const left = Math.max(PANEL_VIEWPORT_MARGIN, Math.min(rect.left, maxLeft));
-  const maxTop = window.innerHeight - panel.offsetHeight - PANEL_VIEWPORT_MARGIN;
-  const top = Math.max(
-    PANEL_VIEWPORT_MARGIN,
-    Math.min(rect.bottom + PANEL_VIEWPORT_MARGIN, maxTop),
-  );
-  panel.style.left = `${left}px`;
-  panel.style.top = `${top}px`;
-}
-
-/**
- * DOM-backed {@link IHoverPanelView} adapter driving the floating preview panel.
- *
- * It keeps all DOM concerns (lazy creation, `textContent`-only content so the
- * webview CSP is honoured, and viewport clamping against the hovered card) in
- * the webview layer, while the {@link HoverIntroductionController} stays
- * DOM-free. The panel is anchored to the mounted card node looked up by folder
- * path; when that node is absent (not currently rendered) the panel stays
- * hidden.
- */
-const hoverPanelView: IHoverPanelView = {
-  showText(anchorFolderPath: string, introduction: string): void {
-    const article = cardNodes.get(anchorFolderPath);
-    if (undefined === article) {
-      return;
-    }
-    const panel = ensureHoverPanel();
-    panel.replaceChildren(el('p', 'card-hover-intro', introduction));
-    panel.hidden = false;
-    positionHoverPanel(panel, article);
+const hoverDom: IHoverDom = {
+  findAnchor: (folderPath: string): IHoverAnchor | undefined => cardNodes.get(folderPath),
+  createPanel: (): IHoverPanelElement => el('div', 'card-hover-panel'),
+  mountPanel: (panel: IHoverPanelElement): void => {
+    document.body.appendChild(panel as HTMLElement);
   },
-  hide(): void {
-    if (undefined !== hoverPanel) {
-      hoverPanel.hidden = true;
-    }
-  },
+  createIntro: (text: string): unknown => el('p', 'card-hover-intro', text),
+  viewport: () => ({ width: window.innerWidth, height: window.innerHeight }),
 };
-
+/** DOM-backed adapter driving the floating preview panel. */
+const hoverPanelView: IHoverPanelView = new DomHoverPanelView(hoverDom);
 /**
  * {@link IScheduler} adapter over `setTimeout`/`clearTimeout`, backing the hover
  * debounce. It keeps the controller's timing deterministic in tests (a manual
