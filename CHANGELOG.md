@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The agent actions now attach the spec folder as chat context so the agent acts on the right
+  spec instead of asking "which spec?". `KiroChatAgentGateway` composes the submitted prompt as
+  an in-prompt folder reference token followed by the fixed template (the pure, `vscode`-free
+  `composeMessageWithFolderContext` builds `#[[folder:<specFolderFsPath>]]` on its own line, then
+  the template), mirroring how Kiro's own context references are shaped; Kiro parses that token
+  out of the prompt text and resolves it to the spec folder on both the `kiroAgent.sessions.sendPrompt`
+  path and the `kiroAgent.focusChatInput` fallbacks. `kiroAgent.selectFilesAsContext` is not used:
+  it only seeds the chat input box, which the programmatic `sendPrompt` ignores. The attach
+  degrades gracefully: when no spec folder path is available the plain template is sent without
+  any token, so the prior submit behaviour is preserved and the send is never blocked. The
+  create + activate + `chatView.focus` + fire-and-forget `sendPrompt` sequence is otherwise
+  unchanged.
+- The agent diagnostic line is now a concise single line. Instead of logging the entire detected
+  `kiroAgent.*` id list on every action, it records the dispatch path, the activation kind, the
+  fire-and-forget send mode, whether the spec folder was attached as context (`context=yes|no`), a
+  COUNT of detected `kiroAgent.*` commands (`kiroAgentCommandCount=NNN`) and whether the generic
+  chat-open command exists, still in the "Kiro Spec Tracker" output channel.
 - The agent actions now activate and bring the new Kiro chat session to the foreground, and the
   confirmation toast is immediate. After creating the session with `kiroAgent.sessions.create`,
   `KiroChatAgentGateway` activates it (preferring `kiroAgent.sessions.switch`, which reports
@@ -34,14 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   command exists the error toast fires. The legacy, absent-on-target-builds command ids
   (`kiroAgent.executions.queueUserMessage`, `kiroAgent.sendMainUserInput`,
   `kiroAgent.focusContinueInput`) and the clipboard-paste workaround were removed as dead code.
-  Attaching the spec as structured chat context is deferred to a later step and is not yet
-  implemented.
 
 ### Added
 
-- Add an observability diagnostic for the agent actions: each action appends a line to a
-  "Kiro Spec Tracker" output channel naming the detected `kiroAgent.*` command ids, whether
-  the generic chat-open command was found, and which dispatch path was taken
+- Add an observability diagnostic for the agent actions: each action appends one concise line to
+  a "Kiro Spec Tracker" output channel recording a COUNT of detected `kiroAgent.*` commands,
+  whether the generic chat-open command was found, and which dispatch path was taken
   (`create+sendPrompt`, `focusInput-submit`, `focusInput-fill`, `chat-open` or `none`). The
   dispatch logic stays unit-tested in the `vscode`-free adapter; only the output channel lives
   in a thin, host-only `Vscode*` wrapper. Read it via View → Output → "Kiro Spec Tracker" to

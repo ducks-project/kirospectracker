@@ -260,10 +260,19 @@ the UI. The dispatch logic lives in this adapter and is unit-tested against a fa
 the `sessions.create` result the preferred path narrows with a type guard); only the raw
 `vscode` calls live in the excluded thin wrapper.
 
-Context attach (`kiroAgent.selectFilesAsContext`) is **not** implemented: it is reserved for the
-v0.7.0 step-2 objective (see `.kiro/steering/kiro-agent-commands.md`). Guaranteeing a brand-new
-chat session now holds through the `sessions.create` path; the spec name interpolated into the
-message remains the disambiguator for the UI-level fallbacks.
+Context attach rides the same dispatch chain rather than adding a command. The pure, `vscode`-free
+[SpecAgentContext](../src/core/SpecAgentContext.ts) composes the submitted prompt as an in-prompt
+folder reference token on its own line followed by the fixed template
+(`#[[folder:<specFolderFsPath>]]\n<template>`, the folder path taken from the snapshot's
+`folderPath`), mirroring the reference shape Kiro resolves. Kiro parses that token out of the
+prompt text and attaches the spec folder as context on both the `sendPrompt` path and the
+`focusChatInput` fallbacks, so the agent acts on the right spec. `kiroAgent.selectFilesAsContext`
+is **not** used: it only seeds the chat input box, which the programmatic `sendPrompt` ignores, so
+the token-in-text approach supersedes it. The attach degrades gracefully: when no spec folder path
+is available the plain template is sent without any token, preserving the no-context submit. The
+concise diagnostic line records whether context was attached (`context=yes|no`) and a COUNT of the
+detected `kiroAgent.*` commands rather than the full id list (see
+`.kiro/steering/kiro-agent-commands.md`).
 
 A future official Kiro API or another spec-driven IDE becomes just another adapter plus a
 factory branch, with no change to the core, the UI wiring, the message templates, or the DRY
