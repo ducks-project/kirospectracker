@@ -10,6 +10,18 @@ import { RecordingDiagnosticSink } from '../helpers/recording-diagnostic-sink';
 /** A minimal spec snapshot for the tests. */
 const SPEC = { name: 'spec-tracker', folderPath: '/w/.kiro/specs/spec-tracker' } as ISpecSnapshot;
 
+/** A spec snapshot with no folder path, exercising graceful degradation. */
+const SPEC_NO_FOLDER = { name: 'spec-tracker', folderPath: '' } as ISpecSnapshot;
+
+/** The in-prompt folder context token built for {@link SPEC}'s folder path. */
+const CONTEXT_TOKEN = '#[[folder:/w/.kiro/specs/spec-tracker]]';
+
+/** The context-carrying run-required prompt (token line + template). */
+const CONTEXT_RUN_REQUIRED = `${CONTEXT_TOKEN}\nRun all required tasks`;
+
+/** The context-carrying sync-tasks prompt (token line + template). */
+const CONTEXT_SYNC = `${CONTEXT_TOKEN}\nUpdate the tasks for the spec-tracker`;
+
 /** The preferred-path command ids (new session + real submit). */
 const SESSIONS_CREATE = 'kiroAgent.sessions.create';
 const SESSIONS_SEND_PROMPT = 'kiroAgent.sessions.sendPrompt';
@@ -75,8 +87,9 @@ describe('KiroChatAgentGateway', () => {
         SESSIONS_SEND_PROMPT,
       ]);
       expect(commands.executed[0].args).to.deep.equal([]);
-      // POSITIONAL (sessionId, prompt), NOT an options object.
-      expect(commands.executed[1].args).to.deep.equal(['sess-1', 'Run all required tasks']);
+      // POSITIONAL (sessionId, prompt), NOT an options object; the prompt carries
+      // the spec folder as an in-prompt context token.
+      expect(commands.executed[1].args).to.deep.equal(['sess-1', CONTEXT_RUN_REQUIRED]);
       expect(reporter.errors).to.have.length(0);
     });
 
@@ -104,10 +117,7 @@ describe('KiroChatAgentGateway', () => {
 
       await gateway.syncTasks(SPEC);
 
-      expect(commands.executed[1].args).to.deep.equal([
-        'sess-1',
-        'Update the tasks for the spec-tracker',
-      ]);
+      expect(commands.executed[1].args).to.deep.equal(['sess-1', CONTEXT_SYNC]);
     });
 
     it('logs the create+sendPrompt diagnostic path', async () => {
@@ -193,7 +203,7 @@ describe('KiroChatAgentGateway', () => {
       ]);
       expect(commands.executed[1].args).to.deep.equal(['sess-1']);
       expect(commands.executed[2].args).to.deep.equal([]);
-      expect(commands.executed[3].args).to.deep.equal(['sess-1', 'Run all required tasks']);
+      expect(commands.executed[3].args).to.deep.equal(['sess-1', CONTEXT_RUN_REQUIRED]);
       expect(diagnostics.lines[0]).to.contain('activation=switch');
       expect(notifier.infos).to.deep.equal([SENT_TOAST]);
     });
@@ -362,6 +372,51 @@ describe('KiroChatAgentGateway', () => {
     });
   });
 
+  describe('spec folder context attach (in-prompt token)', () => {
+    it('submits a prompt carrying the folder context token when folderPath is non-empty', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT],
+        undefined,
+        createResult('sess-1'),
+      );
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      // The submitted prompt is token + template, token on its own line.
+      expect(commands.executed[1].args).to.deep.equal(['sess-1', CONTEXT_RUN_REQUIRED]);
+      expect(commands.executed[1].args[1]).to.contain(CONTEXT_TOKEN);
+      expect(diagnostics.lines[0]).to.contain('context=yes');
+    });
+
+    it('submits the PLAIN template with NO token when folderPath is empty', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT],
+        undefined,
+        createResult('sess-1'),
+      );
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC_NO_FOLDER, 'required');
+
+      // No folder path: the plain template is sent, with no context token.
+      expect(commands.executed[1].args).to.deep.equal(['sess-1', 'Run all required tasks']);
+      expect(commands.executed[1].args[1]).to.not.contain('#[[folder:');
+      expect(diagnostics.lines[0]).to.contain('context=no');
+    });
+
+    it('carries the context token on the focusChatInput submit fallback too', async () => {
+      const commands = new FakeCommandGateway([FOCUS_CHAT_INPUT]);
+      const { gateway } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(commands.executed[0].args).to.deep.equal([
+        { prompt: CONTEXT_RUN_REQUIRED, submit: true, newSession: true },
+      ]);
+    });
+  });
+
   describe('focusChatInput submit (fallback A)', () => {
     it('opens a NEW session and submits via focusChatInput', async () => {
       const commands = new FakeCommandGateway([FOCUS_CHAT_INPUT]);
@@ -372,7 +427,7 @@ describe('KiroChatAgentGateway', () => {
       expect(commands.executed).to.have.length(1);
       expect(commands.executed[0].id).to.equal(FOCUS_CHAT_INPUT);
       expect(commands.executed[0].args).to.deep.equal([
-        { prompt: 'Run all required tasks', submit: true, newSession: true },
+        { prompt: CONTEXT_RUN_REQUIRED, submit: true, newSession: true },
       ]);
       expect(notifier.infos).to.deep.equal([
         'Kiro Spec Tracker: sent to Kiro chat \u2014 "Run all required tasks".',
@@ -417,7 +472,7 @@ describe('KiroChatAgentGateway', () => {
 
       expect(commands.executed).to.have.length(1);
       expect(commands.executed[0].id).to.equal(GENERIC_CHAT_OPEN);
-      expect(commands.executed[0].args).to.deep.equal(['Run all required tasks']);
+      expect(commands.executed[0].args).to.deep.equal([CONTEXT_RUN_REQUIRED]);
       expect(notifier.infos).to.deep.equal([
         'Kiro Spec Tracker: opened the chat with "Run all required tasks" \u2014 ' +
           'you may need to send it.',
@@ -477,12 +532,13 @@ describe('KiroChatAgentGateway', () => {
       await gateway.syncTasks(SPEC);
 
       expect(diagnostics.lines).to.deep.equal([
-        'agent action: path=none; kiroAgent ids=[(none)]; generic chat-open=no',
+        'agent action: path=none; activation=none; send=fire-and-forget; context=yes; ' +
+          'kiroAgentCommandCount=0; generic chat-open=no',
       ]);
     });
   });
 
-  it('logs a diagnostic naming the detected ids, path, activation and send mode', async () => {
+  it('logs a concise diagnostic (path, activation, send, context, command count), not the id list', async () => {
     const commands = new FakeCommandGateway(
       [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, SESSIONS_SWITCH, CHAT_VIEW_FOCUS, GENERIC_CHAT_OPEN],
       undefined,
@@ -493,11 +549,14 @@ describe('KiroChatAgentGateway', () => {
     await gateway.runTasks(SPEC, 'required');
 
     expect(diagnostics.lines).to.have.length(1);
+    // Concise single line: a COUNT of kiroAgent.* ids (4 here), not the full list.
     expect(diagnostics.lines[0]).to.equal(
-      'agent action: path=create+sendPrompt; kiroAgent ids=' +
-        `[${SESSIONS_CREATE}, ${SESSIONS_SEND_PROMPT}, ${SESSIONS_SWITCH}, ${CHAT_VIEW_FOCUS}]; ` +
-        'generic chat-open=yes; activation=switch; send=fire-and-forget',
+      'agent action: path=create+sendPrompt; activation=switch; send=fire-and-forget; ' +
+        'context=yes; kiroAgentCommandCount=4; generic chat-open=yes',
     );
+    // The full id list must NOT leak into the concise line.
+    expect(diagnostics.lines[0]).to.not.contain(SESSIONS_CREATE);
+    expect(diagnostics.lines[0]).to.not.contain(SESSIONS_SEND_PROMPT);
   });
 
   it('always reports availability as integrated (built only when supported)', () => {

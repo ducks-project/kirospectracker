@@ -9,6 +9,7 @@ import type { IAgentErrorReporter } from '../ports/IAgentErrorReporter';
 import type { IAgentNotifier } from '../ports/IAgentNotifier';
 import type { ICommandGateway } from '../ports/ICommandGateway';
 import { runMessageForScope, SPEC_AGENT_MESSAGES } from '../../core/SpecAgentMessages';
+import { composeMessageWithFolderContext } from '../../core/SpecAgentContext';
 
 /**
  * Undocumented Kiro command creating a chat session and returning its id.
@@ -190,13 +191,19 @@ function isAccepted(value: unknown): value is ISessionSwitchResult {
  * any throw falls through to the next step. EVERY taken path produces honest,
  * path-specific feedback (a submitting path says "sent"; a fill-only path says
  * "press Enter"; the generic fallback says "you may need to send it"), and each
- * action writes one observability line (detected ids + path taken) to the
- * injected {@link IAgentDiagnosticSink}. A failure is surfaced through the error
+ * action writes one concise observability line (path, activation, send mode,
+ * whether context was attached, a COUNT of detected kiroAgent.* ids and whether
+ * the generic chat-open exists) to the injected {@link IAgentDiagnosticSink}. A failure is surfaced through the error
  * reporter and NEVER thrown to the caller, so the UI never hard-fails.
  *
- * Context attach (`kiroAgent.selectFilesAsContext`) is intentionally NOT
- * implemented here: it is reserved for the v0.7.0 step-2 objective. See
- * `.kiro/steering/kiro-agent-commands.md` for the command reference.
+ * Context attach rides the SAME dispatch chain: the spec folder is carried as an
+ * in-prompt `#[[folder:<fsPath>]]` token composed by the pure
+ * {@link composeMessageWithFolderContext} and submitted as the prompt text, so
+ * no new command is called. `kiroAgent.selectFilesAsContext` is NOT used: it only
+ * seeds the chat input box, which the programmatic `sendPrompt` ignores (the
+ * token-in-text approach supersedes it). When no spec folder path is available
+ * the plain template is sent WITHOUT any token, preserving the no-context send.
+ * See `.kiro/steering/kiro-agent-commands.md` for the command reference.
  */
 export class KiroChatAgentGateway implements ISpecAgentGateway {
   private readonly commands: ICommandGateway;
@@ -216,11 +223,19 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
   private activation: ActivationKind = 'none';
 
   /**
+   * Whether the current `send` attached the spec folder as an in-prompt context
+   * token. Set at the start of every {@link send} from the composed message and
+   * consumed by {@link logDiagnostic}; it is `true` only when a non-empty spec
+   * folder path produced a `#[[folder:...]]` token.
+   */
+  private contextAttached = false;
+
+  /**
    * Build the adapter over its command gateway, feedback channels and sink.
    * @param commands The thin command gateway.
    * @param reporter The channel surfacing a best-effort failure.
    * @param notifier The channel confirming an honest success/affordance.
-   * @param diagnostics The observability sink for the detected ids and path.
+   * @param diagnostics The observability sink for the concise diagnostic line.
    */
   public constructor(
     commands: ICommandGateway,
@@ -263,7 +278,7 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
    * @param spec The spec snapshot.
    */
   public async syncTasks(spec: ISpecSnapshot): Promise<void> {
-    await this.send(SPEC_AGENT_MESSAGES.syncTasks(spec.name));
+    await this.send(SPEC_AGENT_MESSAGES.syncTasks(spec.name), spec.folderPath);
   }
 
   /**
@@ -272,19 +287,29 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
    * @param scope The run scope.
    */
   public async runTasks(spec: ISpecSnapshot, scope: RunScope): Promise<void> {
-    await this.send(runMessageForScope(scope));
+    await this.send(runMessageForScope(scope), spec.folderPath);
   }
 
   /**
    * Send a message through the most robust available path, never throwing and
-   * always giving the user honest, visible feedback.
-   * @param message The fixed-template message to send.
+   * always giving the user honest, visible feedback. The spec folder is attached
+   * as an in-prompt context token when its path is non-empty (degrading to the
+   * plain template otherwise), so the agent acts on the right spec.
+   * @param message The fixed-template message to send (and to toast).
+   * @param folderFsPath The spec folder absolute path, empty when unavailable.
    */
-  private async send(message: string): Promise<void> {
+  private async send(message: string, folderFsPath: string): Promise<void> {
     this.activation = 'none';
+    // Compose the context-carrying prompt once (token + template). When no spec
+    // folder path is available the plain template is returned WITHOUT a token,
+    // so the no-context send is preserved and the send can never be blocked.
+    const composed = composeMessageWithFolderContext(message, folderFsPath);
+    this.contextAttached = composed !== message;
     try {
       const ids = await this.commands.getCommands();
-      const path = await this.dispatch(message, ids);
+      // The dispatch chain submits the composed (context-carrying) prompt; the
+      // toast uses the plain, human-readable template.
+      const path = await this.dispatch(composed, ids);
       this.logDiagnostic(ids, path);
       this.notify(message, path);
     } catch (error) {
@@ -545,22 +570,27 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
   }
 
   /**
-   * Write one observability line naming the detected Kiro/chat command ids and
-   * the chosen dispatch path, so a tester can report what their host exposes.
+   * Write one concise observability line: the dispatch path, the activation kind,
+   * the fire-and-forget send mode, whether the spec folder was attached as
+   * context, a COUNT of detected kiroAgent.* ids (not the full list, to stay
+   * concise) and whether the generic chat-open exists, so a tester can still
+   * diagnose a future build.
    * @param ids The registered command ids.
    * @param path The path actually taken by {@link dispatch}.
    */
   private logDiagnostic(ids: readonly string[], path: DispatchPath): void {
-    const kiroIds = ids.filter((id) => id.startsWith(KIRO_AGENT_PREFIX));
-    const detected = 0 < kiroIds.length ? kiroIds.join(', ') : '(none)';
+    const kiroAgentCommandCount = ids.filter((id) => id.startsWith(KIRO_AGENT_PREFIX)).length;
     const genericChat = ids.includes(GENERIC_CHAT_OPEN) ? 'yes' : 'no';
-    // The preferred path records how the session was activated and that the
-    // submission was dispatched fire-and-forget (so the toast is immediate).
-    const extra =
-      'create+sendPrompt' === path ? `; activation=${this.activation}; send=fire-and-forget` : '';
+    const context = this.contextAttached ? 'yes' : 'no';
+    // The preferred path records how the session was activated; every path
+    // records that the submission was fire-and-forget (so the toast is
+    // immediate). A COUNT of detected kiroAgent.* ids replaces the full id list
+    // to keep the line concise while still diagnosing a future build.
+    const activation = 'create+sendPrompt' === path ? this.activation : 'none';
     this.diagnostics.append(
-      `agent action: path=${path}; kiroAgent ids=[${detected}]; ` +
-        `generic chat-open=${genericChat}${extra}`,
+      `agent action: path=${path}; activation=${activation}; send=fire-and-forget; ` +
+        `context=${context}; kiroAgentCommandCount=${kiroAgentCommandCount}; ` +
+        `generic chat-open=${genericChat}`,
     );
   }
 }
