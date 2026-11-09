@@ -10,8 +10,16 @@ import { RecordingDiagnosticSink } from '../helpers/recording-diagnostic-sink';
 /** A minimal spec snapshot for the tests. */
 const SPEC = { name: 'spec-tracker', folderPath: '/w/.kiro/specs/spec-tracker' } as ISpecSnapshot;
 
-/** A no-op sleep so the focus/paste timing never delays the tests. */
-const noSleep = async (): Promise<void> => undefined;
+/** The preferred-path command ids (new session + real submit). */
+const SESSIONS_CREATE = 'kiroAgent.sessions.create';
+const SESSIONS_SEND_PROMPT = 'kiroAgent.sessions.sendPrompt';
+const FOCUS_CHAT_INPUT = 'kiroAgent.focusChatInput';
+const GENERIC_CHAT_OPEN = 'workbench.action.chat.open';
+
+/** A `sessions.create` result map yielding a non-empty session id. */
+function createResult(sessionId: string): ReadonlyMap<string, unknown> {
+  return new Map<string, unknown>([[SESSIONS_CREATE, { sessionId }]]);
+}
 
 /** Build a gateway over a command surface plus fresh recording feedback fakes. */
 function buildGateway(commands: FakeCommandGateway): {
@@ -23,161 +31,267 @@ function buildGateway(commands: FakeCommandGateway): {
   const reporter = new RecordingReporter();
   const notifier = new RecordingNotifier();
   const diagnostics = new RecordingDiagnosticSink();
-  const gateway = new KiroChatAgentGateway(commands, reporter, notifier, diagnostics, noSleep);
+  const gateway = new KiroChatAgentGateway(commands, reporter, notifier, diagnostics);
   return { gateway, reporter, notifier, diagnostics };
 }
 
 /**
- * Behaviour specification for the selection/sequencing logic of
+ * Behaviour specification for the capability-probed, cascading dispatch logic of
  * {@link KiroChatAgentGateway} against a fake command gateway.
  */
 describe('KiroChatAgentGateway', () => {
-  it('prefers the direct-argument queue command and uses no clipboard', async () => {
-    const commands = new FakeCommandGateway([
-      'kiroAgent.executions.queueUserMessage',
-      'kiroAgent.sendMainUserInput',
-    ]);
-    const { gateway, reporter } = buildGateway(commands);
+  describe('create + sendPrompt (preferred path)', () => {
+    it('creates a NEW session and submits the prompt POSITIONALLY', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, FOCUS_CHAT_INPUT, GENERIC_CHAT_OPEN],
+        undefined,
+        createResult('sess-1'),
+      );
+      const { gateway, reporter } = buildGateway(commands);
 
-    await gateway.runTasks(SPEC, 'required');
+      await gateway.runTasks(SPEC, 'required');
 
-    expect(commands.executed).to.have.length(1);
-    expect(commands.executed[0].id).to.equal('kiroAgent.executions.queueUserMessage');
-    expect(commands.executed[0].args).to.deep.equal(['Run all required tasks']);
-    expect(commands.clipboardWrites).to.have.length(0);
-    expect(reporter.errors).to.have.length(0);
+      expect(commands.executed.map((entry) => entry.id)).to.deep.equal([
+        SESSIONS_CREATE,
+        SESSIONS_SEND_PROMPT,
+      ]);
+      expect(commands.executed[0].args).to.deep.equal([]);
+      // POSITIONAL (sessionId, prompt), NOT an options object.
+      expect(commands.executed[1].args).to.deep.equal(['sess-1', 'Run all required tasks']);
+      expect(reporter.errors).to.have.length(0);
+    });
+
+    it('confirms an honest "sent" notification on the create+sendPrompt path', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT],
+        undefined,
+        createResult('sess-1'),
+      );
+      const { gateway, notifier, reporter } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(notifier.infos).to.deep.equal([
+        'Kiro Spec Tracker: sent to Kiro chat \u2014 "Run all required tasks".',
+      ]);
+      expect(reporter.errors).to.have.length(0);
+    });
+
+    it('interpolates the spec name into the submitted sync message', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT],
+        undefined,
+        createResult('sess-1'),
+      );
+      const { gateway } = buildGateway(commands);
+
+      await gateway.syncTasks(SPEC);
+
+      expect(commands.executed[1].args).to.deep.equal([
+        'sess-1',
+        'Update the tasks for the spec-tracker',
+      ]);
+    });
+
+    it('logs the create+sendPrompt diagnostic path', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT],
+        undefined,
+        createResult('sess-1'),
+      );
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(diagnostics.lines[0]).to.contain('path=create+sendPrompt');
+    });
+
+    it('falls through to focusInput-submit when create returns no session id', async () => {
+      const commands = new FakeCommandGateway([
+        SESSIONS_CREATE,
+        SESSIONS_SEND_PROMPT,
+        FOCUS_CHAT_INPUT,
+      ]);
+      const { gateway, notifier, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      // create ran, but sendPrompt must NOT be called without a valid session id.
+      const executedIds = commands.executed.map((entry) => entry.id);
+      expect(executedIds).to.not.include(SESSIONS_SEND_PROMPT);
+      expect(executedIds[0]).to.equal(SESSIONS_CREATE);
+      expect(executedIds).to.include(FOCUS_CHAT_INPUT);
+      expect(diagnostics.lines[0]).to.contain('path=focusInput-submit');
+      expect(notifier.infos).to.deep.equal([
+        'Kiro Spec Tracker: sent to Kiro chat \u2014 "Run all required tasks".',
+      ]);
+    });
+
+    it('falls through when create returns an empty-string session id', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, FOCUS_CHAT_INPUT],
+        undefined,
+        createResult(''),
+      );
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      const executedIds = commands.executed.map((entry) => entry.id);
+      expect(executedIds).to.not.include(SESSIONS_SEND_PROMPT);
+      expect(diagnostics.lines[0]).to.contain('path=focusInput-submit');
+    });
+
+    it('falls through to the next path when sendPrompt throws', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, FOCUS_CHAT_INPUT],
+        SESSIONS_SEND_PROMPT,
+        createResult('sess-1'),
+      );
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(diagnostics.lines[0]).to.contain('path=focusInput-submit');
+    });
   });
 
-  it('confirms an honest "sent" notification on the queue path', async () => {
-    const commands = new FakeCommandGateway(['kiroAgent.executions.queueUserMessage']);
-    const { gateway, notifier, reporter } = buildGateway(commands);
+  describe('focusChatInput submit (fallback A)', () => {
+    it('opens a NEW session and submits via focusChatInput', async () => {
+      const commands = new FakeCommandGateway([FOCUS_CHAT_INPUT]);
+      const { gateway, notifier } = buildGateway(commands);
 
-    await gateway.runTasks(SPEC, 'required');
+      await gateway.runTasks(SPEC, 'required');
 
-    expect(notifier.infos).to.deep.equal([
-      'Kiro Spec Tracker: sent to Kiro chat \u2014 "Run all required tasks".',
-    ]);
-    expect(reporter.errors).to.have.length(0);
+      expect(commands.executed).to.have.length(1);
+      expect(commands.executed[0].id).to.equal(FOCUS_CHAT_INPUT);
+      expect(commands.executed[0].args).to.deep.equal([
+        { prompt: 'Run all required tasks', submit: true, newSession: true },
+      ]);
+      expect(notifier.infos).to.deep.equal([
+        'Kiro Spec Tracker: sent to Kiro chat \u2014 "Run all required tasks".',
+      ]);
+    });
+
+    it('logs the focusInput-submit diagnostic path', async () => {
+      const commands = new FakeCommandGateway([FOCUS_CHAT_INPUT]);
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(diagnostics.lines[0]).to.contain('path=focusInput-submit');
+    });
   });
 
-  it('sends the sync message via the queue command with the spec name', async () => {
-    const commands = new FakeCommandGateway(['kiroAgent.executions.queueUserMessage']);
-    const { gateway } = buildGateway(commands);
+  describe('focusChatInput fill-only (fallback B)', () => {
+    it('fills only and tells the user to press Enter when submit throws', async () => {
+      // focusChatInput fails only on the FIRST (submit) call; the fill-only
+      // retry uses a distinct options object, so configure a one-shot failure.
+      const commands = new OneShotFailingFocus();
+      const { gateway, notifier, diagnostics } = buildGateway(
+        commands as unknown as FakeCommandGateway,
+      );
 
-    await gateway.syncTasks(SPEC);
+      await gateway.runTasks(SPEC, 'required');
 
-    expect(commands.executed[0].args).to.deep.equal(['Update the tasks for the spec-tracker']);
+      expect(diagnostics.lines[0]).to.contain('path=focusInput-fill');
+      expect(notifier.infos).to.deep.equal([
+        'Kiro Spec Tracker: filled the chat with "Run all required tasks" \u2014 ' +
+          'press Enter to run it.',
+      ]);
+    });
   });
 
-  it('falls back to the focus + clipboard-paste path and restores the clipboard', async () => {
-    const commands = new FakeCommandGateway(
-      ['kiroAgent.focusContinueInput', 'kiroAgent.sendMainUserInput'],
-      'previous-clipboard',
-    );
-    const { gateway } = buildGateway(commands);
+  describe('generic chat-open (fallback C)', () => {
+    it('uses the generic chat-open fallback when no kiroAgent command exists', async () => {
+      const commands = new FakeCommandGateway([GENERIC_CHAT_OPEN]);
+      const { gateway, notifier } = buildGateway(commands);
 
-    await gateway.runTasks(SPEC, 'required-and-optional');
+      await gateway.runTasks(SPEC, 'required');
 
-    const executedIds = commands.executed.map((entry) => entry.id);
-    expect(executedIds).to.deep.equal([
-      'kiroAgent.focusContinueInput',
-      'editor.action.clipboardPasteAction',
-      'kiroAgent.sendMainUserInput',
-    ]);
-    // The message is written, then the original clipboard is restored last.
-    expect(commands.clipboardWrites).to.deep.equal([
-      'Run required and optional tasks',
-      'previous-clipboard',
-    ]);
+      expect(commands.executed).to.have.length(1);
+      expect(commands.executed[0].id).to.equal(GENERIC_CHAT_OPEN);
+      expect(commands.executed[0].args).to.deep.equal(['Run all required tasks']);
+      expect(notifier.infos).to.deep.equal([
+        'Kiro Spec Tracker: opened the chat with "Run all required tasks" \u2014 ' +
+          'you may need to send it.',
+      ]);
+    });
+
+    it('logs the chat-open diagnostic path', async () => {
+      const commands = new FakeCommandGateway([GENERIC_CHAT_OPEN]);
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.syncTasks(SPEC);
+
+      expect(diagnostics.lines[0]).to.contain('path=chat-open');
+    });
   });
 
-  it('notifies an honest "pasted, press Enter" affordance on the paste path', async () => {
-    const commands = new FakeCommandGateway([
-      'kiroAgent.focusContinueInput',
-      'kiroAgent.sendMainUserInput',
-    ]);
-    const { gateway, notifier, reporter } = buildGateway(commands);
+  describe('none (no usable surface)', () => {
+    it('reports honestly and takes no path when no command surface is available', async () => {
+      const commands = new FakeCommandGateway(['some.unrelated.command']);
+      const { gateway, reporter, notifier } = buildGateway(commands);
 
-    await gateway.runTasks(SPEC, 'required');
+      await gateway.syncTasks(SPEC);
 
-    expect(notifier.infos).to.deep.equal([
-      'Kiro Spec Tracker: pasted "Run all required tasks" into the Kiro chat \u2014 ' +
-        'press Enter to run it.',
-    ]);
-    expect(reporter.errors).to.have.length(0);
-  });
+      expect(commands.executed).to.have.length(0);
+      expect(reporter.errors).to.have.length(1);
+      expect(notifier.infos).to.have.length(0);
+    });
 
-  it('restores the clipboard and reports (no success toast) when a paste command throws', async () => {
-    const commands = new FakeCommandGateway(
-      ['kiroAgent.sendMainUserInput'],
-      'keep-me',
-      'editor.action.clipboardPasteAction',
-    );
-    const { gateway, reporter, notifier } = buildGateway(commands);
+    it('falls through to none (error toast) when the chat-open fallback throws', async () => {
+      const commands = new FakeCommandGateway([GENERIC_CHAT_OPEN], GENERIC_CHAT_OPEN);
+      const { gateway, reporter, notifier, diagnostics } = buildGateway(commands);
 
-    await gateway.syncTasks(SPEC);
+      await gateway.syncTasks(SPEC);
 
-    // The clipboard was restored to its original content despite the failure.
-    expect(commands.clipboardWrites[commands.clipboardWrites.length - 1]).to.equal('keep-me');
-    expect(reporter.errors).to.have.length(1);
-    // A failed send must never masquerade as a success.
-    expect(notifier.infos).to.have.length(0);
-  });
+      expect(diagnostics.lines[0]).to.contain('path=none');
+      expect(reporter.errors).to.have.length(1);
+      expect(notifier.infos).to.have.length(0);
+    });
 
-  it('uses the generic chat-open fallback when no kiroAgent command exists', async () => {
-    const commands = new FakeCommandGateway(['workbench.action.chat.open']);
-    const { gateway, notifier } = buildGateway(commands);
+    it('never throws and reports when probing the command surface fails', async () => {
+      const commands = new ThrowingGetCommands();
+      const { gateway, reporter, notifier } = buildGateway(
+        commands as unknown as FakeCommandGateway,
+      );
 
-    await gateway.runTasks(SPEC, 'required');
+      await gateway.syncTasks(SPEC);
 
-    expect(commands.executed).to.have.length(1);
-    expect(commands.executed[0].id).to.equal('workbench.action.chat.open');
-    expect(commands.executed[0].args).to.deep.equal(['Run all required tasks']);
-    expect(notifier.infos).to.deep.equal([
-      'Kiro Spec Tracker: opened the chat with "Run all required tasks" \u2014 ' +
-        'you may need to send it.',
-    ]);
-  });
+      expect(reporter.errors).to.have.length(1);
+      expect(reporter.errors[0]).to.contain('could not be completed');
+      expect(notifier.infos).to.have.length(0);
+    });
 
-  it('reports honestly and takes no path when no command surface is available', async () => {
-    const commands = new FakeCommandGateway(['some.unrelated.command']);
-    const { gateway, reporter, notifier } = buildGateway(commands);
+    it('logs the none path with no kiroAgent ids when nothing is usable', async () => {
+      const commands = new FakeCommandGateway(['some.unrelated.command']);
+      const { gateway, diagnostics } = buildGateway(commands);
 
-    await gateway.syncTasks(SPEC);
+      await gateway.syncTasks(SPEC);
 
-    expect(commands.executed).to.have.length(0);
-    expect(reporter.errors).to.have.length(1);
-    expect(notifier.infos).to.have.length(0);
+      expect(diagnostics.lines).to.deep.equal([
+        'agent action: path=none; kiroAgent ids=[(none)]; generic chat-open=no',
+      ]);
+    });
   });
 
   it('logs a diagnostic naming the detected ids and chosen path on every action', async () => {
-    const commands = new FakeCommandGateway([
-      'kiroAgent.executions.queueUserMessage',
-      'kiroAgent.focusContinueInput',
-      'workbench.action.chat.open',
-      'some.unrelated.command',
-    ]);
+    const commands = new FakeCommandGateway(
+      [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, FOCUS_CHAT_INPUT, GENERIC_CHAT_OPEN],
+      undefined,
+      createResult('sess-1'),
+    );
     const { gateway, diagnostics } = buildGateway(commands);
 
     await gateway.runTasks(SPEC, 'required');
 
     expect(diagnostics.lines).to.have.length(1);
     expect(diagnostics.lines[0]).to.equal(
-      'agent action: path=queue; kiroAgent ids=' +
-        '[kiroAgent.executions.queueUserMessage, kiroAgent.focusContinueInput]; ' +
+      'agent action: path=create+sendPrompt; kiroAgent ids=' +
+        `[${SESSIONS_CREATE}, ${SESSIONS_SEND_PROMPT}, ${FOCUS_CHAT_INPUT}]; ` +
         'generic chat-open=yes',
     );
-  });
-
-  it('logs the none path with no kiroAgent ids when nothing is usable', async () => {
-    const commands = new FakeCommandGateway(['some.unrelated.command']);
-    const { gateway, diagnostics } = buildGateway(commands);
-
-    await gateway.syncTasks(SPEC);
-
-    expect(diagnostics.lines).to.deep.equal([
-      'agent action: path=none; kiroAgent ids=[(none)]; generic chat-open=no',
-    ]);
   });
 
   it('always reports availability as integrated (built only when supported)', () => {
@@ -191,7 +305,7 @@ describe('KiroChatAgentGateway', () => {
     });
 
     it('is true for the generic chat-open command', () => {
-      expect(KiroChatAgentGateway.isSupported(['workbench.action.chat.open'])).to.equal(true);
+      expect(KiroChatAgentGateway.isSupported([GENERIC_CHAT_OPEN])).to.equal(true);
     });
 
     it('is false when neither is present', () => {
@@ -199,3 +313,44 @@ describe('KiroChatAgentGateway', () => {
     });
   });
 });
+
+/**
+ * A command gateway exposing only `focusChatInput` whose FIRST execution throws
+ * (the submit attempt) and whose SECOND succeeds (the fill-only retry), so the
+ * dispatch chain is driven from `focusInput-submit` down to `focusInput-fill`.
+ */
+class OneShotFailingFocus {
+  public readonly executed: { id: string; args: readonly unknown[] }[] = [];
+
+  private calls = 0;
+
+  // eslint-disable-next-line class-methods-use-this
+  public async getCommands(): Promise<readonly string[]> {
+    return [FOCUS_CHAT_INPUT];
+  }
+
+  public async executeCommand<T = void>(id: string, ...args: readonly unknown[]): Promise<T> {
+    this.executed.push({ id, args });
+    this.calls += 1;
+    if (1 === this.calls) {
+      throw new Error('submit unavailable');
+    }
+    return undefined as T;
+  }
+}
+
+/**
+ * A command gateway whose capability probe (`getCommands`) throws, driving the
+ * adapter's outer try/catch so the action is reported, never thrown, to the UI.
+ */
+class ThrowingGetCommands {
+  // eslint-disable-next-line class-methods-use-this
+  public async getCommands(): Promise<readonly string[]> {
+    throw new Error('probe failed');
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  public async executeCommand<T = void>(): Promise<T> {
+    return undefined as T;
+  }
+}

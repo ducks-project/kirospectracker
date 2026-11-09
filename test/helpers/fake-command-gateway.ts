@@ -7,54 +7,50 @@ export interface IExecutedCommand {
 }
 
 /**
- * Fake {@link ICommandGateway} recording executions and clipboard writes, with a
- * configurable command surface and an optional failing command.
+ * Fake {@link ICommandGateway} recording executions, with a configurable command
+ * surface, per-command return values and an optional failing command.
  *
  * It lets the agent adapter and the factory be unit-tested without `vscode`,
- * conforming to the full port contract (no duck-typing).
+ * conforming to the full port contract (no duck-typing). Return values seed the
+ * generic `executeCommand<T>` so a test can drive the `sessions.create` result
+ * the preferred dispatch path reads.
  */
 export class FakeCommandGateway implements ICommandGateway {
   private readonly ids: readonly string[];
 
-  private clipboard: string;
-
   private readonly failingId: string | undefined;
+
+  private readonly results: ReadonlyMap<string, unknown>;
 
   /** Commands executed, in order. */
   public readonly executed: IExecutedCommand[] = [];
 
-  /** Texts written to the clipboard, in order. */
-  public readonly clipboardWrites: string[] = [];
-
   /**
-   * Build the fake over a command surface and initial clipboard content.
+   * Build the fake over a command surface, an optional failing command and
+   * optional per-command return values.
    * @param ids The registered command ids.
-   * @param clipboard The initial clipboard content.
    * @param failingId A command id that throws when executed.
+   * @param results A map of command id to the value its execution resolves to.
    */
-  public constructor(ids: readonly string[], clipboard = 'original', failingId?: string) {
+  public constructor(
+    ids: readonly string[],
+    failingId?: string,
+    results: ReadonlyMap<string, unknown> = new Map(),
+  ) {
     this.ids = ids;
-    this.clipboard = clipboard;
     this.failingId = failingId;
+    this.results = results;
   }
 
   public async getCommands(): Promise<readonly string[]> {
     return this.ids;
   }
 
-  public async executeCommand(id: string, ...args: readonly unknown[]): Promise<void> {
+  public async executeCommand<T = void>(id: string, ...args: readonly unknown[]): Promise<T> {
     this.executed.push({ id, args });
     if (id === this.failingId) {
       throw new Error(`command failed: ${id}`);
     }
-  }
-
-  public async readClipboard(): Promise<string> {
-    return this.clipboard;
-  }
-
-  public async writeClipboard(text: string): Promise<void> {
-    this.clipboard = text;
-    this.clipboardWrites.push(text);
+    return this.results.get(id) as T;
   }
 }

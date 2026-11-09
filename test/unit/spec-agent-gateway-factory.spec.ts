@@ -53,7 +53,7 @@ async function buildFallback(): Promise<UnavailableAgentGateway> {
  */
 describe('createSpecAgentGateway', () => {
   it('selects the Kiro adapter when a kiroAgent command is present and enabled', async () => {
-    const commands = new FakeCommandGateway(['kiroAgent.executions.queueUserMessage']);
+    const commands = new FakeCommandGateway(['kiroAgent.sessions.create']);
     const gateway = await createSpecAgentGateway(
       commands,
       reporter,
@@ -93,7 +93,7 @@ describe('createSpecAgentGateway', () => {
   });
 
   it('always binds the Null Object when the integration is disabled', async () => {
-    const commands = new FakeCommandGateway(['kiroAgent.executions.queueUserMessage']);
+    const commands = new FakeCommandGateway(['kiroAgent.sessions.create']);
     const fallback = await buildFallback();
     const gateway = await createSpecAgentGateway(
       commands,
