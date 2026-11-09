@@ -17,6 +17,7 @@ import { TasksOnlyDocumentPolicy } from './core/status/TasksOnlyDocumentPolicy';
 import { TasksMarkdownParser } from './core/parsing/TasksMarkdownParser';
 import { SpecGrouper } from './core/status/SpecGrouper';
 import { SpecRepository } from './adapters/SpecRepository';
+import { SpecIntroductionLoader } from './adapters/SpecIntroductionLoader';
 import { SpecFileDecorationProvider } from './adapters/SpecFileDecorationProvider';
 import {
   resolveSpecNodeFolderPath,
@@ -82,6 +83,8 @@ export interface IExtensionApi {
   readonly decorations: SpecFileDecorationProvider;
   /** The dashboard webview provider. */
   readonly dashboard: SpecDashboardViewProvider;
+  /** The activity-bar tree provider (exposes the on-hover tooltip resolution). */
+  readonly tree: SpecTreeDataProvider;
   /**
    * The host file-system wrapper that owns the specs `FileSystemWatcher`.
    *
@@ -251,6 +254,23 @@ function createDashboard(
 }
 
 /**
+ * Construct the activity-bar tree provider with its lazy introduction loader.
+ * @param repository The spec repository supplying snapshots.
+ * @param fileSystem The host file-system wrapper used to read `requirements.md`.
+ * @returns The wired tree data provider.
+ */
+function createTree(
+  repository: SpecRepository,
+  fileSystem: VscodeSpecFileSystem,
+): SpecTreeDataProvider {
+  return new SpecTreeDataProvider(
+    repository,
+    new SpecGrouper(),
+    new SpecIntroductionLoader(fileSystem),
+  );
+}
+
+/**
  * Construct every collaborator for the given extension context.
  * @param context The extension context supplying the base URI.
  * @returns The fully wired collaborators.
@@ -268,7 +288,7 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   const agentActions = new SpecAgentActions(repository, agentFallback, gateway);
   const dashboard = createDashboard(context, repository, stats, openDocument, agentActions);
   const decorations = new SpecFileDecorationProvider(repository, new SpecDecorationMapper(), stats);
-  const tree = new SpecTreeDataProvider(repository, new SpecGrouper());
+  const tree = createTree(repository, fileSystem);
   return {
     repository,
     fileSystem,
@@ -395,6 +415,7 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
     repository: wiring.repository,
     decorations: wiring.decorations,
     dashboard: wiring.dashboard,
+    tree: wiring.tree,
     fileSystem: wiring.fileSystem,
   };
 }
