@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { DomHoverPanelView } from '../../src/webview/DomHoverPanelView';
+import type { IHoverRect } from '../../src/webview/computeHoverPlacement';
 import type {
   IHoverAnchor,
   IHoverDom,
@@ -11,7 +12,14 @@ class FakePanel implements IHoverPanelElement {
   public hidden = false;
   public offsetWidth = 100;
   public offsetHeight = 50;
-  public readonly style = { left: '', top: '' };
+  public readonly props = new Map<string, string>();
+  public readonly style = {
+    left: '',
+    top: '',
+    setProperty: (name: string, value: string): void => {
+      this.props.set(name, value);
+    },
+  };
   public readonly attributes = new Map<string, string>();
   public children: unknown[] = [];
   public setAttribute(name: string, value: string): void {
@@ -49,9 +57,22 @@ class FakeDom implements IHoverDom {
   }
 }
 
-const anchorAt = (left: number, bottom: number): IHoverAnchor => ({
-  getBoundingClientRect: () => ({ left, bottom }),
-});
+/** Fake card recording its attributes. */
+class FakeAnchor implements IHoverAnchor {
+  public readonly attributes = new Map<string, string>();
+  public constructor(private readonly rect: IHoverRect) {}
+  public getBoundingClientRect(): IHoverRect {
+    return this.rect;
+  }
+  public setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
+  public removeAttribute(name: string): void {
+    this.attributes.delete(name);
+  }
+}
+const anchorAt = (left: number, bottom: number): FakeAnchor =>
+  new FakeAnchor({ left, right: left + 100, top: bottom - 50, bottom });
 
 describe('DomHoverPanelView', () => {
   it('creates, mounts, fills, shows and positions the panel when the anchor exists', () => {
@@ -64,6 +85,38 @@ describe('DomHoverPanelView', () => {
     expect(panel.children).to.deep.equal([{ text: 'Alpha intro' }]);
     expect(panel.style.left).to.equal('20px');
     expect(panel.style.top).to.equal('108px');
+    expect(panel.attributes.get('id')).to.equal('card-hover-panel');
+    expect(panel.attributes.get('data-side')).to.equal('below');
+    expect(panel.props.get('--arrow-left')).to.equal('50px');
+  });
+  it('flips above near the bottom of the viewport', () => {
+    const dom = new FakeDom(new Map([['/a', anchorAt(20, 290)]]));
+    new DomHoverPanelView(dom).showText('/a', 'x');
+    expect(dom.panels[0].attributes.get('data-side')).to.equal('above');
+  });
+  it('sets aria-describedby on the card and removes it on hide', () => {
+    const anchor = anchorAt(20, 100);
+    const dom = new FakeDom(new Map([['/a', anchor]]));
+    const view = new DomHoverPanelView(dom);
+    view.showText('/a', 'x');
+    expect(anchor.attributes.get('aria-describedby')).to.equal('card-hover-panel');
+    view.hide();
+    expect(anchor.attributes.has('aria-describedby')).to.equal(false);
+  });
+  it('moves aria-describedby when shown for another card', () => {
+    const first = anchorAt(0, 100);
+    const second = anchorAt(0, 200);
+    const dom = new FakeDom(
+      new Map([
+        ['/a', first],
+        ['/b', second],
+      ]),
+    );
+    const view = new DomHoverPanelView(dom);
+    view.showText('/a', 'x');
+    view.showText('/b', 'y');
+    expect(first.attributes.has('aria-describedby')).to.equal(false);
+    expect(second.attributes.has('aria-describedby')).to.equal(true);
   });
 
   it('does nothing when the anchor is not rendered', () => {
@@ -92,6 +145,6 @@ describe('DomHoverPanelView', () => {
     const dom = new FakeDom(new Map([['/a', anchorAt(390, 290)]]));
     new DomHoverPanelView(dom).showText('/a', 'x');
     expect(dom.panels[0].style.left).to.equal('292px');
-    expect(dom.panels[0].style.top).to.equal('242px');
+    expect(dom.panels[0].style.top).to.equal('182px');
   });
 });
