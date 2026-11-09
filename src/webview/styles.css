@@ -177,6 +177,113 @@ body {
   gap: 0.2rem;
 }
 
+/* Folder-filter affordance next to the search box, styled like the Extensions
+   view filter button: a small icon button opening a dropdown of folders. */
+.folder-filter {
+  position: relative;
+  display: flex;
+}
+
+.folder-filter-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  cursor: pointer;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  background: var(--vscode-button-secondaryBackground, transparent);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: var(--radius);
+  opacity: 0.8;
+}
+
+.folder-filter-button:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.folder-filter-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.folder-filter-button.pressed {
+  opacity: 1;
+  border-color: var(--vscode-focusBorder);
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+}
+
+.folder-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.2rem;
+  background: var(--vscode-menu-background, var(--vscode-dropdown-background, var(--vscode-editor-background)));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  border-radius: var(--radius);
+}
+
+.folder-menu[hidden] {
+  display: none;
+}
+
+.folder-menu-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  cursor: pointer;
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+.folder-menu-item:hover {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
+}
+
+.folder-menu-item:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.folder-menu-item.pressed {
+  font-weight: 600;
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.folder-menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-menu-count {
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+
+.folder-menu-empty {
+  padding: 0.35rem 0.6rem;
+  opacity: 0.7;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
 .toggle,
 .link,
 .run {
@@ -273,11 +380,39 @@ body {
   margin: 0;
 }
 
+/* The owning-folder label is a clickable folder-filter toggle. Reset the native
+   button look so it keeps its discreet, inline appearance while remaining an
+   accessible, focusable button. */
 .card-owner {
-  display: block;
+  display: inline-block;
+  font: inherit;
   font-size: 0.7rem;
   opacity: 0.6;
   margin-top: 0.1rem;
+  padding: 0 0.1rem;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+}
+
+.card-owner:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.card-owner:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.card-owner[aria-pressed='true'] {
+  opacity: 1;
+  font-weight: 600;
+  text-decoration: underline;
 }
 
 /* The status badge is a clickable toggle filter, colored by state. Reset the

@@ -11,8 +11,11 @@ import type { RunScope } from '../core/ports/ISpecAgentGateway';
 import type { SpecFilterKey } from '../core/model/SpecFilterKey';
 import type { ISpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
 import type { ISpecStatToggleView } from '../core/status/SpecStatToggleView';
+import type { ISpecFolderToggleView } from '../core/status/SpecFolderToggleView';
 import { planDashboardRender } from './DashboardRenderPlanner';
 import { SpecCardFilter } from '../core/status/SpecCardFilter';
+import { SpecFolderFilter } from '../core/status/SpecFolderFilter';
+import { SpecFolderToggleView } from '../core/status/SpecFolderToggleView';
 import { SpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
 import { SpecStatToggleView } from '../core/status/SpecStatToggleView';
 import { SpecStatusFilter } from '../core/status/SpecStatusFilter';
@@ -23,6 +26,7 @@ import { statusToFilterKey } from '../core/model/SpecFilterKey';
 interface IWebviewState {
   readonly layout?: DashboardLayout;
   readonly filterKeys?: readonly SpecFilterKey[];
+  readonly folderKeys?: readonly string[];
 }
 
 /** Minimal shape of the VS Code webview API injected into the global scope. */
@@ -43,6 +47,7 @@ const DOCUMENT_KINDS: readonly SpecDocumentKind[] = ['requirements', 'design', '
 /** Pure core projectors shared across renders. */
 const statToggleView = new SpecStatToggleView();
 const layoutToggleView = new SpecLayoutToggleView();
+const folderToggleView = new SpecFolderToggleView();
 
 const vscodeApi = acquireVsCodeApi();
 
@@ -66,6 +71,7 @@ const state: {
   query: string;
   layout: DashboardLayout;
   filter: SpecStatusFilter;
+  folderFilter: SpecFolderFilter;
 } = {
   cards: [],
   stats: { total: 0, completed: 0, inProgress: 0, notStarted: 0, malformed: 0 },
@@ -73,14 +79,20 @@ const state: {
   query: '',
   layout: persistedState?.layout ?? 'list',
   filter: SpecStatusFilter.fromUnknown(persistedState?.filterKeys ?? []),
+  folderFilter: SpecFolderFilter.fromUnknown(persistedState?.folderKeys ?? []),
 };
 
 /**
  * Persist the parts of the render state that must survive a re-render or a view
- * reload: the chosen layout and the active status-filter keys.
+ * reload: the chosen layout, the active status-filter keys and the active
+ * folder-filter keys.
  */
 function persistState(): void {
-  vscodeApi.setState({ layout: state.layout, filterKeys: state.filter.toArray() });
+  vscodeApi.setState({
+    layout: state.layout,
+    filterKeys: state.filter.toArray(),
+    folderKeys: state.folderFilter.toArray(),
+  });
 }
 
 /**
@@ -124,6 +136,8 @@ const ICON_PATHS: Readonly<Record<string, string>> = {
   grid: 'M2 2h5v5H2V2zm7 0h5v5H9V2zM2 9h5v5H2V9zm7 0h5v5H9V9z',
   // A diagonal cross, i.e. a clear/close glyph.
   close: 'M4 3L3 4l3.5 3.5L3 11l1 1 3.5-3.5L11 12l1-1-3.5-3.5L12 4l-1-1-3.5 3.5L4 3z',
+  // A funnel, i.e. a filter glyph (matching the Extensions view affordance).
+  filter: 'M1 2h14v2l-5 5v5l-4-2V9L1 4V2z',
 };
 
 /**
@@ -156,6 +170,18 @@ function icon(glyph: string): SVGElement {
  */
 function toggleStatusFilter(key: SpecFilterKey): void {
   state.filter = state.filter.toggle(key);
+  persistState();
+  rerender();
+}
+
+/**
+ * Toggle a folder filter key, persist the new set and re-render. Shared by the
+ * search-box folder menu and the clickable card folder label so both stay in
+ * sync over the same {@link SpecFolderFilter}.
+ * @param key The stable folder key to toggle.
+ */
+function toggleFolderFilter(key: string): void {
+  state.folderFilter = state.folderFilter.toggle(key);
   persistState();
   rerender();
 }
@@ -625,6 +651,33 @@ function appendCardProgress(article: HTMLElement, card: ISpecCardView): void {
 }
 
 /**
+ * Render the owning-folder label of a card as a clickable toggle button.
+ *
+ * Clicking it toggles that folder in the shared {@link SpecFolderFilter}, so it
+ * stays in sync with the search-box folder menu. It keeps its discreet styling,
+ * is an accessible button (`aria-pressed` reflecting whether that folder filter
+ * is active), and stops click propagation so it never also triggers the
+ * card-body open gesture (consistent with the status badge and the other inner
+ * controls).
+ * @param card The spec card view.
+ * @returns The owner-label button element.
+ */
+function renderOwnerLabel(card: ISpecCardView): HTMLElement {
+  const pressed = state.folderFilter.isActive(card.folderKey);
+  const owner = el('button', 'card-owner', card.ownerLabel);
+  owner.setAttribute('type', 'button');
+  owner.setAttribute('aria-pressed', String(pressed));
+  owner.setAttribute('aria-label', `Filter by ${card.ownerLabel} folder`);
+  owner.title = `Filter by ${card.ownerLabel} folder`;
+  owner.addEventListener('click', (event) => {
+    // Inner control: do not also trigger the card-body open gesture.
+    event.stopPropagation();
+    toggleFolderFilter(card.folderKey);
+  });
+  return owner;
+}
+
+/**
  * Render one spec card.
  * @param card The spec card view.
  * @returns The card element.
@@ -635,7 +688,7 @@ function renderCard(card: ISpecCardView): HTMLElement {
   header.appendChild(el('h2', 'card-title', card.name));
   header.appendChild(renderStatusBadge(card));
   article.appendChild(header);
-  article.appendChild(el('span', 'card-owner', card.ownerLabel));
+  article.appendChild(renderOwnerLabel(card));
   appendCardProgress(article, card);
   article.appendChild(renderLinks(card));
   article.appendChild(renderActions(card));
@@ -644,12 +697,12 @@ function renderCard(card: ISpecCardView): HTMLElement {
 }
 
 /**
- * Filter cards by the active status toggles and the search query, composed by
- * the pure {@link SpecCardFilter}.
+ * Filter cards by the active status toggles, the active folder filter and the
+ * search query, composed (logical AND) by the pure {@link SpecCardFilter}.
  * @returns The filtered cards.
  */
 function filtered(): readonly ISpecCardView[] {
-  return new SpecCardFilter(state.filter, state.query).apply(state.cards);
+  return new SpecCardFilter(state.filter, state.folderFilter, state.query).apply(state.cards);
 }
 
 /**
@@ -789,7 +842,116 @@ function renderSearch(): HTMLElement {
 }
 
 /**
- * Build the persistent toolbar (search box + icon layout toggles).
+ * Populate the folder-filter menu with one accessible toggle item per distinct
+ * spec-owning folder, rebuilt from the current cards and folder filter.
+ *
+ * The menu is (re)filled every time it opens, so it always reflects the folders
+ * currently loaded and their pressed state without rebuilding the persistent
+ * toolbar. An empty-folder case shows a discreet, non-interactive hint.
+ * @param menu The menu element to populate.
+ * @param closeMenu Callback hiding the menu after an item activates.
+ */
+function buildFolderMenu(menu: HTMLElement, closeMenu: () => void): void {
+  menu.replaceChildren();
+  const items: readonly ISpecFolderToggleView[] = folderToggleView.build(
+    state.cards,
+    state.folderFilter,
+  );
+  if (0 === items.length) {
+    const empty = el('span', 'folder-menu-empty', 'No folders to filter');
+    menu.appendChild(empty);
+    return;
+  }
+  items.forEach((item) => menu.appendChild(folderMenuItem(item, closeMenu)));
+}
+
+/**
+ * Build one keyboard-accessible folder-filter menu item.
+ * @param item The folder toggle view (key, label, count, pressed).
+ * @param closeMenu Callback hiding the menu after activation.
+ * @returns The menu-item button element.
+ */
+function folderMenuItem(item: ISpecFolderToggleView, closeMenu: () => void): HTMLElement {
+  const button = el('button', item.pressed ? 'folder-menu-item pressed' : 'folder-menu-item');
+  button.setAttribute('type', 'button');
+  button.setAttribute('role', 'menuitemcheckbox');
+  button.setAttribute('aria-checked', String(item.pressed));
+  button.appendChild(el('span', 'folder-menu-label', item.label));
+  button.appendChild(el('span', 'folder-menu-count', String(item.count)));
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    closeMenu();
+    toggleFolderFilter(item.key);
+  });
+  return button;
+}
+
+/** Keys that toggle or close the folder-filter menu from the keyboard. */
+const FOLDER_MENU_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', 'Escape']);
+
+/**
+ * Wire the folder-filter button and menu to open/close by mouse and keyboard
+ * (click or Enter/Space toggle, Escape closes), rebuilding the menu on each open
+ * so it always reflects the current folders and their pressed state.
+ * @param button The folder-filter toggle button.
+ * @param menu The folder-filter dropdown menu.
+ */
+function wireFolderFilter(button: HTMLElement, menu: HTMLElement): void {
+  const setExpanded = (open: boolean): void => {
+    if (open) {
+      buildFolderMenu(menu, () => setExpanded(false));
+    }
+    menu.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+  };
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setExpanded(menu.hidden);
+  });
+  button.addEventListener('keydown', (event) => {
+    if ('Escape' === event.key) {
+      setExpanded(false);
+      return;
+    }
+    if (!FOLDER_MENU_KEYS.has(event.key)) {
+      return;
+    }
+    event.preventDefault();
+    setExpanded(menu.hidden);
+  });
+}
+
+/**
+ * Build the folder-filter control: an Extensions-view-style filter button that
+ * opens a menu listing the distinct spec-owning folders as additive toggles.
+ *
+ * The button lives in the persistent toolbar (built once), but its menu is
+ * rebuilt on every open from the current state, so it always reflects the loaded
+ * folders and their pressed state. It is keyboard-accessible (Enter/Space toggle
+ * the menu, Escape closes it) with `aria-haspopup`/`aria-expanded`.
+ * @returns The folder-filter control element.
+ */
+function renderFolderFilter(): HTMLElement {
+  const group = el('div', 'folder-filter');
+  const button = el('button', 'folder-filter-button');
+  button.setAttribute('type', 'button');
+  button.setAttribute('aria-haspopup', 'true');
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('aria-pressed', String(!state.folderFilter.isEmpty()));
+  button.setAttribute('aria-label', 'Filter by folder');
+  button.title = 'Filter by folder';
+  button.appendChild(icon('filter'));
+  const menu = el('div', 'folder-menu');
+  menu.setAttribute('role', 'menu');
+  menu.hidden = true;
+  wireFolderFilter(button, menu);
+  group.appendChild(button);
+  group.appendChild(menu);
+  return group;
+}
+
+/**
+ * Build the persistent toolbar (search box + folder filter + layout toggle).
  *
  * This element is created once on the initial mount and then reused across
  * every subsequent render, so the live search input keeps its focus and caret
@@ -799,6 +961,7 @@ function renderSearch(): HTMLElement {
 function renderToolbar(): HTMLElement {
   const toolbar = el('div', 'toolbar');
   toolbar.appendChild(renderSearch());
+  toolbar.appendChild(renderFolderFilter());
   const toggles = el('div', 'layout-toggles');
   toggles.setAttribute('role', 'group');
   toggles.setAttribute('aria-label', 'Dashboard layout');
@@ -819,6 +982,22 @@ function syncToggleLabel(app: HTMLElement): void {
     return;
   }
   applyLayoutToggle(node, layoutToggleView.describeToggle(state.layout));
+}
+
+/**
+ * Reflect the active folder filter on the persistent toolbar's folder button
+ * (a pressed look when at least one folder is selected) without rebuilding the
+ * toolbar (which hosts the search input).
+ * @param app The app root hosting the toolbar.
+ */
+function syncFolderFilterButton(app: HTMLElement): void {
+  const node = app.querySelector('.toolbar .folder-filter .folder-filter-button');
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+  const active = !state.folderFilter.isEmpty();
+  node.classList.toggle('pressed', active);
+  node.setAttribute('aria-pressed', String(active));
 }
 
 /**
@@ -878,6 +1057,7 @@ function render(): void {
   stats?.replaceWith(renderStats(state.stats));
   replaceGlobalStats(app);
   syncToggleLabel(app);
+  syncFolderFilterButton(app);
   const content = app.querySelector('.content');
   if (null !== content && content instanceof HTMLElement) {
     renderContent(content);
@@ -966,6 +1146,14 @@ document.addEventListener('click', () => {
     menu.hidden = true;
     const toggle = menu.parentElement?.querySelector('.run-toggle');
     toggle?.setAttribute('aria-expanded', 'false');
+  });
+  document.querySelectorAll('.folder-menu').forEach((menu) => {
+    if (!(menu instanceof HTMLElement) || menu.hidden) {
+      return;
+    }
+    menu.hidden = true;
+    const button = menu.parentElement?.querySelector('.folder-filter-button');
+    button?.setAttribute('aria-expanded', 'false');
   });
 });
 
