@@ -1,25 +1,21 @@
 import type { IHoverPanelView } from './IHoverPanelView';
+import { computeHoverPlacement } from './computeHoverPlacement';
+import type { IHoverRect } from './computeHoverPlacement';
 
-/** Viewport margin, in pixels, kept between the panel and the window edges. */
-const PANEL_VIEWPORT_MARGIN = 8;
-
-/** Minimal rectangle of a hovered card, in viewport coordinates. */
-export interface IHoverAnchorRect {
-  readonly left: number;
-  readonly bottom: number;
-}
-
+/** Stable id of the popin, referenced by the card's `aria-describedby`. */
+export const HOVER_PANEL_ID = 'card-hover-panel';
 /** Minimal card element the panel anchors to. */
 export interface IHoverAnchor {
-  getBoundingClientRect(): IHoverAnchorRect;
+  getBoundingClientRect(): IHoverRect;
+  setAttribute(name: string, value: string): void;
+  removeAttribute(name: string): void;
 }
-
 /** Minimal panel element the adapter drives (structural subset of `HTMLElement`). */
 export interface IHoverPanelElement {
   hidden: boolean;
   readonly offsetWidth: number;
   readonly offsetHeight: number;
-  readonly style: { left: string; top: string };
+  readonly style: { left: string; top: string; setProperty(name: string, value: string): void };
   setAttribute(name: string, value: string): void;
   replaceChildren(...nodes: never[] | unknown[]): void;
 }
@@ -49,6 +45,7 @@ export interface IHoverDom {
 export class DomHoverPanelView implements IHoverPanelView {
   private readonly dom: IHoverDom;
   private panel: IHoverPanelElement | undefined;
+  private describedAnchor: IHoverAnchor | undefined;
 
   /**
    * Build the adapter over its DOM environment.
@@ -68,10 +65,13 @@ export class DomHoverPanelView implements IHoverPanelView {
     panel.replaceChildren(this.dom.createIntro(introduction));
     panel.hidden = false;
     this.position(panel, anchor);
+    this.describe(anchor);
   }
 
   /** @inheritdoc */
   public hide(): void {
+    this.describedAnchor?.removeAttribute('aria-describedby');
+    this.describedAnchor = undefined;
     if (undefined !== this.panel) {
       this.panel.hidden = true;
     }
@@ -85,6 +85,7 @@ export class DomHoverPanelView implements IHoverPanelView {
     if (undefined === this.panel) {
       this.panel = this.dom.createPanel();
       this.panel.setAttribute('role', 'tooltip');
+      this.panel.setAttribute('id', HOVER_PANEL_ID);
       this.panel.hidden = true;
       this.dom.mountPanel(this.panel);
     }
@@ -92,21 +93,30 @@ export class DomHoverPanelView implements IHoverPanelView {
   }
 
   /**
-   * Position the panel just below the card, clamped inside the viewport.
+   * Link the card to the popin for assistive technologies, unlinking the previous card.
+   * @param anchor The card the popin is shown for.
+   */
+  private describe(anchor: IHoverAnchor): void {
+    if (this.describedAnchor !== anchor) {
+      this.describedAnchor?.removeAttribute('aria-describedby');
+    }
+    anchor.setAttribute('aria-describedby', HOVER_PANEL_ID);
+    this.describedAnchor = anchor;
+  }
+  /**
+   * Place the panel below or above the card with its arrow aimed at the card.
    * @param panel The panel element.
    * @param anchor The hovered card.
    */
   private position(panel: IHoverPanelElement, anchor: IHoverAnchor): void {
-    const rect = anchor.getBoundingClientRect();
-    const view = this.dom.viewport();
-    const maxLeft = view.width - panel.offsetWidth - PANEL_VIEWPORT_MARGIN;
-    const left = Math.max(PANEL_VIEWPORT_MARGIN, Math.min(rect.left, maxLeft));
-    const maxTop = view.height - panel.offsetHeight - PANEL_VIEWPORT_MARGIN;
-    const top = Math.max(
-      PANEL_VIEWPORT_MARGIN,
-      Math.min(rect.bottom + PANEL_VIEWPORT_MARGIN, maxTop),
-    );
-    panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
+    const placement = computeHoverPlacement({
+      anchor: anchor.getBoundingClientRect(),
+      panel: { width: panel.offsetWidth, height: panel.offsetHeight },
+      viewport: this.dom.viewport(),
+    });
+    panel.setAttribute('data-side', placement.side);
+    panel.style.left = `${placement.left}px`;
+    panel.style.top = `${placement.top}px`;
+    panel.style.setProperty('--arrow-left', `${placement.arrowLeft}px`);
   }
 }

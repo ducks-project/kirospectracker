@@ -92,12 +92,18 @@ body {
 }
 
 .global-stat-cancelled {
-  color: var(--vscode-descriptionForeground, var(--vscode-disabledForeground, var(--vscode-foreground)));
+  color: var(
+    --vscode-descriptionForeground,
+    var(--vscode-disabledForeground, var(--vscode-foreground))
+  );
   text-decoration: line-through;
 }
 
 .global-stat-inProgress {
-  color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground, var(--vscode-foreground)));
+  color: var(
+    --vscode-charts-orange,
+    var(--vscode-editorWarning-foreground, var(--vscode-foreground))
+  );
 }
 
 .global-stat-todo {
@@ -226,7 +232,10 @@ body {
   max-height: 60vh;
   overflow-y: auto;
   padding: 0.2rem;
-  background: var(--vscode-menu-background, var(--vscode-dropdown-background, var(--vscode-editor-background)));
+  background: var(
+    --vscode-menu-background,
+    var(--vscode-dropdown-background, var(--vscode-editor-background))
+  );
   border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
   border-radius: var(--radius);
 }
@@ -453,7 +462,10 @@ body {
 }
 
 .badge-inProgress {
-  color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground, var(--vscode-foreground)));
+  color: var(
+    --vscode-charts-orange,
+    var(--vscode-editorWarning-foreground, var(--vscode-foreground))
+  );
 }
 
 .badge-inProgress[aria-pressed='true'] {
@@ -520,13 +532,19 @@ body {
 }
 
 .task-state-cancelled {
-  color: var(--vscode-descriptionForeground, var(--vscode-disabledForeground, var(--vscode-foreground)));
+  color: var(
+    --vscode-descriptionForeground,
+    var(--vscode-disabledForeground, var(--vscode-foreground))
+  );
   text-decoration: line-through;
   opacity: 0.7;
 }
 
 .task-state-inProgress {
-  color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground, var(--vscode-foreground)));
+  color: var(
+    --vscode-charts-orange,
+    var(--vscode-editorWarning-foreground, var(--vscode-foreground))
+  );
   font-style: italic;
 }
 
@@ -609,7 +627,10 @@ body {
   flex-direction: column;
   min-width: 100%;
   padding: 0.2rem;
-  background: var(--vscode-menu-background, var(--vscode-dropdown-background, var(--vscode-editor-background)));
+  background: var(
+    --vscode-menu-background,
+    var(--vscode-dropdown-background, var(--vscode-editor-background))
+  );
   border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
   border-radius: var(--radius);
 }
@@ -640,28 +661,68 @@ body {
   outline-offset: -1px;
 }
 
-/* Floating requirements preview, shown on card hover, styled after the
-   Extensions view's hover card: a fixed, bordered, shadowed panel of a
-   readable width that is clamped within the viewport by the client. */
+/* Floating requirements preview, shown on card hover. It sits below the card
+   (or above when there is no room) with an arrow aimed at the card; the client
+   sets data-side and --arrow-left. Colours come from the VS Code theme only. */
 .card-hover-panel {
+  --hover-arrow-size: 8px;
+  --hover-bg: var(--vscode-editorHoverWidget-background, var(--vscode-editor-background));
+  --hover-border: var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
   position: fixed;
   z-index: 20;
-  max-width: 420px;
-  max-height: 60vh;
-  overflow-y: auto;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 16px));
   padding: 0.6rem 0.8rem;
   color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
-  background: var(--vscode-editorHoverWidget-background, var(--vscode-editor-background));
-  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
+  background: var(--hover-bg);
+  border: 1px solid var(--hover-border);
   border-radius: var(--radius);
   box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgb(0 0 0 / 36%));
   pointer-events: none;
+  animation: card-hover-in 120ms ease-out;
+}
+/* Arrow: a rotated square sharing the popin's background and border. */
+.card-hover-panel::before {
+  content: '';
+  position: absolute;
+  left: var(--arrow-left, 16px);
+  width: var(--hover-arrow-size);
+  height: var(--hover-arrow-size);
+  background: var(--hover-bg);
+  border: 1px solid var(--hover-border);
+  transform: translateX(-50%) rotate(45deg);
+}
+.card-hover-panel[data-side='below']::before {
+  top: calc(var(--hover-arrow-size) / -2 - 1px);
+  border-right: 0;
+  border-bottom: 0;
+}
+.card-hover-panel[data-side='above']::before {
+  bottom: calc(var(--hover-arrow-size) / -2 - 1px);
+  border-top: 0;
+  border-left: 0;
 }
 .card-hover-panel[hidden] {
   display: none;
 }
+@keyframes card-hover-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-hover-panel {
+    animation: none;
+  }
+}
 .card-hover-intro {
+  max-height: 60vh;
   margin: 0;
+  overflow-y: auto;
   white-space: pre-wrap;
   line-height: 1.4;
 }

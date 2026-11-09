@@ -681,6 +681,11 @@ function wireCardHover(article: HTMLElement, card: ISpecCardView): void {
   article.addEventListener('blur', leave);
 }
 
+document.addEventListener('keydown', (event: KeyboardEvent): void => {
+  if ('Escape' === event.key) {
+    hoverController.leave();
+  }
+});
 /**
  * Append the required/optional progress bars and the per-state breakdown row to
  * a card.
