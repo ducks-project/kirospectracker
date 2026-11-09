@@ -18,9 +18,18 @@ export interface ISpecCardView {
   readonly folderPath: string;
 
   /**
+   * Stable identity of the owning workspace folder (its absolute path), used as
+   * the key of the folder-scoped filter. It is distinct from {@link ownerLabel}
+   * on purpose: two workspace folders can share a basename (same label) yet have
+   * different paths (different keys), so the folder filter keys on this stable
+   * value while the menu shows the label.
+   */
+  readonly folderKey: string;
+
+  /**
    * Concise, human-readable label of the owning workspace folder (its
-   * basename), shown discreetly on the card. Derived by a pure core helper so
-   * it stays testable and reusable by the later folder-filtering milestone.
+   * basename), shown discreetly on the card and in the folder-filter menu.
+   * Derived by the pure {@link deriveSpecOwnerLabel} helper so it stays testable.
    */
   readonly ownerLabel: string;
 

@@ -54,6 +54,7 @@ describe('SpecCardViewMapper (properties)', () => {
         const card = mapper.map(snapshot);
         expect(card.status).to.equal(snapshot.status);
         expect(card.progress).to.deep.equal(snapshot.progress);
+        expect(card.folderKey).to.equal(snapshot.workspacePath);
         expect(card.ownerLabel).to.equal(deriveSpecOwnerLabel(snapshot.workspacePath));
       }),
     );

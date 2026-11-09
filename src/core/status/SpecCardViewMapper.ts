@@ -22,6 +22,7 @@ export class SpecCardViewMapper {
     return {
       name: snapshot.name,
       folderPath: snapshot.folderPath,
+      folderKey: snapshot.workspacePath,
       ownerLabel: deriveSpecOwnerLabel(snapshot.workspacePath),
       documents: snapshot.documents,
       status: snapshot.status,

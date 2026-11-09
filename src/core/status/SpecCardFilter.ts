@@ -1,41 +1,56 @@
 import type { ISpecCardView } from '../model/ISpecCardView';
+import type { SpecFolderFilter } from './SpecFolderFilter';
 import type { SpecStatusFilter } from './SpecStatusFilter';
 
 /**
- * Pure composition of the status filter and the free-text search applied to the
- * dashboard cards.
+ * Pure composition of the status filter, the folder filter and the free-text
+ * search applied to the dashboard cards.
  *
- * A card is visible when it passes BOTH the active status filter and the search
- * query (case-insensitive substring match on the spec name). The two criteria
- * are independent and composed with a logical AND, matching the dashboard
- * requirement that the status toggles and the search box narrow the list
- * together. Being `vscode`- and DOM-free, it is unit- and property-testable in
- * the core; the webview only applies the decision.
+ * A card is visible when it passes the active status filter AND the active
+ * folder filter AND the search query (case-insensitive substring match on the
+ * spec name). The three criteria are independent and composed with a logical
+ * AND, matching the dashboard requirement that the status toggles, the
+ * folder-scoped filter and the search box narrow the list together. Being
+ * `vscode`- and DOM-free, it is unit- and property-testable in the core; the
+ * webview only applies the decision.
  */
 export class SpecCardFilter {
   /** The active additive status filter. */
   private readonly statusFilter: SpecStatusFilter;
 
+  /** The active additive folder filter. */
+  private readonly folderFilter: SpecFolderFilter;
+
   /** The normalized (trimmed, lower-cased) search query. */
   private readonly normalizedQuery: string;
 
   /**
-   * Build a card filter over a status filter and a raw search query.
+   * Build a card filter over a status filter, a folder filter and a raw query.
    * @param statusFilter The active additive status filter.
+   * @param folderFilter The active additive folder filter.
    * @param query The raw search query (trimmed and lower-cased internally).
    */
-  public constructor(statusFilter: SpecStatusFilter, query: string) {
+  public constructor(
+    statusFilter: SpecStatusFilter,
+    folderFilter: SpecFolderFilter,
+    query: string,
+  ) {
     this.statusFilter = statusFilter;
+    this.folderFilter = folderFilter;
     this.normalizedQuery = query.trim().toLowerCase();
   }
 
   /**
-   * Whether a single card is visible under both criteria.
+   * Whether a single card is visible under all three criteria.
    * @param card The card view to test.
-   * @returns `true` when the card passes the status filter and the search.
+   * @returns `true` when the card passes the status, folder and search filters.
    */
   public isVisible(card: ISpecCardView): boolean {
-    return this.statusFilter.matches(card.status) && this.matchesQuery(card);
+    return (
+      this.statusFilter.matches(card.status) &&
+      this.folderFilter.matches(card.folderKey) &&
+      this.matchesQuery(card)
+    );
   }
 
   /**
