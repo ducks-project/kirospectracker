@@ -53,6 +53,7 @@ export class BoundedCache<K, V> {
     this.entries.delete(key);
     this.entries.set(key, value);
     if (this.entries.size > this.capacity) {
+      // Safe assertion: size exceeds capacity (>= 1), so the iterator yields a key.
       const oldest = this.entries.keys().next().value as K;
       this.entries.delete(oldest);
     }
