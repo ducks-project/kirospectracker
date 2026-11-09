@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 
 import type { SpecGrouper } from '../core/status/SpecGrouper';
-import type { SpecIntroductionLoader } from './SpecIntroductionLoader';
 import type { SpecRepository } from './SpecRepository';
 import type { SpecTreeNode } from './SpecTreeNode';
 import { buildSpecTreeContextValue } from '../core/status/SpecTreeContextValue';
@@ -24,8 +23,6 @@ export class SpecTreeDataProvider implements vscode.TreeDataProvider<SpecTreeNod
 
   private readonly grouper: SpecGrouper;
 
-  private readonly introductionLoader: SpecIntroductionLoader;
-
   private readonly emitter: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
 
   private readonly disposeRepositoryListener: () => void;
@@ -37,16 +34,10 @@ export class SpecTreeDataProvider implements vscode.TreeDataProvider<SpecTreeNod
    * Build the tree provider over the repository and the pure grouper.
    * @param repository The spec repository supplying snapshots.
    * @param grouper The pure status grouper.
-   * @param introductionLoader The lazy loader for a spec's requirements introduction.
    */
-  public constructor(
-    repository: SpecRepository,
-    grouper: SpecGrouper,
-    introductionLoader: SpecIntroductionLoader,
-  ) {
+  public constructor(repository: SpecRepository, grouper: SpecGrouper) {
     this.repository = repository;
     this.grouper = grouper;
-    this.introductionLoader = introductionLoader;
     this.disposeRepositoryListener = this.repository.onDidChangeSpecs(() => this.emitter.fire());
   }
 
@@ -86,35 +77,6 @@ export class SpecTreeDataProvider implements vscode.TreeDataProvider<SpecTreeNod
       return node.group.specs.map((spec) => ({ kind: 'spec', spec }));
     }
     return [];
-  }
-
-  /**
-   * Resolve a spec leaf's hover tooltip on demand with its requirements intro.
-   *
-   * VS Code calls this once per tree item on hover, so the `requirements.md`
-   * introduction is read and parsed lazily here (never pre-loaded for every
-   * spec). A group node, a spec without a requirements document, or a document
-   * without a derivable introduction leaves the tooltip untouched.
-   * @param item The tree item whose undefined tooltip may be resolved.
-   * @param node The node associated with the tree item.
-   * @param _token The cancellation token (unused: the single read is cheap).
-   * @returns The same item, with a markdown tooltip when an introduction exists.
-   */
-  public async resolveTreeItem(
-    item: vscode.TreeItem,
-    node: SpecTreeNode,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _token: vscode.CancellationToken,
-  ): Promise<vscode.TreeItem> {
-    if ('spec' !== node.kind || !node.spec.documents.requirements) {
-      return item;
-    }
-    const introduction = await this.introductionLoader.load(node.spec.folderPath);
-    if (undefined === introduction) {
-      return item;
-    }
-    item.tooltip = new vscode.MarkdownString(introduction);
-    return item;
   }
 
   /**
