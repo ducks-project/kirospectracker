@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Clean up the extension manifest: `activationEvents` is now empty because VS Code derives
+  activation from the declared command and view contributions; `kirospectracker.openDocument`
+  is declared as a command (hidden from the Command Palette via a `commandPalette` `when:
+  false` entry, alongside the context-only tree commands) so its activation is generated too.
+  No behavior change — the extension still activates on its views and commands.
+
+### Added
+
+- Give each activity-bar view its own icon (`media/view-dashboard.svg` for the Specs
+  Dashboard, `media/view-tree.svg` for Specs by Status), resolving the missing per-view icon
+  warning when both views share the container.
+
 ## [0.7.0] - 2026-11-09
 
 ### Added

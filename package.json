@@ -32,23 +32,13 @@
     "url": "https://github.com/ducks-project/kirospectracker/issues"
   },
   "homepage": "https://github.com/ducks-project/kirospectracker#readme",
-  "activationEvents": [
-    "onView:kirospectracker.dashboard",
-    "onView:kirospectracker.tree",
-    "onCommand:kirospectracker.refresh",
-    "onCommand:kirospectracker.runTasks",
-    "onCommand:kirospectracker.toggleLayout",
-    "onCommand:kirospectracker.openDocument",
-    "onCommand:kirospectracker.tree.openRequirements",
-    "onCommand:kirospectracker.tree.openDesign",
-    "onCommand:kirospectracker.tree.openTasks",
-    "onCommand:kirospectracker.tree.openNotes",
-    "onCommand:kirospectracker.tree.syncFiles",
-    "onCommand:kirospectracker.tree.runRequired",
-    "onCommand:kirospectracker.tree.runRequiredAndOptional"
-  ],
+  "activationEvents": [],
   "contributes": {
     "commands": [
+      {
+        "command": "kirospectracker.openDocument",
+        "title": "Kiro Spec Tracker: Open Spec Document"
+      },
       {
         "command": "kirospectracker.refresh",
         "title": "Kiro Spec Tracker: Refresh Specs",
@@ -100,6 +90,40 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "kirospectracker.openDocument",
+          "when": "false"
+        },
+        {
+          "command": "kirospectracker.tree.openRequirements",
+          "when": "false"
+        },
+        {
+          "command": "kirospectracker.tree.openDesign",
+          "when": "false"
+        },
+        {
+          "command": "kirospectracker.tree.openTasks",
+          "when": "false"
+        },
+        {
+          "command": "kirospectracker.tree.openNotes",
+          "when": "false"
+        },
+        {
+          "command": "kirospectracker.tree.syncFiles",
+          "when": "false"
+        },
+        {
+          "command": "kirospectracker.tree.runRequired",
+          "when": "false"
+        },
+        {
+          "command": "kirospectracker.tree.runRequiredAndOptional",
+          "when": "false"
+        }
+      ],
       "explorer/context": [
         {
           "command": "kirospectracker.runTasks",
@@ -181,11 +205,13 @@
         {
           "id": "kirospectracker.dashboard",
           "name": "Specs Dashboard",
-          "type": "webview"
+          "type": "webview",
+          "icon": "media/view-dashboard.svg"
         },
         {
           "id": "kirospectracker.tree",
-          "name": "Specs by Status"
+          "name": "Specs by Status",
+          "icon": "media/view-tree.svg"
         }
       ]
     }
