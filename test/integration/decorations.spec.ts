@@ -59,12 +59,29 @@ describe('Spec decorations (Node host)', () => {
     await vscode.workspace.fs.writeFile(inProgressTasksUri, originalTasksContent);
   });
 
-  it('discovers the four fixture specs', () => {
+  it('discovers the five fixture specs', () => {
     const names = api.repository
       .getSpecs()
       .map((spec) => spec.name)
       .sort();
-    expect(names).to.deep.equal(['completed', 'in-progress', 'malformed', 'not-started']);
+    expect(names).to.deep.equal([
+      'cancelled-completed',
+      'completed',
+      'in-progress',
+      'malformed',
+      'not-started',
+    ]);
+  });
+
+  it('decorates a spec completed entirely via cancelled tasks with the Completed badge', () => {
+    const cancelledCompleted = api.repository
+      .getSpecs()
+      .find((spec) => 'cancelled-completed' === spec.name);
+    expect(cancelledCompleted).to.not.equal(undefined);
+    const uri = vscode.Uri.file(path.normalize(cancelledCompleted!.folderPath));
+    const decoration = api.decorations.provideFileDecoration(uri);
+    expect(decoration).to.not.equal(undefined);
+    expect(decoration?.badge).to.equal('✓');
   });
 
   it('applies a decoration to a spec folder', () => {

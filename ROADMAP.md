@@ -9,19 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.8.0 — Task-level statistics and extended task states [Planned]
-
-- [ ] Add discreet global statistics counted over tasks (not specs): total tasks done, in
-      progress, cancelled, and to do, plus an overall percentage complete relative to the
-      whole (where complete counts as done or cancelled).
-- [ ] Extend task-state parsing to recognize cancelled (`[-]`) and in-progress (`[~]`) in
-      addition to done (`[x]`) and not done (`[ ]`).
-- [ ] Update the completion model so a spec is complete when every required task is done or
-      cancelled, and fully complete when every required and optional task is done or
-      cancelled; reflect this in the UI.
-- [ ] Update the related documents (steering `kiro-spec-format`, README, architecture) to
-      describe the extended task states and completion rules.
-
 ## v0.9.0 — Folder-scoped filtering [Planned]
 
 - [ ] Add a filter button on the search box (like the Extensions view) whose menu lists the

@@ -7,11 +7,11 @@ boundary with `vscode`.
 ## Layers
 
 - Core (`core/`): pure logic. Never imports `vscode`. Contains the `tasks.md` parser, the
-  tolerant meta reader, the status resolver, the progress calculator, the stats and
-  decoration mappers, the dashboard view projectors (card view, stat toggles, layout
-  toggles), the additive status-filter state machine and card-visibility composer, the
-  tree-item context-value builder, the HTML escaper and nonce factory, and the immutable
-  value objects.
+  tolerant meta reader, the status resolver, the progress calculator, the per-spec stats and
+  decoration mappers, the global task-level statistics calculator, the dashboard view
+  projectors (card view, stat toggles, layout toggles), the additive status-filter state
+  machine and card-visibility composer, the tree-item context-value builder, the HTML escaper
+  and nonce factory, and the immutable value objects.
 - Ports (`core/ports/` and `adapters/ports/`): interfaces describing what each side needs
   ([IDocumentPolicy](../src/core/ports/IDocumentPolicy.ts),
   [IScheduler](../src/core/ports/IScheduler.ts),
@@ -62,6 +62,7 @@ flowchart TD
     PROG["SpecProgressCalculator"]
     FACT["SpecSnapshotFactory"]
     MAPS["SpecDecorationMapper / SpecStatsCalculator / SpecGrouper"]
+    GSTATS["GlobalTaskStatsCalculator"]
     HTML["DashboardHtmlBuilder / HtmlEscaper / NonceFactory"]
   end
 
@@ -86,6 +87,31 @@ flowchart TD
   DEC --> MAPS
   DASH --> HTML
 ```
+
+## Task-state model
+
+A parsed task carries a [TaskState](../src/core/model/TaskState.ts) discriminated union, never
+a floating bracket literal: `'todo'` (`[ ]`), `'done'` (`[x]`/`[X]`), `'cancelled'` (`[-]`) and
+`'inProgress'` (`[~]`). The raw bracket mark is read in exactly ONE place, the pure
+`taskStateFromMark` helper, which is the single source of truth for the mapping and is tolerant
+(any other character, including a space, maps to `'todo'`). Nothing downstream re-inspects a
+`[-]` or `[~]` literal; consumers branch on the `TaskState` value.
+
+Progress and completion are RESOLVED-based: a task is RESOLVED when it is done OR cancelled
+(`isResolved`), and a cancelled task counts in BOTH the numerator and the denominator. So
+[SpecProgressCalculator](../src/core/status/SpecProgressCalculator.ts) folds done + cancelled
+into `requiredDone` / `optionalDone` while also exposing the per-state breakdown (done,
+cancelled, in-progress, todo) so the dashboard can render each state distinctly without
+re-deriving it. [SpecStatusResolver](../src/core/status/SpecStatusResolver.ts) treats a spec as
+`Completed` when every required task is resolved and `FullyCompleted` when every optional task
+is resolved too; a spec whose required tasks are all `[-]` (cancelled) therefore resolves to the
+Completed badge, exactly like one whose tasks are all `[x]`.
+
+The [GlobalTaskStatsCalculator](../src/core/status/GlobalTaskStatsCalculator.ts) aggregates the
+leaf tasks of every spec into a single `IGlobalTaskStats` (done, cancelled, in-progress, todo,
+total, and a RESOLVED-based `percentComplete`), walking each tree once and bucketing leaves by
+state. These discreet global, task-level statistics sit alongside the existing per-spec stats
+and are surfaced in the dashboard. Being pure core, it is gate-covered and host-free.
 
 ## Dashboard flow
 

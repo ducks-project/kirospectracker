@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-09
+
+### Added
+
+- Extend task-state parsing to recognize cancelled (`[-]`) and in-progress (`[~]`) in addition
+  to done (`[x]`) and not done (`[ ]`), mapped once through a pure `taskStateFromMark` helper so
+  no raw bracket literal is scattered across the code.
+- Add discreet global, task-level statistics across all specs (total tasks done, cancelled, in
+  progress and to do, plus an overall resolved percentage), computed by a pure
+  `GlobalTaskStatsCalculator` and surfaced in the dashboard.
+- Render the done, cancelled and in-progress task states distinctly in the dashboard (cancelled
+  shown struck through and dimmed, in-progress shown subtly), using theme-aware styling.
+
+### Changed
+
+- Count a task as resolved when it is done OR cancelled: completion and progress now treat a
+  cancelled task like a done one (it counts in both the numerator and the denominator), so a
+  spec whose required tasks are all cancelled resolves to Completed.
+
 ## [0.7.1] - 2026-11-09
 
 ### Changed
@@ -259,7 +278,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.7.1...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ducks-project/kirospectracker/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/ducks-project/kirospectracker/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/ducks-project/kirospectracker/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ducks-project/kirospectracker/compare/v0.5.0...v0.6.0
