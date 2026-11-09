@@ -236,10 +236,17 @@ fixed message, then runs a capability-probed, cascading try/catch chain ordered 
 each step guarded by a `getCommands(true)` membership check and wrapped so any throw falls
 through to the next:
 
-1. `kiroAgent.sessions.create` + `kiroAgent.sessions.sendPrompt` — open a NEW session and
-   **truly submit** the prompt (starts the agent run). It proceeds only when `create` returns a
-   non-empty string `sessionId` (otherwise `sendPrompt` silently no-ops), falling through
-   otherwise. → notify "sent".
+1. `kiroAgent.sessions.create` + activate + foreground + `kiroAgent.sessions.sendPrompt` — open a
+   NEW session, **activate** it so it becomes the visible chat (prefer `kiroAgent.sessions.switch`,
+   which returns `{ accepted }`, else the best-effort `kiroAgent.viewSession`), bring the chat view
+   to the **foreground** with `kiroAgent.chatView.focus`, then **fire-and-forget**
+   `kiroAgent.sessions.sendPrompt` (positional `sessionId, prompt`) so the "sent" toast is
+   immediate rather than delayed to end-of-turn. It proceeds only when `create` returns a non-empty
+   string `sessionId` (otherwise `sendPrompt` silently no-ops), falling through otherwise.
+   Activation and focus are best-effort: a throw or `accepted: false` never aborts the send, and a
+   fire-and-forget `sendPrompt` rejection is swallowed into the diagnostic sink. → notify "sent"
+   (or, when no activation command exists, "sent — open it from Session History if it did not come
+   to the front").
 2. `kiroAgent.focusChatInput({ prompt, submit: true, newSession: true })` — UI submit in a new
    session (best-effort; depends on the chat webview being rendered). → notify "sent".
 3. `kiroAgent.focusChatInput({ prompt })` — fill only, no submit. → notify "press Enter".

@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The agent actions now activate and bring the new Kiro chat session to the foreground, and the
+  confirmation toast is immediate. After creating the session with `kiroAgent.sessions.create`,
+  `KiroChatAgentGateway` activates it (preferring `kiroAgent.sessions.switch`, which reports
+  `{ accepted }`, and falling back to the best-effort `kiroAgent.viewSession`) and foregrounds the
+  chat view with `kiroAgent.chatView.focus`, both guarded by the capability probe and wrapped so a
+  failure never aborts the send. It then dispatches `kiroAgent.sessions.sendPrompt` fire-and-forget
+  (the command resolves only at end-of-turn) and shows the "sent to Kiro chat" toast right away
+  instead of after the agent finishes, removing the multi-second delay. When no activation command
+  is available the prompt is still sent, and the toast says the session may have opened in Session
+  History. The diagnostic line now records how the session was activated (`activation=switch`,
+  `viewSession` or `none`) and that the submission was fire-and-forget.
 - The agent actions (Sync Files, Run required tasks, Run required and optional tasks) now open
   a new Kiro chat session and submit the templated prompt on supported builds, instead of only
   opening the chat for a manual send. `KiroChatAgentGateway` runs a capability-probed,
