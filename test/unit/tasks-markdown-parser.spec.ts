@@ -12,21 +12,36 @@ import { TasksMarkdownParser } from '../../src/core/parsing/TasksMarkdownParser'
 describe('TasksMarkdownParser', () => {
   const parser = new TasksMarkdownParser();
 
-  it('recognises an unchecked task as not done', () => {
+  it('recognises an unchecked task as todo', () => {
     const [task] = parser.parse('- [ ] 1. Do the thing');
-    expect(task.done).to.equal(false);
+    expect(task.state).to.equal('todo');
     expect(task.id).to.equal('1');
     expect(task.title).to.equal('Do the thing');
   });
 
   it('recognises a lowercase checked task as done', () => {
     const [task] = parser.parse('- [x] 1. Done thing');
-    expect(task.done).to.equal(true);
+    expect(task.state).to.equal('done');
   });
 
   it('recognises an uppercase checked task as done', () => {
     const [task] = parser.parse('- [X] 1. Done thing');
-    expect(task.done).to.equal(true);
+    expect(task.state).to.equal('done');
+  });
+
+  it('recognises a cancelled task from the [-] mark', () => {
+    const [task] = parser.parse('- [-] 1. Abandoned thing');
+    expect(task.state).to.equal('cancelled');
+  });
+
+  it('recognises an in-progress task from the [~] mark', () => {
+    const [task] = parser.parse('- [~] 1. Ongoing thing');
+    expect(task.state).to.equal('inProgress');
+  });
+
+  it('degrades an unknown bracket character to todo', () => {
+    const [task] = parser.parse('- [?] 1. Mystery thing');
+    expect(task.state).to.equal('todo');
   });
 
   it('marks a task optional when a * is glued to the bracket', () => {
@@ -37,7 +52,7 @@ describe('TasksMarkdownParser', () => {
   it('tolerates a space between the glued * and the number', () => {
     const [task] = parser.parse('- [x]*  1.3 Property test');
     expect(task.optional).to.equal(true);
-    expect(task.done).to.equal(true);
+    expect(task.state).to.equal('done');
   });
 
   it('does NOT mark a task optional from the word "optional" in prose', () => {
@@ -52,7 +67,7 @@ describe('TasksMarkdownParser', () => {
     const [parent] = parser.parse(content);
     expect(parent.children).to.have.length(2);
     expect(parent.children[0].id).to.equal('1.1');
-    expect(parent.children[1].done).to.equal(false);
+    expect(parent.children[1].state).to.equal('todo');
   });
 
   it('attaches a _Requirements:_ line to the current task as metadata, not a task', () => {

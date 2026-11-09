@@ -46,7 +46,29 @@ describe('TasksMarkdownParser (properties)', () => {
           const star = optional ? '*' : '';
           const [task] = parser.parse(`- [${mark}]${star} ${id}. Title`);
           expect(task.optional).to.equal(optional);
-          expect(task.done).to.equal(done);
+          expect(task.state).to.equal(done ? 'done' : 'todo');
+        },
+      ),
+    );
+  });
+
+  it('maps each known mark to its task state and unknown chars to todo', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 99 }), (id) => {
+        expect(parser.parse(`- [-] ${id}. Task`)[0].state).to.equal('cancelled');
+        expect(parser.parse(`- [~] ${id}. Task`)[0].state).to.equal('inProgress');
+      }),
+    );
+  });
+
+  it('degrades any non-mark bracket character to todo', () => {
+    fc.assert(
+      fc.property(
+        fc.char().filter((char) => !['x', 'X', '-', '~', ']'].includes(char)),
+        fc.integer({ min: 1, max: 99 }),
+        (mark, id) => {
+          const [task] = parser.parse(`- [${mark}] ${id}. Task`);
+          expect(task.state).to.equal('todo');
         },
       ),
     );

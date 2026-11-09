@@ -45,12 +45,21 @@ export class SpecStatusResolver {
   }
 
   /**
-   * Whether no task (required or optional) is done.
+   * Whether no task (required or optional) is resolved OR in progress.
+   *
+   * A single `[~]` (in-progress) leaf is enough to leave NotStarted, so the
+   * check excludes both the resolved count and the in-progress count across the
+   * required and optional sets.
    * @param progress The computed progress.
-   * @returns `true` when nothing is done.
+   * @returns `true` when nothing is resolved and nothing is in progress.
    */
   private static isNotStarted(progress: ISpecProgress): boolean {
-    return 0 === progress.requiredDone && 0 === progress.optionalDone;
+    return (
+      0 === progress.requiredDone &&
+      0 === progress.optionalDone &&
+      0 === progress.requiredInProgress &&
+      0 === progress.optionalInProgress
+    );
   }
 
   /**

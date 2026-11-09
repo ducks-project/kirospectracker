@@ -18,6 +18,14 @@ const SNAPSHOT: ISpecSnapshot = {
     requiredTotal: 2,
     optionalDone: 0,
     optionalTotal: 0,
+    requiredResolvedDone: 1,
+    requiredResolvedCancelled: 0,
+    requiredInProgress: 0,
+    requiredTodo: 1,
+    optionalResolvedDone: 0,
+    optionalResolvedCancelled: 0,
+    optionalInProgress: 0,
+    optionalTodo: 0,
   },
 };
 

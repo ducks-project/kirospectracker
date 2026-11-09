@@ -19,6 +19,14 @@ const progressArb = fc.record({
   optionalTotal: fc.nat(),
   requiredRatio: fc.double({ min: 0, max: 1, noNaN: true }),
   optionalRatio: fc.double({ min: 0, max: 1, noNaN: true }),
+  requiredResolvedDone: fc.nat(),
+  requiredResolvedCancelled: fc.nat(),
+  requiredInProgress: fc.nat(),
+  requiredTodo: fc.nat(),
+  optionalResolvedDone: fc.nat(),
+  optionalResolvedCancelled: fc.nat(),
+  optionalInProgress: fc.nat(),
+  optionalTodo: fc.nat(),
 });
 
 /** Arbitrary over a full snapshot. */

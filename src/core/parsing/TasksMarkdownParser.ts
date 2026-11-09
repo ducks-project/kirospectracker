@@ -1,10 +1,12 @@
 import type { ITaskItem } from '../model/ITaskItem';
+import type { TaskState } from '../model/TaskState';
+import { taskStateFromMark } from '../model/TaskState';
 
 /** A mutable task node used while building the immutable tree. */
 interface IMutableTask {
   id: string;
   title: string;
-  done: boolean;
+  state: TaskState;
   optional: boolean;
   readonly children: IMutableTask[];
   readonly requirements: string[];
@@ -13,7 +15,7 @@ interface IMutableTask {
 
 /** Match a task list line: indentation, checkbox, optional `*`, number, title. */
 const TASK_LINE =
-  /^(?<indent>[ \t]*)-\s+\[(?<mark>[ xX])\](?<optional>\*?)\s*(?<id>\d+(?:\.\d+)*)?\.?\s*(?<title>.*)$/;
+  /^(?<indent>[ \t]*)-\s+\[(?<mark>[^\]])\](?<optional>\*?)\s*(?<id>\d+(?:\.\d+)*)?\.?\s*(?<title>.*)$/;
 
 /** Match a `_Requirements: 1.1, 2.3_` metadata line, capturing the list body. */
 const REQUIREMENTS_LINE = /^\s*(?:-\s+)?_Requirements:\s*(?<body>.*?)_\s*$/i;
@@ -44,7 +46,7 @@ function matchTask(line: string): IMutableTask | undefined {
   return {
     id: id ?? '',
     title: title.trim(),
-    done: 'x' === mark || 'X' === mark,
+    state: taskStateFromMark(mark),
     optional: '*' === optional,
     children: [],
     requirements: [],
@@ -96,7 +98,7 @@ function freeze(task: IMutableTask): ITaskItem {
   return {
     id: task.id,
     title: task.title,
-    done: task.done,
+    state: task.state,
     optional: task.optional,
     children: task.children.map((child) => freeze(child)),
     requirements: [...task.requirements],
@@ -121,12 +123,13 @@ function consumeLine(line: string, roots: IMutableTask[], stack: IMutableTask[])
 /**
  * Pure parser turning `tasks.md` text into an immutable {@link ITaskItem} tree.
  *
- * It recognises the GitHub-Flavored-Markdown checkbox (`- [ ]` / `- [x]` /
- * `- [X]`), the `*` optional marker glued to the closing bracket, the
- * hierarchical task number, nesting via indentation, and the
- * `_Requirements: ..._` metadata line. It is total: it never throws on
- * malformed input and silently skips lines it cannot parse. The word "optional"
- * in free text is NOT a marker; only the `*` after `]` flips the flag.
+ * It recognises the four checkbox states (`- [ ]` todo, `- [x]`/`- [X]` done,
+ * `- [-]` cancelled, `- [~]` in-progress), the `*` optional marker glued to the
+ * closing bracket, the hierarchical task number, nesting via indentation, and
+ * the `_Requirements: ..._` metadata line. Any other single bracket character
+ * degrades to `todo`. It is total: it never throws on malformed input and
+ * silently skips lines it cannot parse. The word "optional" in free text is NOT
+ * a marker; only the `*` after `]` flips the flag.
  */
 export class TasksMarkdownParser {
   /** Pattern splitting the document body into lines (LF and CRLF). */

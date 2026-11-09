@@ -1,3 +1,5 @@
+import type { TaskState } from './TaskState';
+
 /**
  * A single parsed task from a `tasks.md` file.
  *
@@ -13,8 +15,8 @@ export interface ITaskItem {
   /** Human-readable title following the task number on the checkbox line. */
   readonly title: string;
 
-  /** Whether the checkbox is checked (`- [x]` / `- [X]`). */
-  readonly done: boolean;
+  /** Lifecycle state derived from the checkbox mark (`[ ]`/`[x]`/`[-]`/`[~]`). */
+  readonly state: TaskState;
 
   /** Whether a `*` is glued to the checkbox (`- [ ]* 1.2`), marking it optional. */
   readonly optional: boolean;

@@ -24,6 +24,14 @@ const cardArb: fc.Arbitrary<ISpecCardView> = fc.record({
     optionalTotal: 0,
     requiredRatio: 0,
     optionalRatio: 0,
+    requiredResolvedDone: 0,
+    requiredResolvedCancelled: 0,
+    requiredInProgress: 0,
+    requiredTodo: 0,
+    optionalResolvedDone: 0,
+    optionalResolvedCancelled: 0,
+    optionalInProgress: 0,
+    optionalTodo: 0,
   }),
 });
 

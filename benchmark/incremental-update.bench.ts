@@ -55,6 +55,14 @@ function makeProgress(index: number): ISpecProgress {
     optionalTotal: 0,
     requiredRatio: requiredDone / REQUIRED_TASK_TOTAL,
     optionalRatio: 0,
+    requiredResolvedDone: requiredDone,
+    requiredResolvedCancelled: 0,
+    requiredInProgress: 0,
+    requiredTodo: REQUIRED_TASK_TOTAL - requiredDone,
+    optionalResolvedDone: 0,
+    optionalResolvedCancelled: 0,
+    optionalInProgress: 0,
+    optionalTodo: 0,
   };
 }
 

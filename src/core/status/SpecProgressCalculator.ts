@@ -7,10 +7,43 @@ const FULL_RATIO = 1;
 /** Empty ratio returned when the optional set has no task. */
 const EMPTY_RATIO = 0;
 
-/** Accumulator of done/total counts for one task set. */
+/** Per-state accumulator for one task set (required or optional). */
 interface ICounts {
   done: number;
+  cancelled: number;
+  inProgress: number;
+  todo: number;
   total: number;
+}
+
+/**
+ * Build an empty per-state accumulator.
+ * @returns A fresh accumulator with all counters at zero.
+ */
+function emptyCounts(): ICounts {
+  return { done: 0, cancelled: 0, inProgress: 0, todo: 0, total: 0 };
+}
+
+/**
+ * Increment exactly one per-state counter for a leaf and bump the total.
+ * @param counts The accumulator to mutate.
+ * @param state The leaf's task state.
+ */
+function tally(counts: ICounts, state: ITaskItem['state']): void {
+  counts.total += 1;
+  if ('done' === state) {
+    counts.done += 1;
+    return;
+  }
+  if ('cancelled' === state) {
+    counts.cancelled += 1;
+    return;
+  }
+  if ('inProgress' === state) {
+    counts.inProgress += 1;
+    return;
+  }
+  counts.todo += 1;
 }
 
 /**
@@ -25,12 +58,17 @@ function visit(tasks: readonly ITaskItem[], required: ICounts, optional: ICounts
       visit(task.children, required, optional);
       return;
     }
-    const bucket = task.optional ? optional : required;
-    bucket.total += 1;
-    if (task.done) {
-      bucket.done += 1;
-    }
+    tally(task.optional ? optional : required, task.state);
   });
+}
+
+/**
+ * Compute the RESOLVED count of a set (done + cancelled).
+ * @param counts The per-state accumulator.
+ * @returns The number of resolved leaves.
+ */
+function resolved(counts: ICounts): number {
+  return counts.done + counts.cancelled;
 }
 
 /**
@@ -51,7 +89,7 @@ function ratio(counts: ICounts, emptyFallback: number): number {
   if (0 === counts.total) {
     return emptyFallback;
   }
-  return counts.done / counts.total;
+  return resolved(counts) / counts.total;
 }
 
 export class SpecProgressCalculator {
@@ -83,18 +121,26 @@ export class SpecProgressCalculator {
    * @returns The immutable progress value object.
    */
   public calculate(tasks: readonly ITaskItem[]): ISpecProgress {
-    const required: ICounts = { done: 0, total: 0 };
-    const optional: ICounts = { done: 0, total: 0 };
+    const required: ICounts = emptyCounts();
+    const optional: ICounts = emptyCounts();
 
     visit(tasks, required, optional);
 
     return {
-      requiredDone: required.done,
+      requiredDone: resolved(required),
       requiredTotal: required.total,
-      optionalDone: optional.done,
+      optionalDone: resolved(optional),
       optionalTotal: optional.total,
       requiredRatio: ratio(required, this.emptyRequiredRatio),
       optionalRatio: ratio(optional, this.emptyOptionalRatio),
+      requiredResolvedDone: required.done,
+      requiredResolvedCancelled: required.cancelled,
+      requiredInProgress: required.inProgress,
+      requiredTodo: required.todo,
+      optionalResolvedDone: optional.done,
+      optionalResolvedCancelled: optional.cancelled,
+      optionalInProgress: optional.inProgress,
+      optionalTodo: optional.todo,
     };
   }
 }

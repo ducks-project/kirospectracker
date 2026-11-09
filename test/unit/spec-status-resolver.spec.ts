@@ -22,6 +22,8 @@ function progress(
   requiredTotal: number,
   optionalDone: number,
   optionalTotal: number,
+  requiredInProgress = 0,
+  optionalInProgress = 0,
 ): ISpecProgress {
   return {
     requiredDone,
@@ -30,6 +32,14 @@ function progress(
     optionalTotal,
     requiredRatio: 0 === requiredTotal ? 1 : requiredDone / requiredTotal,
     optionalRatio: 0 === optionalTotal ? 0 : optionalDone / optionalTotal,
+    requiredResolvedDone: requiredDone,
+    requiredResolvedCancelled: 0,
+    requiredInProgress,
+    requiredTodo: Math.max(0, requiredTotal - requiredDone - requiredInProgress),
+    optionalResolvedDone: optionalDone,
+    optionalResolvedCancelled: 0,
+    optionalInProgress,
+    optionalTodo: Math.max(0, optionalTotal - optionalDone - optionalInProgress),
   };
 }
 
@@ -67,6 +77,21 @@ describe('SpecStatusResolver', () => {
   it('resolves FullyCompleted when all required are done and there are no optionals', () => {
     // With no optional task, the optional set is trivially fully done.
     expect(resolver.resolve(ALL_DOCS, progress(3, 3, 0, 0))).to.equal(SpecStatus.FullyCompleted);
+  });
+
+  it('resolves Completed for an all-cancelled required spec with pending optionals', () => {
+    // 3/3 required resolved purely through cancellation, 0/2 optional done.
+    const allCancelled: ISpecProgress = {
+      ...progress(3, 3, 0, 2),
+      requiredResolvedDone: 0,
+      requiredResolvedCancelled: 3,
+    };
+    expect(resolver.resolve(ALL_DOCS, allCancelled)).to.equal(SpecStatus.Completed);
+  });
+
+  it('resolves InProgress (not NotStarted) for a [~]-only spec', () => {
+    // Nothing resolved, but one required task is in progress.
+    expect(resolver.resolve(ALL_DOCS, progress(0, 1, 0, 0, 1, 0))).to.equal(SpecStatus.InProgress);
   });
 
   it('honours a stricter policy that also requires design.md', () => {

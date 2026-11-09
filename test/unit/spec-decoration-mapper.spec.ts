@@ -12,6 +12,14 @@ const PROGRESS: ISpecProgress = {
   optionalTotal: 3,
   requiredRatio: 1,
   optionalRatio: 2 / 3,
+  requiredResolvedDone: 8,
+  requiredResolvedCancelled: 0,
+  requiredInProgress: 0,
+  requiredTodo: 0,
+  optionalResolvedDone: 2,
+  optionalResolvedCancelled: 0,
+  optionalInProgress: 0,
+  optionalTodo: 1,
 };
 
 /**

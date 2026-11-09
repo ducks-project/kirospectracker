@@ -24,6 +24,14 @@ function snapshotOf(name: string, status: SpecStatus): ISpecSnapshot {
       optionalTotal: 0,
       requiredRatio: 1,
       optionalRatio: 0,
+      requiredResolvedDone: 0,
+      requiredResolvedCancelled: 0,
+      requiredInProgress: 0,
+      requiredTodo: 0,
+      optionalResolvedDone: 0,
+      optionalResolvedCancelled: 0,
+      optionalInProgress: 0,
+      optionalTodo: 0,
     },
   };
 }

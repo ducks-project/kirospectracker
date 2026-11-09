@@ -1,5 +1,6 @@
 import type { ISpecSnapshot } from '../../core/model/ISpecSnapshot';
 import type { ITaskItem } from '../../core/model/ITaskItem';
+import { isResolved } from '../../core/model/TaskState';
 import type { TasksMarkdownParser } from '../../core/parsing/TasksMarkdownParser';
 import type { RunPromptBuilder } from '../../core/RunPromptBuilder';
 import type { ISpecFileSystem } from '../ports/ISpecFileSystem';
@@ -18,9 +19,12 @@ const CONSENT_MESSAGE = 'Copy a ready-to-paste execution prompt for this spec to
 const CONSENT_CONFIRM = 'Copy prompt';
 
 /**
- * Flatten a task tree to its pending (not-done) leaf titles, in order.
+ * Flatten a task tree to its pending (unresolved) leaf titles, in order.
+ *
+ * A leaf is pending when it is neither done nor cancelled; a cancelled task is
+ * treated as resolved and therefore omitted.
  * @param tasks The task tree.
- * @returns The titles of not-done leaf tasks.
+ * @returns The titles of unresolved leaf tasks.
  */
 function pendingLeafTitles(tasks: readonly ITaskItem[]): string[] {
   const titles: string[] = [];
@@ -29,7 +33,7 @@ function pendingLeafTitles(tasks: readonly ITaskItem[]): string[] {
       titles.push(...pendingLeafTitles(task.children));
       return;
     }
-    if (!task.done) {
+    if (!isResolved(task.state)) {
       titles.push(task.title);
     }
   });

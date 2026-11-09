@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import * as fc from 'fast-check';
 
 import type { ITaskItem } from '../../src/core/model/ITaskItem';
+import type { TaskState } from '../../src/core/model/TaskState';
 import { SpecStatus } from '../../src/core/model/SpecStatus';
 import { SpecProgressCalculator } from '../../src/core/status/SpecProgressCalculator';
 import { SpecStatusResolver } from '../../src/core/status/SpecStatusResolver';
@@ -13,21 +14,24 @@ const resolver = new SpecStatusResolver(new TasksOnlyDocumentPolicy());
 /** All documents present. */
 const ALL_DOCS = { tasks: true, requirements: true, design: true, notes: true };
 
+/** Arbitrary over the four task states. */
+const stateArb = fc.constantFrom<TaskState>('todo', 'done', 'cancelled', 'inProgress');
+
 /** Arbitrary generating a flat list of leaf tasks. */
-const leavesArb = fc.array(fc.record({ done: fc.boolean(), optional: fc.boolean() }), {
+const leavesArb = fc.array(fc.record({ state: stateArb, optional: fc.boolean() }), {
   maxLength: 30,
 });
 
 /**
  * Build leaf tasks from a generated descriptor list.
- * @param descriptors The generated done/optional flags.
+ * @param descriptors The generated state/optional flags.
  * @returns The leaf tasks.
  */
-function toTasks(descriptors: ReadonlyArray<{ done: boolean; optional: boolean }>): ITaskItem[] {
+function toTasks(descriptors: ReadonlyArray<{ state: TaskState; optional: boolean }>): ITaskItem[] {
   return descriptors.map((descriptor, index) => ({
     id: String(index + 1),
     title: `Task ${index + 1}`,
-    done: descriptor.done,
+    state: descriptor.state,
     optional: descriptor.optional,
     children: [],
     requirements: [],
@@ -72,11 +76,13 @@ describe('SpecProgress and SpecStatus (properties)', () => {
         fc.array(fc.constant(false), { minLength: 1, maxLength: 12 }),
         fc.nat(),
         (base, checkCount) => {
-          const required = base.map(() => false);
-          const before = toTasks(required.map((done) => ({ done, optional: false })));
-          const toCheck = Math.min(checkCount, required.length);
+          const before = toTasks(base.map(() => ({ state: 'todo' as TaskState, optional: false })));
+          const toCheck = Math.min(checkCount, base.length);
           const after = toTasks(
-            required.map((_done, index) => ({ done: index < toCheck, optional: false })),
+            base.map((_value, index) => ({
+              state: (index < toCheck ? 'done' : 'todo') as TaskState,
+              optional: false,
+            })),
           );
           const statusBefore = resolver.resolve(ALL_DOCS, calculator.calculate(before));
           const statusAfter = resolver.resolve(ALL_DOCS, calculator.calculate(after));
