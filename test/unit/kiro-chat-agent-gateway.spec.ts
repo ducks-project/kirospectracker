@@ -13,8 +13,27 @@ const SPEC = { name: 'spec-tracker', folderPath: '/w/.kiro/specs/spec-tracker' }
 /** The preferred-path command ids (new session + real submit). */
 const SESSIONS_CREATE = 'kiroAgent.sessions.create';
 const SESSIONS_SEND_PROMPT = 'kiroAgent.sessions.sendPrompt';
+const SESSIONS_SWITCH = 'kiroAgent.sessions.switch';
+const VIEW_SESSION = 'kiroAgent.viewSession';
+const CHAT_VIEW_FOCUS = 'kiroAgent.chatView.focus';
 const FOCUS_CHAT_INPUT = 'kiroAgent.focusChatInput';
 const GENERIC_CHAT_OPEN = 'workbench.action.chat.open';
+
+/** The honest "sent" toast raised on a successfully activated create path. */
+const SENT_TOAST = 'Kiro Spec Tracker: sent to Kiro chat \u2014 "Run all required tasks".';
+
+/** The degraded "sent" toast raised when no activation command is available. */
+const DEGRADED_TOAST =
+  'Kiro Spec Tracker: sent to Kiro chat \u2014 if it did not come to the front, ' +
+  'open it from Session History.';
+
+/** A `sessions.switch` result accepting (or rejecting) the activation. */
+function switchResult(accepted: boolean): ReadonlyMap<string, unknown> {
+  return new Map<string, unknown>([
+    [SESSIONS_CREATE, { sessionId: 'sess-1' }],
+    [SESSIONS_SWITCH, { accepted, sessionId: 'sess-1' }],
+  ]);
+}
 
 /** A `sessions.create` result map yielding a non-empty session id. */
 function createResult(sessionId: string): ReadonlyMap<string, unknown> {
@@ -63,17 +82,15 @@ describe('KiroChatAgentGateway', () => {
 
     it('confirms an honest "sent" notification on the create+sendPrompt path', async () => {
       const commands = new FakeCommandGateway(
-        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT],
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, SESSIONS_SWITCH, CHAT_VIEW_FOCUS],
         undefined,
-        createResult('sess-1'),
+        switchResult(true),
       );
       const { gateway, notifier, reporter } = buildGateway(commands);
 
       await gateway.runTasks(SPEC, 'required');
 
-      expect(notifier.infos).to.deep.equal([
-        'Kiro Spec Tracker: sent to Kiro chat \u2014 "Run all required tasks".',
-      ]);
+      expect(notifier.infos).to.deep.equal([SENT_TOAST]);
       expect(reporter.errors).to.have.length(0);
     });
 
@@ -142,10 +159,10 @@ describe('KiroChatAgentGateway', () => {
       expect(diagnostics.lines[0]).to.contain('path=focusInput-submit');
     });
 
-    it('falls through to the next path when sendPrompt throws', async () => {
+    it('falls through to the next path when create throws (before sending)', async () => {
       const commands = new FakeCommandGateway(
         [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, FOCUS_CHAT_INPUT],
-        SESSIONS_SEND_PROMPT,
+        SESSIONS_CREATE,
         createResult('sess-1'),
       );
       const { gateway, diagnostics } = buildGateway(commands);
@@ -153,6 +170,195 @@ describe('KiroChatAgentGateway', () => {
       await gateway.runTasks(SPEC, 'required');
 
       expect(diagnostics.lines[0]).to.contain('path=focusInput-submit');
+    });
+  });
+
+  describe('session activation + foreground (create path)', () => {
+    it('activates via sessions.switch (accepted) then focuses the chat view, before sending', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SWITCH, CHAT_VIEW_FOCUS, SESSIONS_SEND_PROMPT],
+        undefined,
+        switchResult(true),
+      );
+      const { gateway, notifier, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      // Order: create -> switch -> chatView.focus -> sendPrompt (positional).
+      expect(commands.executed.map((entry) => entry.id)).to.deep.equal([
+        SESSIONS_CREATE,
+        SESSIONS_SWITCH,
+        CHAT_VIEW_FOCUS,
+        SESSIONS_SEND_PROMPT,
+      ]);
+      expect(commands.executed[1].args).to.deep.equal(['sess-1']);
+      expect(commands.executed[2].args).to.deep.equal([]);
+      expect(commands.executed[3].args).to.deep.equal(['sess-1', 'Run all required tasks']);
+      expect(diagnostics.lines[0]).to.contain('activation=switch');
+      expect(notifier.infos).to.deep.equal([SENT_TOAST]);
+    });
+
+    it('falls back to viewSession when sessions.switch returns accepted:false', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SWITCH, VIEW_SESSION, SESSIONS_SEND_PROMPT],
+        undefined,
+        switchResult(false),
+      );
+      const { gateway, notifier, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      const executedIds = commands.executed.map((entry) => entry.id);
+      expect(executedIds).to.deep.equal([
+        SESSIONS_CREATE,
+        SESSIONS_SWITCH,
+        VIEW_SESSION,
+        SESSIONS_SEND_PROMPT,
+      ]);
+      expect(commands.executed[2].args).to.deep.equal(['sess-1']);
+      expect(diagnostics.lines[0]).to.contain('activation=viewSession');
+      expect(notifier.infos).to.deep.equal([SENT_TOAST]);
+    });
+
+    it('falls back to viewSession when sessions.switch throws', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SWITCH, VIEW_SESSION, SESSIONS_SEND_PROMPT],
+        SESSIONS_SWITCH,
+        switchResult(true),
+      );
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      const executedIds = commands.executed.map((entry) => entry.id);
+      expect(executedIds).to.include(VIEW_SESSION);
+      expect(executedIds).to.include(SESSIONS_SEND_PROMPT);
+      expect(diagnostics.lines[0]).to.contain('activation=viewSession');
+    });
+
+    it('uses viewSession directly when sessions.switch is absent', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, VIEW_SESSION, SESSIONS_SEND_PROMPT],
+        undefined,
+        createResult('sess-1'),
+      );
+      const { gateway, notifier, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(commands.executed.map((entry) => entry.id)).to.deep.equal([
+        SESSIONS_CREATE,
+        VIEW_SESSION,
+        SESSIONS_SEND_PROMPT,
+      ]);
+      expect(diagnostics.lines[0]).to.contain('activation=viewSession');
+      expect(notifier.infos).to.deep.equal([SENT_TOAST]);
+    });
+
+    it('still sends with the degraded toast when no activation command exists', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SEND_PROMPT],
+        undefined,
+        createResult('sess-1'),
+      );
+      const { gateway, notifier, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      const executedIds = commands.executed.map((entry) => entry.id);
+      expect(executedIds).to.deep.equal([SESSIONS_CREATE, SESSIONS_SEND_PROMPT]);
+      expect(diagnostics.lines[0]).to.contain('activation=none');
+      expect(notifier.infos).to.deep.equal([DEGRADED_TOAST]);
+    });
+
+    it('degrades to activation=none when viewSession throws, still sending', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, VIEW_SESSION, SESSIONS_SEND_PROMPT],
+        VIEW_SESSION,
+        createResult('sess-1'),
+      );
+      const { gateway, notifier, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(commands.executed.map((entry) => entry.id)).to.include(SESSIONS_SEND_PROMPT);
+      expect(diagnostics.lines[0]).to.contain('activation=none');
+      expect(notifier.infos).to.deep.equal([DEGRADED_TOAST]);
+    });
+
+    it('treats a non-object sessions.switch result as not accepted', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SWITCH, VIEW_SESSION, SESSIONS_SEND_PROMPT],
+        undefined,
+        new Map<string, unknown>([
+          [SESSIONS_CREATE, { sessionId: 'sess-1' }],
+          [SESSIONS_SWITCH, 'not-an-object'],
+        ]),
+      );
+      const { gateway, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      // switch returned a non-object: not accepted, so viewSession is used.
+      expect(commands.executed.map((entry) => entry.id)).to.include(VIEW_SESSION);
+      expect(diagnostics.lines[0]).to.contain('activation=viewSession');
+    });
+
+    it('does not abort the send when chatView.focus throws', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SWITCH, CHAT_VIEW_FOCUS, SESSIONS_SEND_PROMPT],
+        CHAT_VIEW_FOCUS,
+        switchResult(true),
+      );
+      const { gateway, notifier } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(commands.executed.map((entry) => entry.id)).to.include(SESSIONS_SEND_PROMPT);
+      expect(notifier.infos).to.deep.equal([SENT_TOAST]);
+    });
+  });
+
+  describe('fire-and-forget send (immediate toast)', () => {
+    it('shows the success toast WITHOUT awaiting sendPrompt resolution', async () => {
+      // sendPrompt never settles: if the gateway awaited it, no toast would fire.
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SWITCH, CHAT_VIEW_FOCUS, SESSIONS_SEND_PROMPT],
+        undefined,
+        switchResult(true),
+        { pendingIds: [SESSIONS_SEND_PROMPT] },
+      );
+      const { gateway, notifier, reporter } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+
+      expect(commands.executed.map((entry) => entry.id)).to.include(SESSIONS_SEND_PROMPT);
+      expect(notifier.infos).to.deep.equal([SENT_TOAST]);
+      expect(reporter.errors).to.have.length(0);
+    });
+
+    it('swallows a fire-and-forget sendPrompt rejection and logs it to the sink', async () => {
+      const commands = new FakeCommandGateway(
+        [SESSIONS_CREATE, SESSIONS_SWITCH, CHAT_VIEW_FOCUS, SESSIONS_SEND_PROMPT],
+        undefined,
+        switchResult(true),
+        { rejectingIds: [SESSIONS_SEND_PROMPT] },
+      );
+      const { gateway, notifier, reporter, diagnostics } = buildGateway(commands);
+
+      await gateway.runTasks(SPEC, 'required');
+      // Let the rejected microtask settle so the .catch handler runs.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // No throw reached the UI: the normal toast fired, no error was reported.
+      expect(notifier.infos).to.deep.equal([SENT_TOAST]);
+      expect(reporter.errors).to.have.length(0);
+      expect(
+        diagnostics.lines.some((line) =>
+          line.includes('sendPrompt (fire-and-forget) failed: command rejected'),
+        ),
+      ).to.equal(true);
     });
   });
 
@@ -276,11 +482,11 @@ describe('KiroChatAgentGateway', () => {
     });
   });
 
-  it('logs a diagnostic naming the detected ids and chosen path on every action', async () => {
+  it('logs a diagnostic naming the detected ids, path, activation and send mode', async () => {
     const commands = new FakeCommandGateway(
-      [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, FOCUS_CHAT_INPUT, GENERIC_CHAT_OPEN],
+      [SESSIONS_CREATE, SESSIONS_SEND_PROMPT, SESSIONS_SWITCH, CHAT_VIEW_FOCUS, GENERIC_CHAT_OPEN],
       undefined,
-      createResult('sess-1'),
+      switchResult(true),
     );
     const { gateway, diagnostics } = buildGateway(commands);
 
@@ -289,8 +495,8 @@ describe('KiroChatAgentGateway', () => {
     expect(diagnostics.lines).to.have.length(1);
     expect(diagnostics.lines[0]).to.equal(
       'agent action: path=create+sendPrompt; kiroAgent ids=' +
-        `[${SESSIONS_CREATE}, ${SESSIONS_SEND_PROMPT}, ${FOCUS_CHAT_INPUT}]; ` +
-        'generic chat-open=yes',
+        `[${SESSIONS_CREATE}, ${SESSIONS_SEND_PROMPT}, ${SESSIONS_SWITCH}, ${CHAT_VIEW_FOCUS}]; ` +
+        'generic chat-open=yes; activation=switch; send=fire-and-forget',
     );
   });
 
