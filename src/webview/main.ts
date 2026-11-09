@@ -105,6 +105,20 @@ function persistState(): void {
 const cardNodes = new Map<string, HTMLElement>();
 
 /**
+ * Introductions already received from the host, keyed by spec folder path.
+ *
+ * A `null` value records that the host answered with no derivable introduction,
+ * so the panel stays hidden without re-requesting.
+ */
+const introductions = new Map<string, string | null>();
+
+/** The single floating preview panel, created lazily on first hover. */
+let hoverPanel: HTMLElement | undefined;
+
+/** Folder path of the card currently hovered, driving the panel's content. */
+let activeHoverFolderPath: string | undefined;
+
+/**
  * Create an element with optional class and text.
  * @param tag Element tag name.
  * @param className Optional class name.
@@ -620,6 +634,155 @@ function wireCardBody(article: HTMLElement, card: ISpecCardView): void {
   });
 }
 
+/** Debounce delay, in milliseconds, before a hovered card requests its intro. */
+const HOVER_REQUEST_DELAY_MS = 150;
+
+/** Folder paths whose introduction has already been requested from the host. */
+const requestedIntroductions = new Set<string>();
+
+/** Pending hover-request timer, cleared when the pointer leaves early. */
+let hoverRequestTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Request a card's requirements introduction from the host, at most once per
+ * card. The host memoises the result in its bounded cache, so a client-side
+ * flag is enough to avoid re-posting the same request.
+ * @param folderPath Absolute path of the hovered spec folder.
+ */
+function requestIntroduction(folderPath: string): void {
+  if (requestedIntroductions.has(folderPath)) {
+    return;
+  }
+  requestedIntroductions.add(folderPath);
+  vscodeApi.postMessage({ type: 'requestIntroduction', folderPath });
+}
+
+/**
+ * Wire a card's hover/focus affordance to lazily request its requirements
+ * introduction and show the floating preview panel.
+ *
+ * The request is debounced so a pointer merely crossing the card does not fetch,
+ * and it only fires for a spec that actually has a `requirements.md`. Leaving or
+ * blurring the card hides the panel; inner controls already stop propagation, so
+ * this never interferes with the card-body open gesture.
+ * @param article The card element.
+ * @param card The spec card view.
+ */
+function wireCardHover(article: HTMLElement, card: ISpecCardView): void {
+  if (!card.documents.requirements) {
+    return;
+  }
+  const enter = (): void => {
+    if (undefined !== hoverRequestTimer) {
+      clearTimeout(hoverRequestTimer);
+    }
+    hoverRequestTimer = setTimeout(
+      () => requestIntroduction(card.folderPath),
+      HOVER_REQUEST_DELAY_MS,
+    );
+    showIntroductionPanel(article, card.folderPath);
+  };
+  const leave = (): void => {
+    if (undefined !== hoverRequestTimer) {
+      clearTimeout(hoverRequestTimer);
+      hoverRequestTimer = undefined;
+    }
+    hideIntroductionPanel();
+  };
+  article.addEventListener('mouseenter', enter);
+  article.addEventListener('focus', enter);
+  article.addEventListener('mouseleave', leave);
+  article.addEventListener('blur', leave);
+}
+
+/** Viewport margin, in pixels, kept between the panel and the window edges. */
+const PANEL_VIEWPORT_MARGIN = 8;
+
+/**
+ * Lazily create the single floating preview panel, appended to the document.
+ * @returns The panel element.
+ */
+function ensureHoverPanel(): HTMLElement {
+  if (undefined === hoverPanel) {
+    hoverPanel = el('div', 'card-hover-panel');
+    hoverPanel.setAttribute('role', 'tooltip');
+    hoverPanel.hidden = true;
+    document.body.appendChild(hoverPanel);
+  }
+  return hoverPanel;
+}
+
+/**
+ * Position the panel just below a card, clamped within the viewport so it never
+ * overflows the right or bottom edges.
+ * @param panel The panel element.
+ * @param article The hovered card element.
+ */
+function positionHoverPanel(panel: HTMLElement, article: HTMLElement): void {
+  const rect = article.getBoundingClientRect();
+  const maxLeft = window.innerWidth - panel.offsetWidth - PANEL_VIEWPORT_MARGIN;
+  const left = Math.max(PANEL_VIEWPORT_MARGIN, Math.min(rect.left, maxLeft));
+  const maxTop = window.innerHeight - panel.offsetHeight - PANEL_VIEWPORT_MARGIN;
+  const top = Math.max(
+    PANEL_VIEWPORT_MARGIN,
+    Math.min(rect.bottom + PANEL_VIEWPORT_MARGIN, maxTop),
+  );
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+}
+
+/**
+ * Show the preview panel for a hovered card, using the cached introduction when
+ * it has already arrived. When it has not, the panel waits for the host reply
+ * (handled by {@link renderIntroduction}); a `null` cache entry (no derivable
+ * introduction) keeps the panel hidden.
+ * @param article The hovered card element.
+ * @param folderPath Absolute path of the hovered spec folder.
+ */
+function showIntroductionPanel(article: HTMLElement, folderPath: string): void {
+  activeHoverFolderPath = folderPath;
+  const cached = introductions.get(folderPath);
+  if (undefined === cached || null === cached) {
+    return;
+  }
+  const panel = ensureHoverPanel();
+  panel.replaceChildren(el('p', 'card-hover-intro', cached));
+  panel.hidden = false;
+  positionHoverPanel(panel, article);
+}
+
+/**
+ * Hide the floating preview panel and forget the active hover target.
+ */
+function hideIntroductionPanel(): void {
+  activeHoverFolderPath = undefined;
+  if (undefined !== hoverPanel) {
+    hoverPanel.hidden = true;
+  }
+}
+
+/**
+ * Handle a host `introduction` reply: cache it, then show it when its card is
+ * still the one being hovered. An `undefined` introduction is cached as `null`
+ * so the panel stays hidden and the card is never re-requested.
+ * @param folderPath Absolute path of the spec folder the reply correlates to.
+ * @param introduction The derived introduction, or `undefined` when none.
+ */
+function renderIntroduction(folderPath: string, introduction: string | undefined): void {
+  introductions.set(folderPath, introduction ?? null);
+  if (folderPath !== activeHoverFolderPath || undefined === introduction) {
+    return;
+  }
+  const article = cardNodes.get(folderPath);
+  if (undefined === article) {
+    return;
+  }
+  const panel = ensureHoverPanel();
+  panel.replaceChildren(el('p', 'card-hover-intro', introduction));
+  panel.hidden = false;
+  positionHoverPanel(panel, article);
+}
+
 /**
  * Append the required/optional progress bars and the per-state breakdown row to
  * a card.
@@ -693,6 +856,7 @@ function renderCard(card: ISpecCardView): HTMLElement {
   article.appendChild(renderLinks(card));
   article.appendChild(renderActions(card));
   wireCardBody(article, card);
+  wireCardHover(article, card);
   return article;
 }
 
@@ -1176,6 +1340,10 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
     state.layout = 'list' === state.layout ? 'grid' : 'list';
     persistState();
     render();
+    return;
+  }
+  if ('introduction' === message.type) {
+    renderIntroduction(message.folderPath, message.introduction);
   }
 });
 

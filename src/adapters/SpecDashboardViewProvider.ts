@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import type {
   DashboardInboundMessage,
+  IIntroductionMessage,
   IRenderMessage,
   ISpecUpdatedMessage,
 } from '../core/model/IDashboardMessage';
@@ -12,6 +13,7 @@ import type { SpecCardViewMapper } from '../core/status/SpecCardViewMapper';
 import type { SpecStatsCalculator } from '../core/status/SpecStatsCalculator';
 import type { IDashboardActions } from './ports/IDashboardActions';
 import type { ILayoutToggleable } from './ports/ILayoutToggleable';
+import type { SpecIntroductionLoader } from './SpecIntroductionLoader';
 import type { SpecRepository } from './SpecRepository';
 
 /** View id contributed in package.json for the dashboard webview. */
@@ -51,6 +53,8 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
 
   private readonly actions: IDashboardActions;
 
+  private readonly introductionLoader: SpecIntroductionLoader;
+
   private view: vscode.WebviewView | undefined;
 
   private disposeRepositoryListener: (() => void) | undefined;
@@ -64,6 +68,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
    * @param htmlBuilder The pure CSP HTML shell builder.
    * @param nonceFactory The per-render nonce factory.
    * @param actions The handler for inbound dashboard intents.
+   * @param introductionLoader The lazy loader serving requirements introductions on hover.
    */
   public constructor(
     extensionUri: vscode.Uri,
@@ -73,6 +78,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     htmlBuilder: DashboardHtmlBuilder,
     nonceFactory: NonceFactory,
     actions: IDashboardActions,
+    introductionLoader: SpecIntroductionLoader,
   ) {
     this.extensionUri = extensionUri;
     this.repository = repository;
@@ -81,6 +87,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     this.htmlBuilder = htmlBuilder;
     this.nonceFactory = nonceFactory;
     this.actions = actions;
+    this.introductionLoader = introductionLoader;
   }
 
   /**
@@ -205,6 +212,10 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
       this.actions.syncTasks(message.folderPath).then(undefined, undefined);
       return;
     }
+    if ('requestIntroduction' === message.type) {
+      this.sendIntroduction(message.folderPath);
+      return;
+    }
     if ('ready' === message.type) {
       // The (re)loaded webview has wired its listener: (re)send the current
       // cached snapshots so a reopened view shows the specs immediately. This
@@ -214,6 +225,22 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     }
     // `setLayout` is handled entirely inside the webview (persisted via its
     // own state); the extension needs no server-side action for it.
+  }
+
+  /**
+   * Load a spec's requirements introduction lazily and post it back, correlated
+   * to the request by `folderPath`.
+   *
+   * It reuses the shared {@link SpecIntroductionLoader} (and its bounded cache),
+   * so a second hover of the same card never re-reads the disk. The whole path
+   * is best-effort: a load failure resolves to no reply and never leaks.
+   * @param folderPath Absolute path of the hovered spec folder.
+   */
+  private sendIntroduction(folderPath: string): void {
+    this.introductionLoader.load(folderPath).then((introduction) => {
+      const message: IIntroductionMessage = { type: 'introduction', folderPath, introduction };
+      this.view?.webview.postMessage(message).then(undefined, undefined);
+    }, undefined);
   }
 
   /**

@@ -87,6 +87,38 @@ function makeBootingWebview(posted: DashboardOutboundMessage[]): {
   return { webview, boot };
 }
 
+/** A fake webview capturing its inbound listener so tests can post to it. */
+interface IDrivableWebview {
+  readonly webview: vscode.Webview;
+  readonly send: (message: InboundMessage) => void;
+}
+
+/**
+ * Build a fake webview capturing its inbound handler so a test can drive an
+ * arbitrary inbound message (e.g. `requestIntroduction`) through the host.
+ * @param posted The sink receiving each outbound message the host posts.
+ * @returns The fake webview and a `send` trigger delivering an inbound message.
+ */
+function makeDrivableWebview(posted: DashboardOutboundMessage[]): IDrivableWebview {
+  let onMessage: ((message: InboundMessage) => void) | undefined;
+  const webview = {
+    cspSource: 'vscode-resource://fixture',
+    html: '',
+    options: {},
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    asWebviewUri: (uri: vscode.Uri) => uri as any,
+    onDidReceiveMessage: (listener: (message: InboundMessage) => void) => {
+      onMessage = listener;
+      return { dispose: () => undefined };
+    },
+    postMessage: async (message: DashboardOutboundMessage) => {
+      posted.push(message);
+      return true;
+    },
+  } as unknown as vscode.Webview;
+  return { webview, send: (message: InboundMessage): void => onMessage?.(message) };
+}
+
 /**
  * Wrap a webview in a minimal {@link vscode.WebviewView} for resolve.
  * @param webview The fake webview to host.
@@ -209,5 +241,47 @@ describe('Spec dashboard (Node host)', () => {
     expect(render).to.have.property('cards');
     const { cards } = render as { readonly cards: readonly unknown[] };
     expect(cards).to.have.length(cachedCount);
+  });
+
+  it('answers a requestIntroduction with the derived introduction', async () => {
+    const inProgress = api.repository.getSpecs().find((spec) => 'in-progress' === spec.name);
+    expect(inProgress).to.not.equal(undefined);
+    const posted: DashboardOutboundMessage[] = [];
+    const drivable = makeDrivableWebview(posted);
+    api.dashboard.resolveWebviewView(makeView(drivable.webview));
+
+    drivable.send({
+      type: 'requestIntroduction',
+      folderPath: inProgress!.folderPath,
+    } as unknown as InboundMessage);
+
+    await waitFor(() => posted.some((message) => 'introduction' === message.type));
+    const reply = posted.find((message) => 'introduction' === message.type) as {
+      readonly folderPath: string;
+      readonly introduction: string | undefined;
+    };
+    expect(reply.folderPath).to.equal(inProgress!.folderPath);
+    expect(reply.introduction).to.equal('An in-progress fixture spec.');
+  });
+
+  it('answers with an undefined introduction when requirements.md is absent', async () => {
+    const completed = api.repository.getSpecs().find((spec) => 'completed' === spec.name);
+    expect(completed).to.not.equal(undefined);
+    const posted: DashboardOutboundMessage[] = [];
+    const drivable = makeDrivableWebview(posted);
+    api.dashboard.resolveWebviewView(makeView(drivable.webview));
+
+    drivable.send({
+      type: 'requestIntroduction',
+      folderPath: completed!.folderPath,
+    } as unknown as InboundMessage);
+
+    await waitFor(() => posted.some((message) => 'introduction' === message.type));
+    const reply = posted.find((message) => 'introduction' === message.type) as {
+      readonly folderPath: string;
+      readonly introduction: string | undefined;
+    };
+    expect(reply.folderPath).to.equal(completed!.folderPath);
+    expect(reply.introduction).to.equal(undefined);
   });
 });

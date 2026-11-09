@@ -83,8 +83,6 @@ export interface IExtensionApi {
   readonly decorations: SpecFileDecorationProvider;
   /** The dashboard webview provider. */
   readonly dashboard: SpecDashboardViewProvider;
-  /** The activity-bar tree provider (exposes the on-hover tooltip resolution). */
-  readonly tree: SpecTreeDataProvider;
   /**
    * The host file-system wrapper that owns the specs `FileSystemWatcher`.
    *
@@ -231,16 +229,16 @@ function createDashboardActions(
  * @param context The extension context supplying the base URI.
  * @param repository The spec repository supplying snapshots.
  * @param stats The pure aggregate-stats calculator.
- * @param openDocument The open-document command.
- * @param agentActions The shared agent task actions.
+ * @param actions The handler for inbound dashboard intents.
+ * @param introductions The lazy loader serving requirements introductions on hover.
  * @returns The wired dashboard provider.
  */
 function createDashboard(
   context: vscode.ExtensionContext,
   repository: SpecRepository,
   stats: SpecStatsCalculator,
-  openDocument: OpenDocumentCommand,
-  agentActions: SpecAgentActions,
+  actions: IDashboardActions,
+  introductions: SpecIntroductionLoader,
 ): SpecDashboardViewProvider {
   return new SpecDashboardViewProvider(
     context.extensionUri,
@@ -249,25 +247,18 @@ function createDashboard(
     new SpecCardViewMapper(),
     new DashboardHtmlBuilder(new HtmlEscaper()),
     new NonceFactory(new WebCryptoRandomSource()),
-    createDashboardActions(openDocument, agentActions),
+    actions,
+    introductions,
   );
 }
 
 /**
- * Construct the activity-bar tree provider with its lazy introduction loader.
+ * Construct the activity-bar tree provider over the repository and grouper.
  * @param repository The spec repository supplying snapshots.
- * @param fileSystem The host file-system wrapper used to read `requirements.md`.
  * @returns The wired tree data provider.
  */
-function createTree(
-  repository: SpecRepository,
-  fileSystem: VscodeSpecFileSystem,
-): SpecTreeDataProvider {
-  return new SpecTreeDataProvider(
-    repository,
-    new SpecGrouper(),
-    new SpecIntroductionLoader(fileSystem),
-  );
+function createTree(repository: SpecRepository): SpecTreeDataProvider {
+  return new SpecTreeDataProvider(repository, new SpecGrouper());
 }
 
 /**
@@ -283,18 +274,18 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   const openDocument = new OpenDocumentCommand(repository, gateway);
   const runTasks = buildRunTasksCommand(repository, fileSystem, gateway);
   const agentFallback = new UnavailableAgentGateway(runTasks);
-  // Start on the always-valid Null Object; capability detection may upgrade it
-  // to the Kiro best-effort adapter once activation resolves the command surface.
+  // Start on the always-valid Null Object; detection may later upgrade it.
   const agentActions = new SpecAgentActions(repository, agentFallback, gateway);
-  const dashboard = createDashboard(context, repository, stats, openDocument, agentActions);
+  const actions = createDashboardActions(openDocument, agentActions);
+  const loader = new SpecIntroductionLoader(fileSystem);
+  const dashboard = createDashboard(context, repository, stats, actions, loader);
   const decorations = new SpecFileDecorationProvider(repository, new SpecDecorationMapper(), stats);
-  const tree = createTree(repository, fileSystem);
   return {
     repository,
     fileSystem,
     dashboard,
     decorations,
-    tree,
+    tree: createTree(repository),
     openDocument,
     runTasks,
     agentActions,
@@ -415,7 +406,6 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
     repository: wiring.repository,
     decorations: wiring.decorations,
     dashboard: wiring.dashboard,
-    tree: wiring.tree,
     fileSystem: wiring.fileSystem,
   };
 }

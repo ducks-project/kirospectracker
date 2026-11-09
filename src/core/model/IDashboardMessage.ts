@@ -30,6 +30,18 @@ export interface IToggleLayoutMessage {
   readonly type: 'toggleLayout';
 }
 
+/**
+ * Outbound message: the requirements introduction requested for a card.
+ *
+ * The response is correlated to its request by `folderPath`; `introduction` is
+ * `undefined` when no introduction can be derived (absent/empty `requirements.md`).
+ */
+export interface IIntroductionMessage {
+  readonly type: 'introduction';
+  readonly folderPath: string;
+  readonly introduction: string | undefined;
+}
+
 /** Inbound message: open one document of a spec. */
 export interface IOpenDocumentMessage {
   readonly type: 'openDocument';
@@ -57,6 +69,17 @@ export interface ISetLayoutMessage {
 }
 
 /**
+ * Inbound message: request the requirements introduction of a card on hover.
+ *
+ * The host loads it lazily (best-effort) and replies with a correlated
+ * {@link IIntroductionMessage}.
+ */
+export interface IRequestIntroductionMessage {
+  readonly type: 'requestIntroduction';
+  readonly folderPath: string;
+}
+
+/**
  * Inbound message: the webview has mounted and wired its message listener.
  *
  * It is posted once on every (re)load of the webview document, which is the
@@ -70,7 +93,11 @@ export interface IReadyMessage {
 }
 
 /** Union of messages the extension sends to the webview. */
-export type DashboardOutboundMessage = IRenderMessage | IToggleLayoutMessage | ISpecUpdatedMessage;
+export type DashboardOutboundMessage =
+  | IRenderMessage
+  | IToggleLayoutMessage
+  | ISpecUpdatedMessage
+  | IIntroductionMessage;
 
 /** Union of messages the webview sends back to the extension. */
 export type DashboardInboundMessage =
@@ -78,4 +105,5 @@ export type DashboardInboundMessage =
   | IRunTasksMessage
   | ISyncFilesMessage
   | ISetLayoutMessage
-  | IReadyMessage;
+  | IReadyMessage
+  | IRequestIntroductionMessage;

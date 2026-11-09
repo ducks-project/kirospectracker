@@ -639,3 +639,29 @@ body {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
 }
+
+/* Floating requirements preview, shown on card hover, styled after the
+   Extensions view's hover card: a fixed, bordered, shadowed panel of a
+   readable width that is clamped within the viewport by the client. */
+.card-hover-panel {
+  position: fixed;
+  z-index: 20;
+  max-width: 420px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.6rem 0.8rem;
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgb(0 0 0 / 36%));
+  pointer-events: none;
+}
+.card-hover-panel[hidden] {
+  display: none;
+}
+.card-hover-intro {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
