@@ -9,11 +9,54 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.10.0 — Requirements preview on hover [Planned]
+## v0.11.0 — Open the workflow's entry document on card click [Planned]
 
-- [ ] On hovering a spec card, load and show the introduction of the spec's `requirements.md`
-      when it exists. Load it asynchronously if that is more performant, keeping the
-      large-workspace (500-spec) speed goal in mind.
+- [ ] Detect each spec's entry document from its `.kiro/specs/<name>/.config.kiro` file,
+      which carries two orthogonal axes observed in real specs: `workflowType`
+      (`requirements-first` / `design-first`) and `specType` (`feature` / `bugfix`). The
+      file format is not publicly documented, so isolate the reading behind a dedicated
+      port/adapter (as done for the agent gateway in v0.7.0) and keep the parsing pure.
+- [ ] Resolve the entry document from both axes: `specType: bugfix` opens `bugfix.md`;
+      otherwise `workflowType: design-first` opens `design.md`; otherwise `requirements.md`.
+      Fall back to the first present document (`requirements.md` then `design.md` then
+      `tasks.md`) when `.config.kiro` is missing, unreadable, or carries an unknown value,
+      so the behaviour never regresses for configless specs.
+- [ ] Make only the card-click default document dynamic; the explicit per-document actions
+      stay available and unchanged.
+- [ ] Add `bugfix` as a first-class spec document kind (model, dashboard button, and open
+      action), designed so a future new document kind is a small, additive change rather
+      than a rewrite.
+
+## v0.12.0 — Hide completed specs from VS Code views [Planned]
+
+- [ ] Add three independent settings so the user can, for completed specs: hide them from
+      the Explorer, exclude them from Search, and keep them out of Quick Open (Ctrl+P). The
+      extension drives the matching VS Code mechanisms (`files.exclude`, `search.exclude`)
+      from each spec's completion state and refreshes them when a spec's state changes.
+- [ ] Decide during the preparatory investigation whether a dedicated Quick Open setting is
+      warranted or whether `files.exclude` already covers it; drop the redundant setting if
+      so.
+- [ ] Add a dedicated configuration document (`docs/configuration.md`) listing every
+      setting (new and existing) and reference it from the README.
+
+## v0.13.0 — Internationalization (French as first locale) [Planned]
+
+- [ ] Externalize all user-facing strings: manifest strings via `package.nls.json` /
+      `package.nls.<locale>.json` and runtime strings via the `vscode.l10n` API with an
+      `l10n/` bundle, with no behavioural change.
+- [ ] Ship French as the first non-default locale and verify the display language is
+      honoured in Kiro specifically (locale propagation and bundle loading).
+
+## v0.14.0 — Document and enforce the real one-concept-per-file rule [Planned]
+
+- [ ] Write the project's actual file-cohesion rule into the TypeScript steering: a file
+      carries one cohesive concept (one main public class per file), while the members of a
+      single discriminated union or the pure helpers of a type may live together. The
+      strict "one declaration per file" habit was never a written project rule.
+- [ ] Fix only genuine anomalies (a file mixing two unrelated responsibilities) against that
+      rule; deliberately leave legitimate groupings such as `IDashboardMessage.ts` (one
+      message union) and `TaskState.ts` (a type plus its pure derivations) untouched, to
+      avoid cosmetic churn and import/test regressions.
 
 ## v1.0.0 — First stable release [Planned]
 

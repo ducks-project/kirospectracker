@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-09
+
+### Added
+
+- Show a preview of the spec's `requirements.md` introduction when hovering a card in the
+  dashboard, in a floating popin styled after the Extensions view hover. The introduction is
+  loaded lazily on hover (never added to the card payload), so the 500-spec large-workspace
+  speed goal is kept. It is derived by a pure, `vscode`-free `extractRequirementsIntroduction`
+  (the `## Introduction` section, falling back to the first paragraph), read through the
+  existing `ISpecFileSystem` port by a `SpecIntroductionLoader`, and memoised in a bounded
+  `BoundedCache`. The webview asks the host through a new `requestIntroduction` /
+  `introduction` message pair correlated by spec folder path.
+- Place the popin below the card with an arrow pointing at it, flipping above when there is not
+  enough room below and clamping it inside the webview. The placement is computed by a pure
+  `computeHoverPlacement` function. The popin uses VS Code theme variables only, so it follows
+  light, dark and high-contrast themes, and is dismissed with the Escape key. The card is
+  linked to the popin with `aria-describedby`, it also opens on keyboard focus, and its
+  animation is disabled under `prefers-reduced-motion`.
+
+### Changed
+
+- Reset the hover request state on every full dashboard re-render, so a spec whose
+  `requirements.md` appeared after a first hover, or whose first reply was lost, can be
+  requested again. A spec that genuinely has no introduction is still not re-requested within
+  the same render.
+
 ## [0.9.0] - 2026-11-09
 
 ### Added
@@ -298,7 +324,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.9.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/ducks-project/kirospectracker/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ducks-project/kirospectracker/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ducks-project/kirospectracker/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/ducks-project/kirospectracker/compare/v0.7.0...v0.7.1
