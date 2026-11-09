@@ -9,9 +9,10 @@ boundary with `vscode`.
 - Core (`core/`): pure logic. Never imports `vscode`. Contains the `tasks.md` parser, the
   tolerant meta reader, the status resolver, the progress calculator, the per-spec stats and
   decoration mappers, the global task-level statistics calculator, the dashboard view
-  projectors (card view, stat toggles, layout toggles), the additive status-filter state
-  machine and card-visibility composer, the tree-item context-value builder, the HTML escaper
-  and nonce factory, and the immutable value objects.
+  projectors (card view, stat toggles, layout toggles, folder-filter options and menu), the
+  additive status-filter and folder-filter state machines and card-visibility composer, the
+  tree-item context-value builder, the HTML escaper and nonce factory, and the immutable value
+  objects.
 - Ports (`core/ports/` and `adapters/ports/`): interfaces describing what each side needs
   ([IDocumentPolicy](../src/core/ports/IDocumentPolicy.ts),
   [IScheduler](../src/core/ports/IScheduler.ts),
@@ -150,15 +151,25 @@ or a full re-render. The clickable statistics are additive toggle filters backed
 immutable [SpecStatusFilter](../src/core/status/SpecStatusFilter.ts) state machine (toggle a
 key to add it, toggle again to remove it; an empty set shows everything). Card visibility
 composes that status filter with the free-text search through
-[SpecCardFilter](../src/core/status/SpecCardFilter.ts) (a logical AND). The header toggles
+[SpecCardFilter](../src/core/status/SpecCardFilter.ts) (a logical AND). The dashboard also
+offers a folder-scoped filter: a search-box folder button opens a menu listing the distinct
+spec-owning folders as additive toggles, backed by the immutable
+[SpecFolderFilter](../src/core/status/SpecFolderFilter.ts) state machine, which mirrors
+`SpecStatusFilter` but keys on the stable owning-folder identity (the workspace folder path)
+rather than the display basename, so two folders sharing a basename stay distinct.
+`SpecCardFilter` now composes all three criteria (status AND folder AND search). The distinct
+folder options (key, display label and per-folder count) are computed once over the cards by
+the pure [computeFolderOptions](../src/core/status/SpecFolderOptions.ts) helper (O(n), no
+per-task work), and the menu items with their pressed state by the pure
+[SpecFolderToggleView](../src/core/status/SpecFolderToggleView.ts). The header status toggles
 and their pressed state are projected by the pure
 [SpecStatToggleView](../src/core/status/SpecStatToggleView.ts), and the single flipping
 list/grid layout button by [SpecLayoutToggleView](../src/core/status/SpecLayoutToggleView.ts)
 (`describeToggle` returns the glyph of the layout the button switches to, its label and its
-pressed state). The webview only renders the decision and persists the active filter keys and
-layout in its own `setState`. Keeping the state machine and the mappings in `core/` makes the
-least-covered DOM/CSS layer thin and the logic unit- and property-testable without a VS Code
-host.
+pressed state). The webview only renders the decision and persists the active status-filter
+keys, folder-filter keys and layout in its own `setState`. Keeping the state machines and the
+mappings in `core/` makes the least-covered DOM/CSS layer thin and the logic unit- and
+property-testable without a VS Code host.
 
 Each spec card is itself a view over the card view-model: its body is a keyboard-accessible
 button reusing the existing `openDocument` intent to open `requirements.md` (a disabled no-op
@@ -169,8 +180,11 @@ stat toggle, so the two surfaces stay in sync. The state-representative badge co
 the single [SpecStatusColor](../src/core/status/SpecStatusColor.ts) mapping (keyed by filter
 key and shared by both surfaces), bound to VS Code theme color variables in CSS so they
 respect light and dark themes. The discreet owning-folder label on each card is derived by the
-pure [deriveSpecOwnerLabel](../src/core/status/SpecOwnerLabel.ts) helper and rendered as
-escaped plain text. All of these are client-side over the received view-models: they trigger
+pure [deriveSpecOwnerLabel](../src/core/status/SpecOwnerLabel.ts) helper and is itself a
+clickable toggle button driving the same [SpecFolderFilter](../src/core/status/SpecFolderFilter.ts)
+as the search-box folder menu (keyed on the card's stable `folderKey`), so the label and the
+menu stay in sync; it carries an `aria-pressed` state and stops click propagation so it never
+also opens the card. All of these are client-side over the received view-models: they trigger
 no extension-host round-trip beyond the existing openDocument intent and no full re-render
 beyond the existing filter re-render.
 
@@ -347,8 +361,11 @@ notice reappears next launch while the integration stays enabled).
   changing the result.
 - Immutable state machine: [SpecStatusFilter](../src/core/status/SpecStatusFilter.ts) models
   the additive status-filter selection as an immutable value object (every toggle returns a
-  new instance), composed with the search by [SpecCardFilter](../src/core/status/SpecCardFilter.ts).
-  The pure decision is unit- and property-tested, and the webview DOM only applies it.
+  new instance); [SpecFolderFilter](../src/core/status/SpecFolderFilter.ts) models the
+  folder-scoped selection the same way, keyed on the stable owning-folder identity. Both are
+  composed with the search by [SpecCardFilter](../src/core/status/SpecCardFilter.ts) (status
+  AND folder AND search). The pure decision is unit- and property-tested, and the webview DOM
+  only applies it.
 - Strategy / Adapter / Null Object / Factory for the agent actions:
   [ISpecAgentGateway](../src/core/ports/ISpecAgentGateway.ts) is the strategy interface;
   [KiroChatAgentGateway](../src/adapters/agent/KiroChatAgentGateway.ts) adapts the messy

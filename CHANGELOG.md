@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-09
+
+### Added
+
+- Add a folder-scoped filter to the dashboard search box, styled like the Extensions view
+  filter affordance: a filter button opens a menu listing the distinct folders (projects) that
+  contain specs, with a per-folder spec count. Selecting folders is an additive, multi-select
+  toggle (none selected shows every folder; selecting one or more narrows to them) that
+  composes (logical AND) with both the status filter and the search text. The decision lives in
+  a pure, `vscode`-free `SpecFolderFilter` state machine keyed on the stable owning-folder
+  identity (the workspace folder path, not the display basename, so two folders sharing a
+  basename stay distinct); the distinct options and the menu items are projected by the pure
+  `computeFolderOptions` helper and `SpecFolderToggleView`. The menu is keyboard-accessible and
+  the selected folder set is persisted in the webview state like the status filter and layout.
+- Make the owning-folder label on each spec card a clickable toggle that filters/unfilters by
+  that folder, driving the same `SpecFolderFilter` as the search-box menu so the two surfaces
+  stay in sync. The label becomes an accessible button (`aria-pressed` reflecting whether that
+  folder filter is active) keeping its discreet styling, and it stops click propagation so
+  toggling it never also opens the card.
+
 ## [0.8.0] - 2026-11-09
 
 ### Added
@@ -278,7 +298,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.8.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ducks-project/kirospectracker/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ducks-project/kirospectracker/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/ducks-project/kirospectracker/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/ducks-project/kirospectracker/compare/v0.6.0...v0.7.0

@@ -9,13 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.9.0 — Folder-scoped filtering [Planned]
-
-- [ ] Add a filter button on the search box (like the Extensions view) whose menu lists the
-      folders (or projects) that contain specs, to filter to (or unfilter) only those.
-- [ ] Make the owning-folder (or project) information shown on each spec card clickable to
-      filter/unfilter by that folder.
-
 ## v0.10.0 — Requirements preview on hover [Planned]
 
 - [ ] On hovering a spec card, load and show the introduction of the spec's `requirements.md`

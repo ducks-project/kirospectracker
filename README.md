@@ -34,7 +34,10 @@ or run a spec. It is read-only, fully local, and ships no telemetry and no netwo
   a required-progress bar and percentage, the optional progress shown separately, a search
   box, and icon-based list or grid layouts. The aggregate statistics are additive toggle
   filters: click one or more to narrow the list by status, and they compose with the search
-  box. A discreet global strip reports task-level statistics across all specs (done,
+  box. A folder filter button on the search box opens a menu of the folders (projects) that
+  contain specs, and the owning-folder label on each card is clickable, to scope the list to
+  one or more folders; the folder filter composes with the status filter and the search too. A
+  discreet global strip reports task-level statistics across all specs (done,
   cancelled, in-progress and to-do counts, plus an overall resolved percentage). Completed
   specs are set apart but stay visible. Each spec links to its `requirements.md`, `design.md`,
   `tasks.md` and `notes.md` when present.
