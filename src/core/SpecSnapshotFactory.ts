@@ -1,5 +1,6 @@
 import type { ISpecDocuments } from './model/ISpecDocuments';
 import type { ISpecSnapshot } from './model/ISpecSnapshot';
+import type { ITaskItem } from './model/ITaskItem';
 import type { TasksMarkdownParser } from './parsing/TasksMarkdownParser';
 import type { SpecProgressCalculator } from './status/SpecProgressCalculator';
 import type { SpecStatusResolver } from './status/SpecStatusResolver';
@@ -16,6 +17,14 @@ export interface ISpecRawInput {
   readonly tasksContent: string | undefined;
   /** Presence of the annex documents. */
   readonly documents: ISpecDocuments;
+}
+
+/** A snapshot paired with the task tree parsed to build it. */
+export interface ISnapshotWithTasks {
+  /** The immutable snapshot for presentation layers. */
+  readonly snapshot: ISpecSnapshot;
+  /** The parsed task tree, kept only transiently by the caller. */
+  readonly tasks: readonly ITaskItem[];
 }
 
 /**
@@ -54,16 +63,32 @@ export class SpecSnapshotFactory {
    * @returns The immutable snapshot for presentation layers.
    */
   public create(input: ISpecRawInput): ISpecSnapshot {
+    return this.createWithTasks(input).snapshot;
+  }
+
+  /**
+   * Assemble a snapshot and return it alongside the parsed task tree.
+   *
+   * The repository uses the returned tree to feed the global task-stats
+   * calculator, then discards it: the tree is never retained on the snapshot,
+   * preserving the lean-snapshot perf goal.
+   * @param input The raw text and document-presence of a spec.
+   * @returns The snapshot paired with its transient task tree.
+   */
+  public createWithTasks(input: ISpecRawInput): ISnapshotWithTasks {
     const tasks = this.parser.parse(input.tasksContent ?? '');
     const progress = this.calculator.calculate(tasks);
     const status = this.resolver.resolve(input.documents, progress);
     return {
-      name: input.name,
-      folderPath: input.folderPath,
-      workspacePath: input.workspacePath,
-      documents: input.documents,
-      status,
-      progress,
+      snapshot: {
+        name: input.name,
+        folderPath: input.folderPath,
+        workspacePath: input.workspacePath,
+        documents: input.documents,
+        status,
+        progress,
+      },
+      tasks,
     };
   }
 }

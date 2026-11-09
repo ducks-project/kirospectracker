@@ -166,6 +166,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
       type: 'specUpdated',
       card: this.cardMapper.map(snapshot),
       stats: this.stats.calculate(snapshots),
+      globalTaskStats: this.repository.getGlobalTaskStats(),
     };
     this.view.webview.postMessage(message).then(undefined, undefined);
   }
@@ -182,6 +183,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
       type: 'render',
       cards: this.cardMapper.mapAll(snapshots),
       stats: this.stats.calculate(snapshots),
+      globalTaskStats: this.repository.getGlobalTaskStats(),
     };
     this.view.webview.postMessage(message).then(undefined, undefined);
   }

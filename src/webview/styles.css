@@ -58,6 +58,58 @@ body {
   opacity: 0.8;
 }
 
+/* Compact, non-dominating global task-statistics strip: a single discreet line
+   under the status filters summarising the aggregate leaf tasks. Theme-aware
+   colors come from VS Code chart variables only (no raw hex). */
+.global-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.9rem;
+  margin-bottom: var(--gap);
+  padding: 0.15rem 0.1rem;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.global-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.global-stat-value {
+  font-weight: 600;
+}
+
+.global-stat-label {
+  opacity: 0.75;
+}
+
+.global-stat-done {
+  color: var(--vscode-charts-green, var(--vscode-testing-iconPassed, var(--vscode-foreground)));
+}
+
+.global-stat-cancelled {
+  color: var(--vscode-descriptionForeground, var(--vscode-disabledForeground, var(--vscode-foreground)));
+  text-decoration: line-through;
+}
+
+.global-stat-inProgress {
+  color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground, var(--vscode-foreground)));
+}
+
+.global-stat-todo {
+  color: var(--vscode-charts-blue, var(--vscode-textLink-foreground, var(--vscode-foreground)));
+}
+
+.global-stat-overall {
+  margin-left: auto;
+  font-weight: 600;
+  opacity: 1;
+}
+
 .toolbar {
   display: flex;
   gap: var(--gap);
@@ -310,6 +362,37 @@ body {
 .progress-fill {
   height: 100%;
   background: var(--vscode-progressBar-foreground, #4a9);
+}
+
+/* Per-state task breakdown on a card: done, cancelled and in-progress shown
+   distinctly. Done reads as normal foreground; cancelled is dimmed and struck
+   through; in-progress gets its own subtle (italic, warning-toned) style. All
+   colors come from VS Code theme variables (no raw hex). */
+.task-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  margin: 0.3rem 0;
+  font-size: 0.72rem;
+}
+
+.task-state {
+  white-space: nowrap;
+}
+
+.task-state-done {
+  color: var(--vscode-foreground);
+}
+
+.task-state-cancelled {
+  color: var(--vscode-descriptionForeground, var(--vscode-disabledForeground, var(--vscode-foreground)));
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.task-state-inProgress {
+  color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground, var(--vscode-foreground)));
+  font-style: italic;
 }
 
 .links {

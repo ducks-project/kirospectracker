@@ -1,4 +1,5 @@
 import type { RunScope } from '../ports/ISpecAgentGateway';
+import type { IGlobalTaskStats } from './IGlobalTaskStats';
 import type { ISpecCardView } from './ISpecCardView';
 import type { ISpecStats } from './ISpecStats';
 
@@ -13,6 +14,7 @@ export interface IRenderMessage {
   readonly type: 'render';
   readonly cards: readonly ISpecCardView[];
   readonly stats: ISpecStats;
+  readonly globalTaskStats: IGlobalTaskStats;
 }
 
 /** Outbound message: update a single changed card and the aggregate stats. */
@@ -20,6 +22,7 @@ export interface ISpecUpdatedMessage {
   readonly type: 'specUpdated';
   readonly card: ISpecCardView;
   readonly stats: ISpecStats;
+  readonly globalTaskStats: IGlobalTaskStats;
 }
 
 /** Outbound message: toggle the dashboard layout (list <-> grid). */

@@ -165,4 +165,65 @@ describe('SpecRepository', () => {
     repository.dispose();
     expect(repository.getSpecs()).to.deep.equal([]);
   });
+
+  it('aggregates global task stats across every discovered spec', async () => {
+    // alpha: [x] + [ ] => 1 done, 1 todo. beta: [x] => 1 done.
+    const repository = new SpecRepository(seededFileSystem(), makeFactory(), seededFileSystem());
+    await repository.refresh();
+    const stats = repository.getGlobalTaskStats();
+    expect(stats.done).to.equal(2);
+    expect(stats.cancelled).to.equal(0);
+    expect(stats.inProgress).to.equal(0);
+    expect(stats.todo).to.equal(1);
+    expect(stats.total).to.equal(3);
+    expect(stats.percentComplete).to.be.closeTo(2 / 3, 1e-9);
+  });
+
+  it('counts cancelled tasks as resolved in the global percentage', async () => {
+    const root = `${WORKSPACE}/.kiro/specs`;
+    const directories = new Set<string>([`${root}/alpha`]);
+    const files = new Map<string, string>([
+      [`${root}/alpha/tasks.md`, '- [-] 1. Cancelled\n- [~] 2. Doing\n- [x] 3. Done'],
+    ]);
+    const fs = new FakeSpecFileSystem([WORKSPACE], files, directories);
+    const repository = new SpecRepository(fs, makeFactory(), fs);
+    await repository.refresh();
+    const stats = repository.getGlobalTaskStats();
+    expect(stats.done).to.equal(1);
+    expect(stats.cancelled).to.equal(1);
+    expect(stats.inProgress).to.equal(1);
+    expect(stats.todo).to.equal(0);
+    // resolved = done + cancelled = 2 over total 3.
+    expect(stats.percentComplete).to.be.closeTo(2 / 3, 1e-9);
+  });
+
+  it('recomputes the global task stats after a scoped spec change', async () => {
+    const root = `${WORKSPACE}/.kiro/specs`;
+    const fs = seededFileSystem();
+    const repository = new SpecRepository(fs, makeFactory(), fs);
+    await repository.refresh();
+    expect(repository.getGlobalTaskStats().done).to.equal(2);
+    // Flip alpha's todo task to done and emit the change on it.
+    fs.setFile(`${root}/alpha/tasks.md`, '- [x] 1. Done\n- [x] 2. Done');
+    fs.emit(`${root}/alpha/tasks.md`);
+    await flush();
+    const stats = repository.getGlobalTaskStats();
+    expect(stats.done).to.equal(3);
+    expect(stats.todo).to.equal(0);
+    expect(stats.percentComplete).to.equal(1);
+  });
+
+  it('yields all-zero global task stats when no workspace folder is open', async () => {
+    const empty = new FakeSpecFileSystem([], new Map(), new Set());
+    const repository = new SpecRepository(empty, makeFactory(), empty);
+    await repository.refresh();
+    expect(repository.getGlobalTaskStats()).to.deep.equal({
+      done: 0,
+      cancelled: 0,
+      inProgress: 0,
+      todo: 0,
+      total: 0,
+      percentComplete: 0,
+    });
+  });
 });

@@ -1,9 +1,12 @@
+import type { IGlobalTaskStats } from '../core/model/IGlobalTaskStats';
 import type { ISpecDocuments } from '../core/model/ISpecDocuments';
 import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
+import type { ITaskItem } from '../core/model/ITaskItem';
 import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
 import type { ISpecRawInput, SpecSnapshotFactory } from '../core/SpecSnapshotFactory';
 import type { ISpecChangeNotifier } from './ports/ISpecChangeNotifier';
 import type { ISpecFileSystem } from './ports/ISpecFileSystem';
+import { GlobalTaskStatsCalculator } from '../core/status/GlobalTaskStatsCalculator';
 import { mapWithLimit } from '../core/BoundedMap';
 
 /** Default number of spec reads kept in flight during a cold scan. */
@@ -49,6 +52,22 @@ export class SpecRepository {
   private readonly notifier: ISpecChangeNotifier;
 
   private readonly cache: Map<string, ISpecSnapshot> = new Map();
+
+  /**
+   * Per-spec global task stats, keyed by spec folder path.
+   *
+   * It holds one tiny {@link IGlobalTaskStats} value object per spec (six
+   * numbers), computed from the task tree parsed during discovery or a scoped
+   * change and then discarded. The parsed trees themselves are NEVER retained,
+   * so the lean-snapshot 500-spec perf goal is preserved; the global strip is
+   * aggregated from these per-spec stats on demand.
+   */
+  private readonly taskStatsCache: Map<string, IGlobalTaskStats> = new Map();
+
+  private readonly taskStatsCalculator: GlobalTaskStatsCalculator = new GlobalTaskStatsCalculator();
+
+  /** Memoized aggregate, invalidated on every cache mutation. */
+  private aggregatedTaskStats: IGlobalTaskStats | undefined;
 
   private readonly listeners: Set<(delta: SpecChangeDelta) => void> = new Set();
 
@@ -99,6 +118,8 @@ export class SpecRepository {
    */
   public async refresh(): Promise<readonly ISpecSnapshot[]> {
     this.cache.clear();
+    this.taskStatsCache.clear();
+    this.invalidateAggregate();
     const folders = this.fileSystem.workspaceFolders();
     const perFolder = await Promise.all(folders.map((folder) => this.discoverWorkspace(folder)));
     perFolder.flat().forEach((snapshot) => this.cache.set(snapshot.folderPath, snapshot));
@@ -115,12 +136,30 @@ export class SpecRepository {
   }
 
   /**
+   * Return the aggregate task statistics across every cached spec.
+   *
+   * The result is memoized and only recomputed after a change invalidates it
+   * (a full refresh or a scoped spec change), so the dashboard reads it cheaply
+   * on every render. It aggregates the per-spec stats computed from the task
+   * trees parsed during discovery/scoped change; no task tree is retained.
+   * @returns The immutable aggregate global task statistics.
+   */
+  public getGlobalTaskStats(): IGlobalTaskStats {
+    if (undefined === this.aggregatedTaskStats) {
+      this.aggregatedTaskStats = this.aggregateTaskStats();
+    }
+    return this.aggregatedTaskStats;
+  }
+
+  /**
    * Release the change-notifier subscription and the listeners.
    */
   public dispose(): void {
     this.disposeNotifier();
     this.listeners.clear();
     this.cache.clear();
+    this.taskStatsCache.clear();
+    this.invalidateAggregate();
   }
 
   /**
@@ -162,7 +201,57 @@ export class SpecRepository {
       notes: undefined !== notes,
     };
     const input: ISpecRawInput = { name, folderPath, workspacePath, tasksContent, documents };
-    return this.factory.create(input);
+    const { snapshot, tasks } = this.factory.createWithTasks(input);
+    this.rememberTaskStats(snapshot.folderPath, tasks);
+    return snapshot;
+  }
+
+  /**
+   * Compute and cache the per-spec global task stats from a parsed task tree,
+   * then let the tree be discarded by the caller.
+   * @param folderPath Absolute path of the spec folder.
+   * @param tasks The transient task tree parsed for the spec.
+   */
+  private rememberTaskStats(folderPath: string, tasks: readonly ITaskItem[]): void {
+    this.taskStatsCache.set(folderPath, this.taskStatsCalculator.calculate([tasks]));
+    this.invalidateAggregate();
+  }
+
+  /**
+   * Aggregate every cached per-spec task stat into a single value object.
+   *
+   * It sums the per-state leaf counts across specs and recomputes the resolved
+   * percentage over the combined total, matching the `[0, 1]` convention of a
+   * single-spec {@link IGlobalTaskStats}.
+   * @returns The combined global task statistics.
+   */
+  private aggregateTaskStats(): IGlobalTaskStats {
+    let done = 0;
+    let cancelled = 0;
+    let inProgress = 0;
+    let todo = 0;
+    let total = 0;
+    this.taskStatsCache.forEach((stats) => {
+      done += stats.done;
+      cancelled += stats.cancelled;
+      inProgress += stats.inProgress;
+      todo += stats.todo;
+      total += stats.total;
+    });
+    const resolved = done + cancelled;
+    return {
+      done,
+      cancelled,
+      inProgress,
+      todo,
+      total,
+      percentComplete: 0 < total ? resolved / total : 0,
+    };
+  }
+
+  /** Drop the memoized aggregate so the next read recomputes it. */
+  private invalidateAggregate(): void {
+    this.aggregatedTaskStats = undefined;
   }
 
   /**

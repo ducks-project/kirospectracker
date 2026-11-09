@@ -4,6 +4,7 @@ import type {
   DashboardOutboundMessage,
   SpecDocumentKind,
 } from '../core/model/IDashboardMessage';
+import type { IGlobalTaskStats } from '../core/model/IGlobalTaskStats';
 import type { ISpecCardView } from '../core/model/ISpecCardView';
 import type { ISpecStats } from '../core/model/ISpecStats';
 import type { RunScope } from '../core/ports/ISpecAgentGateway';
@@ -47,16 +48,28 @@ const vscodeApi = acquireVsCodeApi();
 
 const persistedState = vscodeApi.getState();
 
+/** Empty global task stats used before the first render arrives. */
+const EMPTY_GLOBAL_TASK_STATS: IGlobalTaskStats = {
+  done: 0,
+  cancelled: 0,
+  inProgress: 0,
+  todo: 0,
+  total: 0,
+  percentComplete: 0,
+};
+
 /** Current render state kept between messages. */
 const state: {
   cards: readonly ISpecCardView[];
   stats: ISpecStats;
+  globalTaskStats: IGlobalTaskStats;
   query: string;
   layout: DashboardLayout;
   filter: SpecStatusFilter;
 } = {
   cards: [],
   stats: { total: 0, completed: 0, inProgress: 0, notStarted: 0, malformed: 0 },
+  globalTaskStats: EMPTY_GLOBAL_TASK_STATS,
   query: '',
   layout: persistedState?.layout ?? 'list',
   filter: SpecStatusFilter.fromUnknown(persistedState?.filterKeys ?? []),
@@ -180,6 +193,49 @@ function renderStats(stats: ISpecStats): HTMLElement {
 }
 
 /**
+ * Append one labelled task-count item to the global-stats strip.
+ * @param strip The strip element to append to.
+ * @param cssClass Extra class applied to the item for its state color.
+ * @param label The human-readable state label.
+ * @param value The count to show.
+ */
+function appendGlobalStatItem(
+  strip: HTMLElement,
+  cssClass: string,
+  label: string,
+  value: number,
+): void {
+  const item = el('span', `global-stat ${cssClass}`);
+  item.appendChild(el('span', 'global-stat-value', String(value)));
+  item.appendChild(el('span', 'global-stat-label', label));
+  strip.appendChild(item);
+}
+
+/**
+ * Render the compact global task-statistics strip.
+ *
+ * It is a single discreet line summarising the aggregate leaf tasks across
+ * every spec (done, cancelled, in-progress, to-do) plus the overall resolved
+ * percentage. It is intentionally non-dominating: a small strip, not a header.
+ * @param stats The aggregate global task stats.
+ * @returns The strip element.
+ */
+function renderGlobalStats(stats: IGlobalTaskStats): HTMLElement {
+  const strip = el('section', 'global-stats');
+  strip.setAttribute('aria-label', 'Global task statistics');
+  appendGlobalStatItem(strip, 'global-stat-done', 'done', stats.done);
+  appendGlobalStatItem(strip, 'global-stat-cancelled', 'cancelled', stats.cancelled);
+  appendGlobalStatItem(strip, 'global-stat-inProgress', 'in progress', stats.inProgress);
+  appendGlobalStatItem(strip, 'global-stat-todo', 'to-do', stats.todo);
+  const percent = Math.round(stats.percentComplete * PERCENT);
+  const overall = el('span', 'global-stat global-stat-overall');
+  overall.appendChild(el('span', 'global-stat-value', `${percent}%`));
+  overall.appendChild(el('span', 'global-stat-label', 'resolved'));
+  strip.appendChild(overall);
+  return strip;
+}
+
+/**
  * Render one progress bar.
  * @param label Row label.
  * @param done Done count.
@@ -195,6 +251,54 @@ function renderProgress(label: string, done: number, total: number, ratio: numbe
   fill.style.width = `${Math.round(ratio * PERCENT)}%`;
   track.appendChild(fill);
   row.appendChild(track);
+  return row;
+}
+
+/**
+ * Append one per-state count to a card's breakdown row when it is non-zero.
+ *
+ * Zero-count states are omitted to keep the row compact; each shown state wears
+ * its own class so the stylesheet renders done normally, cancelled dimmed and
+ * struck through, and in-progress in a subtle style.
+ * @param row The breakdown row element.
+ * @param cssClass The per-state class driving its theme-aware look.
+ * @param label The state label.
+ * @param count The leaf count for this state (required + optional).
+ */
+function appendBreakdownItem(
+  row: HTMLElement,
+  cssClass: string,
+  label: string,
+  count: number,
+): void {
+  if (0 === count) {
+    return;
+  }
+  row.appendChild(el('span', `task-state ${cssClass}`, `${count} ${label}`));
+}
+
+/**
+ * Render the per-state task breakdown of a card.
+ *
+ * It sums the required and optional per-state counts from the card's progress
+ * and shows done, cancelled and in-progress distinctly (to-do is implied by the
+ * progress bar and omitted to stay compact). The whole row is hidden when the
+ * spec has no leaf task.
+ * @param card The spec card view.
+ * @returns The breakdown row, or `undefined` when there is nothing to show.
+ */
+function renderCardBreakdown(card: ISpecCardView): HTMLElement | undefined {
+  const { progress } = card;
+  const done = progress.requiredResolvedDone + progress.optionalResolvedDone;
+  const cancelled = progress.requiredResolvedCancelled + progress.optionalResolvedCancelled;
+  const inProgress = progress.requiredInProgress + progress.optionalInProgress;
+  if (0 === done && 0 === cancelled && 0 === inProgress) {
+    return undefined;
+  }
+  const row = el('div', 'task-states');
+  appendBreakdownItem(row, 'task-state-done', 'done', done);
+  appendBreakdownItem(row, 'task-state-cancelled', 'cancelled', cancelled);
+  appendBreakdownItem(row, 'task-state-inProgress', 'in progress', inProgress);
   return row;
 }
 
@@ -491,17 +595,12 @@ function wireCardBody(article: HTMLElement, card: ISpecCardView): void {
 }
 
 /**
- * Render one spec card.
+ * Append the required/optional progress bars and the per-state breakdown row to
+ * a card.
+ * @param article The card element to populate.
  * @param card The spec card view.
- * @returns The card element.
  */
-function renderCard(card: ISpecCardView): HTMLElement {
-  const article = el('article', `card status-${card.status}`);
-  const header = el('div', 'card-header');
-  header.appendChild(el('h2', 'card-title', card.name));
-  header.appendChild(renderStatusBadge(card));
-  article.appendChild(header);
-  article.appendChild(el('span', 'card-owner', card.ownerLabel));
+function appendCardProgress(article: HTMLElement, card: ISpecCardView): void {
   const { progress } = card;
   article.appendChild(
     renderProgress(
@@ -519,6 +618,25 @@ function renderCard(card: ISpecCardView): HTMLElement {
       progress.optionalRatio,
     ),
   );
+  const breakdown = renderCardBreakdown(card);
+  if (undefined !== breakdown) {
+    article.appendChild(breakdown);
+  }
+}
+
+/**
+ * Render one spec card.
+ * @param card The spec card view.
+ * @returns The card element.
+ */
+function renderCard(card: ISpecCardView): HTMLElement {
+  const article = el('article', `card status-${card.status}`);
+  const header = el('div', 'card-header');
+  header.appendChild(el('h2', 'card-title', card.name));
+  header.appendChild(renderStatusBadge(card));
+  article.appendChild(header);
+  article.appendChild(el('span', 'card-owner', card.ownerLabel));
+  appendCardProgress(article, card);
   article.appendChild(renderLinks(card));
   article.appendChild(renderActions(card));
   wireCardBody(article, card);
@@ -731,6 +849,7 @@ function renderContent(content: HTMLElement): void {
 function mount(app: HTMLElement): HTMLElement {
   app.replaceChildren();
   app.appendChild(renderStats(state.stats));
+  app.appendChild(renderGlobalStats(state.globalTaskStats));
   app.appendChild(renderToolbar());
   const content = el('section', 'content');
   app.appendChild(content);
@@ -757,6 +876,7 @@ function render(): void {
   }
   const stats = app.querySelector('.stats');
   stats?.replaceWith(renderStats(state.stats));
+  replaceGlobalStats(app);
   syncToggleLabel(app);
   const content = app.querySelector('.content');
   if (null !== content && content instanceof HTMLElement) {
@@ -767,12 +887,23 @@ function render(): void {
 rerender = render;
 
 /**
- * Replace the stats region of the live dashboard in place.
- * @param app The app root hosting the stats region.
+ * Replace the compact global-stats strip of the live dashboard in place.
+ * @param app The app root hosting the global-stats strip.
+ */
+function replaceGlobalStats(app: HTMLElement): void {
+  const strip = app.querySelector('.global-stats');
+  strip?.replaceWith(renderGlobalStats(state.globalTaskStats));
+}
+
+/**
+ * Replace the stats region and global-stats strip of the live dashboard in
+ * place.
+ * @param app The app root hosting the stats regions.
  */
 function replaceStats(app: HTMLElement): void {
   const stats = app.querySelector('.stats');
   stats?.replaceWith(renderStats(state.stats));
+  replaceGlobalStats(app);
 }
 
 /**
@@ -843,11 +974,13 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
   if ('render' === message.type) {
     state.cards = message.cards;
     state.stats = message.stats;
+    state.globalTaskStats = message.globalTaskStats;
     render();
     return;
   }
   if ('specUpdated' === message.type) {
     state.stats = message.stats;
+    state.globalTaskStats = message.globalTaskStats;
     applySpecUpdate(message.card);
     return;
   }
