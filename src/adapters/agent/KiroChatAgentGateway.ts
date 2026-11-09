@@ -28,6 +28,40 @@ const SESSIONS_CREATE = 'kiroAgent.sessions.create';
 const SESSIONS_SEND_PROMPT = 'kiroAgent.sessions.sendPrompt';
 
 /**
+ * Undocumented Kiro command activating a created session by id and reporting
+ * whether activation succeeded.
+ *
+ * Reverse-engineered, non-documented and subject to change across Kiro builds.
+ * Signature: `(sessionId: string, ownerWindowId?: number, source?: object):
+ * Promise<{ accepted: boolean, sessionId?: string, reason?: string }>`. It
+ * routes through the sidebar reveal primitive (`switchToSidebarSession`) and is
+ * preferred over {@link VIEW_SESSION} because it returns a verifiable
+ * `accepted` flag.
+ */
+const SESSIONS_SWITCH = 'kiroAgent.sessions.switch';
+
+/**
+ * Undocumented Kiro command activating a created session by id (simple reveal).
+ *
+ * Reverse-engineered, non-documented and subject to change across Kiro builds.
+ * Signature: `(sessionId: string, title?: string): void`. It makes the given
+ * session the active chat in the sidebar but returns nothing, so it is the
+ * best-effort fallback when {@link SESSIONS_SWITCH} is absent.
+ */
+const VIEW_SESSION = 'kiroAgent.viewSession';
+
+/**
+ * Framework-generated Kiro command bringing the chat view container to the
+ * foreground.
+ *
+ * Reverse-engineered, non-documented and subject to change across Kiro builds.
+ * Signature: `(): void` (no args). VS Code auto-provides a `<viewId>.focus`
+ * command for the registered `kiroAgent.chatView` webview view; Kiro's own
+ * spec-review flow calls it immediately before `focusChatInput`.
+ */
+const CHAT_VIEW_FOCUS = 'kiroAgent.chatView.focus';
+
+/**
  * Undocumented Kiro command filling the chat input, submitting when
  * `submit: true`.
  *
@@ -64,12 +98,34 @@ export type DispatchPath =
   | 'none';
 
 /**
+ * How the created session was activated (brought to the foreground), recorded in
+ * the diagnostic line and driving honest toast wording:
+ * - `switch`: `sessions.switch` returned `{ accepted: true }` (verified);
+ * - `viewSession`: the best-effort `viewSession` reveal was invoked;
+ * - `none`: no activation command was available, so the session may stay in
+ *   Session History and the toast must say so.
+ */
+export type ActivationKind = 'switch' | 'viewSession' | 'none';
+
+/**
  * The shape returned by `kiroAgent.sessions.create`: an object carrying the new
  * session id. Modelled as an `interface` so the type guard narrows an `unknown`
  * result against a stable contract rather than a loose `any`.
  */
 interface ISessionCreateResult {
   readonly sessionId: string;
+}
+
+/**
+ * The shape returned by `kiroAgent.sessions.switch`: a structured activation
+ * result whose `accepted` flag reports whether the session was revealed.
+ * Modelled as an `interface` so the type guard narrows an `unknown` result
+ * against a stable contract rather than a loose `any`.
+ */
+interface ISessionSwitchResult {
+  readonly accepted: boolean;
+  readonly sessionId?: string;
+  readonly reason?: string;
 }
 
 /**
@@ -90,6 +146,24 @@ function hasSessionId(value: unknown): value is ISessionCreateResult {
 }
 
 /**
+ * Type guard narrowing an unknown `sessions.switch` result that reports a
+ * verified activation.
+ *
+ * `sessions.switch` can legitimately resolve with `{ accepted: false, reason }`
+ * (e.g. `activationFailed`, `noSurface`, `invalidArgs`), so a resolved promise
+ * does NOT imply success; the activation is only confirmed when `accepted` is
+ * strictly `true`.
+ * @param value The unknown result returned by `kiroAgent.sessions.switch`.
+ * @returns `true` when `value` carries `accepted === true`.
+ */
+function isAccepted(value: unknown): value is ISessionSwitchResult {
+  if (null === value || 'object' !== typeof value) {
+    return false;
+  }
+  return true === (value as { accepted?: unknown }).accepted;
+}
+
+/**
  * Best-effort adapter driving the Kiro agent, confining ALL fragility (the
  * undocumented `kiroAgent.*` command ids and the generic chat-open fallback) to
  * this single class.
@@ -97,9 +171,15 @@ function hasSessionId(value: unknown): value is ISessionCreateResult {
  * It probes the command surface to report an honest {@link availability}, builds
  * every message from the fixed {@link SPEC_AGENT_MESSAGES} templates, then runs
  * a capability-probed, cascading try/catch dispatch chain ordered by robustness:
- * 1. `sessions.create` + `sessions.sendPrompt` — open a NEW session and truly
- *    submit the prompt (the preferred path; proceeds only when `create` returns
- *    a non-empty string session id, else it falls through);
+ * 1. `sessions.create` + activate + foreground + `sessions.sendPrompt` — open a
+ *    NEW session, ACTIVATE it (`sessions.switch` when it returns
+ *    `{ accepted: true }`, else the best-effort `viewSession`), bring the chat
+ *    view to the FOREGROUND (`chatView.focus`), then FIRE-AND-FORGET
+ *    `sessions.sendPrompt` so the "sent" toast is immediate rather than delayed
+ *    to end-of-turn. It proceeds only when `create` returns a non-empty string
+ *    session id, else it falls through. Activation and focus are best-effort: a
+ *    throw or `accepted: false` never aborts the send, and when no activation
+ *    command exists the toast says the session may be in Session History;
  * 2. `focusChatInput({ submit: true, newSession: true })` — UI submit in a new
  *    session (best-effort, depends on the chat webview being rendered);
  * 3. `focusChatInput({ prompt })` — fill only; the user presses Enter;
@@ -126,6 +206,14 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
   private readonly notifier: IAgentNotifier;
 
   private readonly diagnostics: IAgentDiagnosticSink;
+
+  /**
+   * How the created session was activated on the current `send`. Set by the
+   * preferred create path and consumed by {@link logDiagnostic} and
+   * {@link notify}; reset at the start of every {@link send} so it never leaks
+   * across actions. Only meaningful for the `create+sendPrompt` path.
+   */
+  private activation: ActivationKind = 'none';
 
   /**
    * Build the adapter over its command gateway, feedback channels and sink.
@@ -193,6 +281,7 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
    * @param message The fixed-template message to send.
    */
   private async send(message: string): Promise<void> {
+    this.activation = 'none';
     try {
       const ids = await this.commands.getCommands();
       const path = await this.dispatch(message, ids);
@@ -231,29 +320,130 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
   }
 
   /**
-   * PREFERRED path: create a NEW session and truly submit the prompt. Proceeds
-   * only when both ids are present AND `create` returns a non-empty string
-   * session id (otherwise `sendPrompt` would silently no-op), falling through
-   * on any missing id, bad result or throw.
+   * PREFERRED path: create a NEW session, ACTIVATE it, bring the chat view to
+   * the FOREGROUND, then FIRE-AND-FORGET the prompt submission so the toast is
+   * immediate. Proceeds only when both create/send ids are present AND `create`
+   * returns a non-empty string session id (otherwise `sendPrompt` would silently
+   * no-op), falling through on any missing id, bad result or throw BEFORE the
+   * send is dispatched.
+   *
+   * Activation ({@link activateSession}) and view focus ({@link focusChatView})
+   * are best-effort: they run BEFORE the send so the user sees the session when
+   * the run starts, but a throw or `accepted: false` never aborts it. The send
+   * is dispatched with {@link ICommandGateway.executeCommand} and NOT awaited; a
+   * mandatory `.catch` routes any rejection to the diagnostic sink only so it
+   * never surfaces to the UI. The chosen activation kind is recorded in
+   * {@link activation} for honest diagnostics and toast wording.
    * @param message The prompt to submit.
    * @param ids The registered command ids.
-   * @returns `true` when the prompt was submitted; `false` to fall through.
+   * @returns `true` when the prompt was dispatched; `false` to fall through.
    */
   private async tryCreateAndSend(message: string, ids: readonly string[]): Promise<boolean> {
     if (!ids.includes(SESSIONS_CREATE) || !ids.includes(SESSIONS_SEND_PROMPT)) {
       return false;
     }
+    let sessionId: string;
     try {
       const result = await this.commands.executeCommand<unknown>(SESSIONS_CREATE);
       if (!hasSessionId(result)) {
         return false;
       }
-      // POSITIONAL (sessionId, prompt) — NOT an options object.
-      await this.commands.executeCommand(SESSIONS_SEND_PROMPT, result.sessionId, message);
-      return true;
+      sessionId = result.sessionId;
     } catch {
       return false;
     }
+    // Best-effort activation + foreground BEFORE sending: never abort the send.
+    this.activation = await this.activateSession(sessionId, ids);
+    await this.focusChatView(ids);
+    this.dispatchSend(sessionId, message);
+    return true;
+  }
+
+  /**
+   * FIRE-AND-FORGET the prompt submission so the "sent" toast is immediate.
+   *
+   * `sessions.sendPrompt` resolves only at end-of-turn (its ACP `session/prompt`
+   * response carries a `stopReason`), so awaiting it before the toast is exactly
+   * what made the notification feel slow. This dispatches it and attaches a
+   * mandatory `.catch` that routes any rejection to the diagnostic sink only; it
+   * is wrapped in `try/catch` as well so even a synchronous throw from the host
+   * command surface is swallowed and can never reach the UI.
+   * @param sessionId The activated session id.
+   * @param message The prompt to submit (positional with `sessionId`).
+   */
+  private dispatchSend(sessionId: string, message: string): void {
+    try {
+      // POSITIONAL (sessionId, prompt) — NOT an options object.
+      void this.commands
+        .executeCommand(SESSIONS_SEND_PROMPT, sessionId, message)
+        .catch((error: unknown) => this.logSendFailure(error));
+    } catch (error) {
+      this.logSendFailure(error);
+    }
+  }
+
+  /**
+   * ACTIVATE a created session so it becomes the visible chat. Prefers
+   * `sessions.switch` because it returns a verifiable `{ accepted }` result; on
+   * `accepted: false` or a throw it falls back to the best-effort `viewSession`
+   * reveal. Returns `none` when neither command is available (the send still
+   * works; the session may stay in Session History). Never throws.
+   * @param sessionId The non-empty session id to activate.
+   * @param ids The registered command ids.
+   * @returns The {@link ActivationKind} actually achieved.
+   */
+  private async activateSession(
+    sessionId: string,
+    ids: readonly string[],
+  ): Promise<ActivationKind> {
+    if (ids.includes(SESSIONS_SWITCH)) {
+      try {
+        const result = await this.commands.executeCommand<unknown>(SESSIONS_SWITCH, sessionId);
+        if (isAccepted(result)) {
+          return 'switch';
+        }
+      } catch {
+        // Fall through to the viewSession reveal below.
+      }
+    }
+    if (ids.includes(VIEW_SESSION)) {
+      try {
+        // Returns nothing — best-effort reveal.
+        await this.commands.executeCommand(VIEW_SESSION, sessionId);
+        return 'viewSession';
+      } catch {
+        return 'none';
+      }
+    }
+    return 'none';
+  }
+
+  /**
+   * Bring the chat view container to the foreground, mirroring Kiro's own
+   * `chatView.focus` → `focusChatInput` ordering. Guarded by the id check and
+   * wrapped so any throw is ignored (best-effort; never aborts the send).
+   * @param ids The registered command ids.
+   */
+  private async focusChatView(ids: readonly string[]): Promise<void> {
+    if (!ids.includes(CHAT_VIEW_FOCUS)) {
+      return;
+    }
+    try {
+      // No args — framework-generated view focus command.
+      await this.commands.executeCommand(CHAT_VIEW_FOCUS);
+    } catch {
+      // Best-effort: a failed foreground must not abort the send.
+    }
+  }
+
+  /**
+   * Record a fire-and-forget `sendPrompt` rejection in the diagnostic sink only,
+   * so it is observable without ever surfacing to the UI.
+   * @param error The rejection reason from the dispatched `sendPrompt`.
+   */
+  private logSendFailure(error: unknown): void {
+    const detail = error instanceof Error ? error.message : String(error);
+    this.diagnostics.append(`agent action: sendPrompt (fire-and-forget) failed: ${detail}`);
   }
 
   /**
@@ -312,7 +502,11 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
    * @param path The path actually taken by {@link dispatch}.
    */
   private notify(message: string, path: DispatchPath): void {
-    if ('create+sendPrompt' === path || 'focusInput-submit' === path) {
+    if ('create+sendPrompt' === path) {
+      this.notifier.notifyInfo(this.createPathToast(message));
+      return;
+    }
+    if ('focusInput-submit' === path) {
       this.notifier.notifyInfo(`Kiro Spec Tracker: sent to Kiro chat \u2014 "${message}".`);
       return;
     }
@@ -334,6 +528,23 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
   }
 
   /**
+   * Build the create-path toast. When the session was activated it confirms the
+   * submission plainly; when no activation command was available it words the
+   * success honestly so the user knows the session may be in Session History.
+   * @param message The message that was submitted.
+   * @returns The honest, activation-aware toast text.
+   */
+  private createPathToast(message: string): string {
+    if ('none' === this.activation) {
+      return (
+        `Kiro Spec Tracker: sent to Kiro chat \u2014 if it did not come to the front, ` +
+        `open it from Session History.`
+      );
+    }
+    return `Kiro Spec Tracker: sent to Kiro chat \u2014 "${message}".`;
+  }
+
+  /**
    * Write one observability line naming the detected Kiro/chat command ids and
    * the chosen dispatch path, so a tester can report what their host exposes.
    * @param ids The registered command ids.
@@ -343,8 +554,13 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
     const kiroIds = ids.filter((id) => id.startsWith(KIRO_AGENT_PREFIX));
     const detected = 0 < kiroIds.length ? kiroIds.join(', ') : '(none)';
     const genericChat = ids.includes(GENERIC_CHAT_OPEN) ? 'yes' : 'no';
+    // The preferred path records how the session was activated and that the
+    // submission was dispatched fire-and-forget (so the toast is immediate).
+    const extra =
+      'create+sendPrompt' === path ? `; activation=${this.activation}; send=fire-and-forget` : '';
     this.diagnostics.append(
-      `agent action: path=${path}; kiroAgent ids=[${detected}]; generic chat-open=${genericChat}`,
+      `agent action: path=${path}; kiroAgent ids=[${detected}]; ` +
+        `generic chat-open=${genericChat}${extra}`,
     );
   }
 }
