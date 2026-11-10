@@ -366,6 +366,25 @@ function createHiddenSpecs(
 }
 
 /**
+ * Construct the Explorer decoration provider with its translated mapper.
+ * @param repository The spec repository supplying snapshots.
+ * @param stats The pure aggregate-stats calculator.
+ * @param translator The host translator.
+ * @returns The wired decoration provider.
+ */
+function createDecorations(
+  repository: SpecRepository,
+  stats: SpecStatsCalculator,
+  translator: ITranslator,
+): SpecFileDecorationProvider {
+  return new SpecFileDecorationProvider(
+    repository,
+    new SpecDecorationMapper(translator),
+    stats,
+    translator,
+  );
+}
+/**
  * Construct every collaborator for the given extension context.
  * @param context The extension context supplying the base URI.
  * @returns The fully wired collaborators.
@@ -374,8 +393,7 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   const fileSystem = new VscodeSpecFileSystem();
   const repository = createRepository(fileSystem);
   const gateway = new VscodeWorkspaceGateway();
-  const translator = new VscodeTranslator();
-  const stats = new SpecStatsCalculator();
+  const [translator, stats] = [new VscodeTranslator(), new SpecStatsCalculator()];
   const openDocument = new OpenDocumentCommand(repository, gateway, translator);
   const runTasks = buildRunTasksCommand(repository, fileSystem, gateway, translator);
   const agentFallback = new UnavailableAgentGateway(runTasks);
@@ -384,17 +402,11 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   const actions = createDashboardActions(openDocument, agentActions);
   const loader = createIntroductionLoader(context, repository, fileSystem);
   const dashboard = createDashboard(context, repository, stats, actions, loader, translator);
-  const decorations = new SpecFileDecorationProvider(
-    repository,
-    new SpecDecorationMapper(translator),
-    stats,
-    translator,
-  );
   return {
     repository,
     fileSystem,
     dashboard,
-    decorations,
+    decorations: createDecorations(repository, stats, translator),
     tree: createTree(repository, translator),
     openDocument,
     runTasks,

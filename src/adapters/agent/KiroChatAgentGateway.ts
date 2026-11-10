@@ -535,37 +535,41 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
    * @param path The path actually taken by {@link dispatch}.
    */
   private notify(message: string, path: DispatchPath): void {
-    if ('create+sendPrompt' === path) {
-      this.notifier.notifyInfo(this.createPathToast(message));
-      return;
-    }
-    if ('focusInput-submit' === path) {
-      this.notifier.notifyInfo(
-        this.translator.t('Kiro Spec Tracker: sent to Kiro chat \u2014 "{0}".', message),
-      );
-      return;
-    }
-    if ('focusInput-fill' === path) {
-      this.notifier.notifyInfo(
-        this.translator.t(
-          'Kiro Spec Tracker: filled the chat with "{0}" \u2014 press Enter to run it.',
-          message,
-        ),
-      );
-      return;
-    }
-    if ('chat-open' === path) {
-      this.notifier.notifyInfo(
-        this.translator.t(
-          'Kiro Spec Tracker: opened the chat with "{0}" \u2014 you may need to send it.',
-          message,
-        ),
-      );
+    const toast = this.pathToast(message, path);
+    if (undefined !== toast) {
+      this.notifier.notifyInfo(toast);
       return;
     }
     this.reporter.showError(
       this.translator.t('Kiro Spec Tracker: no Kiro chat command is available to run this action.'),
     );
+  }
+  /**
+   * Translate the info toast of a dispatch path.
+   * @param message The message that was (attempted to be) sent.
+   * @param path The path actually taken by {@link dispatch}.
+   * @returns The toast text, or `undefined` when no path succeeded.
+   */
+  private pathToast(message: string, path: DispatchPath): string | undefined {
+    if ('create+sendPrompt' === path) {
+      return this.createPathToast(message);
+    }
+    if ('focusInput-submit' === path) {
+      return this.translator.t('Kiro Spec Tracker: sent to Kiro chat \u2014 "{0}".', message);
+    }
+    if ('focusInput-fill' === path) {
+      return this.translator.t(
+        'Kiro Spec Tracker: filled the chat with "{0}" \u2014 press Enter to run it.',
+        message,
+      );
+    }
+    if ('chat-open' === path) {
+      return this.translator.t(
+        'Kiro Spec Tracker: opened the chat with "{0}" \u2014 you may need to send it.',
+        message,
+      );
+    }
+    return undefined;
   }
 
   /**

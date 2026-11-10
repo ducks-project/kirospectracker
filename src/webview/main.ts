@@ -2,6 +2,7 @@ import type {
   DashboardInboundMessage,
   DashboardLayout,
   DashboardOutboundMessage,
+  IRenderMessage,
   SpecDocumentKind,
 } from '../core/model/IDashboardMessage';
 import type { IGlobalTaskStats } from '../core/model/IGlobalTaskStats';
@@ -1288,6 +1289,22 @@ function applyStrings(messages: Readonly<Record<string, string>>): void {
     render();
   }
 }
+/**
+ * Apply a full `render` message: store the new state and redraw.
+ * @param message The render message.
+ */
+function applyRender(message: IRenderMessage): void {
+  state.cards = message.cards;
+  state.stats = message.stats;
+  state.globalTaskStats = message.globalTaskStats;
+  // A full re-render means the specs were re-discovered (workspace change, a
+  // entry document added), so clear the hover request gate and cache: a
+  // later hover can retry a spec whose reply was lost or whose entry document
+  // appeared after the first hover.
+  hoverController.reset();
+  hasRendered = true;
+  render();
+}
 window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage>) => {
   const message = event.data;
   if ('strings' === message.type) {
@@ -1295,16 +1312,7 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
     return;
   }
   if ('render' === message.type) {
-    state.cards = message.cards;
-    state.stats = message.stats;
-    state.globalTaskStats = message.globalTaskStats;
-    // A full re-render means the specs were re-discovered (workspace change, a
-    // entry document added), so clear the hover request gate and cache: a
-    // later hover can retry a spec whose reply was lost or whose entry document
-    // appeared after the first hover.
-    hoverController.reset();
-    hasRendered = true;
-    render();
+    applyRender(message);
     return;
   }
   if ('specUpdated' === message.type) {
