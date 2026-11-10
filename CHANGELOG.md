@@ -6,6 +6,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-10
+
+### Added
+
+- Resolve each spec's entry document from its `.kiro/specs/<name>/.config.kiro` file, which
+  carries two independent axes: `specType` (`feature` / `bugfix`) and `workflowType`
+  (`requirements-first` / `design-first`). A bugfix spec opens `bugfix.md`, otherwise a
+  design-first spec opens `design.md`, otherwise `requirements.md`. When `.config.kiro` is
+  missing, unreadable or carries an unknown value, or when the resolved document does not
+  exist, the first present document is used (`requirements.md`, then `design.md`, then
+  `tasks.md`), so specs without a configuration file behave as before. The file format is not
+  publicly documented by Kiro, so it is read behind a dedicated `ISpecConfigReader` port and
+  parsed by a pure, tolerant `parseSpecConfig`; the resolution rules live in a single
+  `ENTRY_DOCUMENT_RULES` table, so a new rule is an additive change.
+- Add `bugfix` as a first-class spec document kind: `bugfix.md` is detected like the other
+  documents, gets its own link on the dashboard card and an "Open Bugfix" entry in the tree
+  context menu.
+
+### Changed
+
+- Open the resolved entry document when a dashboard card is clicked, instead of always
+  `requirements.md`. The explicit per-document links are unchanged.
+- Make the hover preview follow the same entry document as the card click, so a design-first
+  spec previews its design and a bugfix spec previews `bugfix.md`. The introduction extractor
+  now also recognises an `Overview` / `Vue d'ensemble` section, so a `design.md` without an
+  `Introduction` section still gets a meaningful preview. The host-side cache is keyed by
+  document path and invalidated per spec, so editing `.config.kiro` or adding `bugfix.md`
+  never serves a stale preview.
+- Hide the dashboard document links whose document does not exist, instead of rendering them
+  disabled; a card with no document renders no link row at all.
+- Dismiss the hover popin as soon as the dashboard list scrolls, so it never covers the
+  content being scrolled to, and raise the delay before it appears from 150 ms to 300 ms so it
+  no longer flashes while the pointer crosses the cards.
+
 ## [0.10.0] - 2026-11-09
 
 ### Added
@@ -324,7 +358,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.10.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/ducks-project/kirospectracker/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ducks-project/kirospectracker/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ducks-project/kirospectracker/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ducks-project/kirospectracker/compare/v0.7.1...v0.8.0

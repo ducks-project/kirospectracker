@@ -9,24 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.11.0 — Open the workflow's entry document on card click [Planned]
-
-- [ ] Detect each spec's entry document from its `.kiro/specs/<name>/.config.kiro` file,
-      which carries two orthogonal axes observed in real specs: `workflowType`
-      (`requirements-first` / `design-first`) and `specType` (`feature` / `bugfix`). The
-      file format is not publicly documented, so isolate the reading behind a dedicated
-      port/adapter (as done for the agent gateway in v0.7.0) and keep the parsing pure.
-- [ ] Resolve the entry document from both axes: `specType: bugfix` opens `bugfix.md`;
-      otherwise `workflowType: design-first` opens `design.md`; otherwise `requirements.md`.
-      Fall back to the first present document (`requirements.md` then `design.md` then
-      `tasks.md`) when `.config.kiro` is missing, unreadable, or carries an unknown value,
-      so the behaviour never regresses for configless specs.
-- [ ] Make only the card-click default document dynamic; the explicit per-document actions
-      stay available and unchanged.
-- [ ] Add `bugfix` as a first-class spec document kind (model, dashboard button, and open
-      action), designed so a future new document kind is a small, additive change rather
-      than a rewrite.
-
 ## v0.12.0 — Hide completed specs from VS Code views [Planned]
 
 - [ ] Add three independent settings so the user can, for completed specs: hide them from
