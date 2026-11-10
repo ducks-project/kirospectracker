@@ -1,10 +1,15 @@
 import { expect } from 'chai';
 import * as vscode from 'vscode';
+import { SpecExcludeGlob } from '../../src/core/hiding/SpecExcludeGlob';
 import type { IExtensionApi } from '../../src/extension';
 
 const EXTENSION_ID = 'ducks-project.kirospectracker';
 const isCi = 'true' === process.env.CI;
 const USER_ENTRY = '**/user-owned-entry';
+/** Completed spec whose name needs escaping; `[` and `]` are valid folder names on every OS. */
+const BRACKET_SPEC = 'brackets[1]';
+/** In-progress neighbour that an unescaped `brackets[1]` glob would wrongly match. */
+const NEIGHBOUR_SPEC = 'brackets1';
 const RESET_COMMAND = 'kirospectracker.resetHiddenSpecs';
 
 /** Statuses hidden by default (Completed, FullyCompleted). */
@@ -39,7 +44,7 @@ describe('Hide specs by status (Node host)', () => {
     api.repository
       .getSpecs()
       .filter((spec) => DEFAULT_HIDDEN.includes(spec.status))
-      .map((spec) => `**/.kiro/specs/${spec.name}/**`)
+      .map((spec) => new SpecExcludeGlob().build(spec.name) as string)
       .sort();
 
   const ownedKeys = (value: Record<string, boolean> | undefined): string[] =>
@@ -136,6 +141,19 @@ describe('Hide specs by status (Node host)', () => {
     expect(all).to.have.length(1);
   });
 
+  it('hides a spec whose name needs escaping, and only that one', async () => {
+    const owned = ownedKeys(exclude('files'));
+    expect(owned).to.include('**/.kiro/specs/brackets[[]1[]]/**');
+    const hidden = await vscode.workspace.findFiles('**/.kiro/specs/brackets*/tasks.md');
+    const all = await vscode.workspace.findFiles('**/.kiro/specs/brackets*/tasks.md', null);
+    expect(all.map((uri) => uri.fsPath.split(/[\\/]/).slice(-2)[0]).sort()).to.deep.equal([
+      NEIGHBOUR_SPEC,
+      BRACKET_SPEC,
+    ]);
+    expect(hidden.map((uri) => uri.fsPath.split(/[\\/]/).slice(-2)[0])).to.deep.equal([
+      NEIGHBOUR_SPEC,
+    ]);
+  });
   it('moves the entries to search.exclude when the mode switches', async () => {
     await setMode('searchAndQuickOpen');
     expect(ownedKeys(exclude('search'))).to.deep.equal(expectedGlobs());
