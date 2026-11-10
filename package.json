@@ -92,6 +92,10 @@
         "command": "kirospectracker.tree.runRequiredAndOptional",
         "title": "Run Required and Optional Tasks",
         "icon": "$(run-all)"
+      },
+      {
+        "command": "kirospectracker.resetHiddenSpecs",
+        "title": "Kiro Spec Tracker: Reset Hidden Specs"
       }
     ],
     "menus": {
@@ -202,6 +206,60 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Enable the best-effort agent integration driving the Sync Files and Run tasks actions through the editor's chat agent (Kiro). The integration relies on non-official, unstable editor commands and is in beta; when disabled, those actions degrade to opening `tasks.md` and offering a consented, ready-to-paste prompt."
+        },
+        "kirospectracker.hideSpecs.mode": {
+          "type": "string",
+          "enum": [
+            "off",
+            "searchAndQuickOpen",
+            "everywhere"
+          ],
+          "default": "off",
+          "enumDescriptions": [
+            "Never hide specs and never write to the exclusion settings.",
+            "Hide the selected specs from Search and Quick Open only, by writing to `search.exclude` in the workspace folder settings. The Explorer is unchanged.",
+            "Hide the selected specs from the Explorer, Search and Quick Open, by writing to `files.exclude` in the workspace folder settings."
+          ],
+          "markdownDescription": "Choose where specs whose status is selected in `#kirospectracker.hideSpecs.statuses#` are hidden. The extension writes one glob per hidden spec (`**/.kiro/specs/<name>/**`) to `search.exclude` or `files.exclude` in the settings of the workspace folder (`.vscode/settings.json`). Entries you already have are never changed or removed; switching back to `off` removes only the entries added by the extension. The Kiro agent's file and text search tools also honor these settings, so they will no longer find hidden specs. VS Code also drops hidden files from the Quick Open history. See the configuration guide for details."
+        },
+        "kirospectracker.hideSpecs.statuses": {
+          "type": "object",
+          "properties": {
+            "Malformed": {
+              "type": "boolean",
+              "default": false,
+              "description": "Hide specs whose tasks.md is missing or that lack a required document."
+            },
+            "NotStarted": {
+              "type": "boolean",
+              "default": false,
+              "description": "Hide specs where no task is done yet."
+            },
+            "InProgress": {
+              "type": "boolean",
+              "default": false,
+              "description": "Hide specs with some tasks done but required tasks still open."
+            },
+            "Completed": {
+              "type": "boolean",
+              "default": true,
+              "description": "Hide specs whose required tasks are all done."
+            },
+            "FullyCompleted": {
+              "type": "boolean",
+              "default": true,
+              "description": "Hide specs whose required and optional tasks are all done."
+            }
+          },
+          "additionalProperties": false,
+          "default": {
+            "Malformed": false,
+            "NotStarted": false,
+            "InProgress": false,
+            "Completed": true,
+            "FullyCompleted": true
+          },
+          "markdownDescription": "Statuses whose specs are hidden when `#kirospectracker.hideSpecs.mode#` is not `off`. Tick one box per status."
         }
       }
     },

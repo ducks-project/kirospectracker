@@ -31,6 +31,15 @@ import { VscodeWorkspaceGateway } from './adapters/VscodeWorkspaceGateway';
 import { VscodeCommandGateway } from './adapters/VscodeCommandGateway';
 import { VscodeOutputChannelDiagnosticSink } from './adapters/VscodeOutputChannelDiagnosticSink';
 import { VscodeAgentBetaNotice } from './adapters/VscodeAgentBetaNotice';
+import { HiddenSpecsSynchronizer } from './adapters/HiddenSpecsSynchronizer';
+import { MementoHiddenSpecsState } from './adapters/MementoHiddenSpecsState';
+import { TimeoutScheduler } from './adapters/TimeoutScheduler';
+import {
+  HIDE_SPECS_SECTION,
+  VscodeHideSpecsConfigReader,
+} from './adapters/VscodeHideSpecsConfigReader';
+import { VscodeHiddenSpecsNotifier } from './adapters/VscodeHiddenSpecsNotifier';
+import { VscodeSettingsWriter } from './adapters/VscodeSettingsWriter';
 import { WebCryptoRandomSource } from './adapters/WebCryptoRandomSource';
 import { SpecAgentActions } from './adapters/SpecAgentActions';
 import { UnavailableAgentGateway } from './adapters/agent/UnavailableAgentGateway';
@@ -38,6 +47,10 @@ import { createSpecAgentGateway } from './adapters/agent/SpecAgentGatewayFactory
 import { OpenDocumentCommand } from './adapters/commands/OpenDocumentCommand';
 import { RefreshCommand, REFRESH_COMMAND_ID } from './adapters/commands/RefreshCommand';
 import { RunTasksCommand, RUN_TASKS_COMMAND_ID } from './adapters/commands/RunTasksCommand';
+import {
+  RESET_HIDDEN_SPECS_COMMAND_ID,
+  ResetHiddenSpecsCommand,
+} from './adapters/commands/ResetHiddenSpecsCommand';
 import {
   ToggleLayoutCommand,
   TOGGLE_LAYOUT_COMMAND_ID,
@@ -93,6 +106,13 @@ export interface IExtensionApi {
    * uses, without racing a host watcher on a real write.
    */
   readonly fileSystem: VscodeSpecFileSystem;
+  /**
+   * The synchroniser writing the hidden-specs exclusions.
+   *
+   * Exposed so the integration harness can trigger and await a run
+   * deterministically instead of racing the debounce window.
+   */
+  readonly hiddenSpecs: HiddenSpecsSynchronizer;
 }
 
 /** Disposable collaborators registered at activation. */
@@ -296,6 +316,33 @@ function createRepository(fileSystem: VscodeSpecFileSystem): SpecRepository {
   );
 }
 /**
+ * Build the hidden-specs synchroniser over the repository and the host ports.
+ * @param context The extension context supplying the workspace state.
+ * @param repository The spec repository supplying snapshots and change events.
+ * @param gateway The workspace gateway used to open the settings file.
+ * @param diagnostics The diagnostic sink recording skipped specs and failures.
+ * @returns The wired (not yet started) synchroniser.
+ */
+function createHiddenSpecs(
+  context: vscode.ExtensionContext,
+  repository: SpecRepository,
+  gateway: VscodeWorkspaceGateway,
+  diagnostics: VscodeOutputChannelDiagnosticSink,
+): HiddenSpecsSynchronizer {
+  const state = new MementoHiddenSpecsState(context.workspaceState);
+  return new HiddenSpecsSynchronizer({
+    specs: repository,
+    config: new VscodeHideSpecsConfigReader(),
+    writer: new VscodeSettingsWriter(),
+    store: state,
+    ledger: state,
+    notifier: new VscodeHiddenSpecsNotifier(gateway),
+    diagnostics,
+    scheduler: new TimeoutScheduler(),
+  });
+}
+
+/**
  * Construct every collaborator for the given extension context.
  * @param context The extension context supplying the base URI.
  * @returns The fully wired collaborators.
@@ -423,6 +470,38 @@ function registerDisposables(context: vscode.ExtensionContext, wiring: IWiring):
 }
 
 /**
+ * Build and start the hidden-specs synchroniser, register the Reset command, and
+ * re-run the synchroniser when its settings change.
+ *
+ * Only `kirospectracker.hideSpecs.*` is observed, never the exclusion settings
+ * the synchroniser writes, so its own writes cannot re-trigger it.
+ * @param context The extension context owning the disposables.
+ * @param wiring The constructed collaborators.
+ * @returns The started synchroniser.
+ */
+function registerHiddenSpecs(
+  context: vscode.ExtensionContext,
+  wiring: IWiring,
+): HiddenSpecsSynchronizer {
+  const { repository, gateway, agentDiagnostics } = wiring;
+  const hiddenSpecs = createHiddenSpecs(context, repository, gateway, agentDiagnostics);
+  const reset = new ResetHiddenSpecsCommand(hiddenSpecs);
+  hiddenSpecs.start();
+  context.subscriptions.push(
+    { dispose: () => hiddenSpecs.dispose() },
+    vscode.commands.registerCommand(RESET_HIDDEN_SPECS_COMMAND_ID, () =>
+      guard(gateway, () => reset.execute()),
+    ),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(HIDE_SPECS_SECTION)) {
+        hiddenSpecs.requestSync();
+      }
+    }),
+  );
+  return hiddenSpecs;
+}
+
+/**
  * Activate the extension (composition root).
  *
  * It constructs the core instances, the repository, the providers and the
@@ -434,6 +513,7 @@ function registerDisposables(context: vscode.ExtensionContext, wiring: IWiring):
 export function activate(context: vscode.ExtensionContext): IExtensionApi {
   const wiring = buildWiring(context);
   registerDisposables(context, wiring);
+  const hiddenSpecs = registerHiddenSpecs(context, wiring);
   wiring.repository.refresh().then(undefined, (error) => reportError(wiring.gateway, error));
   setUpAgentIntegration(context, wiring);
   return {
@@ -441,6 +521,7 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
     decorations: wiring.decorations,
     dashboard: wiring.dashboard,
     fileSystem: wiring.fileSystem,
+    hiddenSpecs,
   };
 }
 
