@@ -10,7 +10,8 @@
 Kiro Spec Tracker reads the [Kiro](https://kiro.dev) specs in your workspace
 (`.kiro/specs/<name>/`) and surfaces their progress across the IDE: status badges in the
 file explorer, a dedicated dashboard in the activity bar, and quick entry points to open
-or run a spec. It is read-only, fully local, and ships no telemetry and no network calls.
+or run a spec. It is fully local, ships no telemetry and no network calls, and writes to your
+settings only if you opt in to hiding specs by status.
 
 ## Table of contents
 
@@ -135,19 +136,26 @@ disabled, the actions use the honest fallback described above.
 
 ## Settings
 
-The extension works with no configuration.
+The extension works with no configuration. Three settings exist:
 
 - `kirospectracker.agentIntegration.enabled` (boolean, default `true`) — enable the
   best-effort agent integration driving the Sync Files and Run tasks actions through the
-  editor's chat agent. When disabled, those actions degrade to opening `tasks.md` and offering
-  a consented, ready-to-paste prompt. See [Agent actions (beta)](#agent-actions-beta).
+  editor's chat agent. See [Agent actions (beta)](#agent-actions-beta).
+- `kirospectracker.hideSpecs.mode` (`off` by default) — opt in to hiding specs by status from
+  Search and Quick Open, or from the Explorer too.
+- `kirospectracker.hideSpecs.statuses` — one checkbox per status choosing which specs are
+  hidden (`Completed` and `FullyCompleted` by default).
 
-Other behaviors, such as which documents make a spec `Malformed`, are documented in the
-extension's contribution points.
+Hiding writes entries to the `files.exclude` or `search.exclude` setting of the workspace
+folder, and has side effects (the Kiro agent's search no longer finds hidden specs, the Quick
+Open history is purged). The full reference, the ownership and cleanup rules and the
+**Reset Hidden Specs** command are in [docs/configuration.md](docs/configuration.md).
 
 ## Security and privacy
 
 - No network request, no telemetry.
+- Writes to your settings only when you enable hiding specs by status, and only to the
+  workspace folder's own settings.
 - Spec content is treated as untrusted data and never evaluated as code.
 - The dashboard webview enforces a strict Content Security Policy with a per-render nonce,
   loads only local bundled resources, and renders spec text as plain text.

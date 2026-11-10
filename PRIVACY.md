@@ -29,3 +29,13 @@ writes that message to the clipboard, pastes it into the chat input, and then re
 clipboard to its previous content. This clipboard use is local and transient; it still
 involves no network request and no telemetry. The honest fallback (open `tasks.md` and offer
 a ready-to-paste prompt) only writes to the clipboard after your explicit consent.
+
+## Settings written locally
+
+If you enable the opt-in `kirospectracker.hideSpecs.mode` setting, the extension writes
+`files.exclude` or `search.exclude` entries (spec folder globs) into the settings of your
+workspace folder (`.vscode/settings.json`), and keeps a record of those entries in the
+workspace state stored by the editor on your machine. These writes are local, still involve no
+network request and no telemetry, and are fully described in
+[docs/configuration.md](docs/configuration.md). With the default mode `off`, nothing is
+written.

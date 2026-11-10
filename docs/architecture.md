@@ -332,6 +332,42 @@ persists the acknowledgement (never shows again), "Disable" turns off the
 opens the extension settings, and dismissing with the close affordance persists nothing (the
 notice reappears next launch while the integration stays enabled).
 
+## Hidden specs flow
+
+The opt-in `kirospectracker.hideSpecs.*` settings keep `files.exclude` / `search.exclude` of
+each workspace folder in line with the specs whose status is ticked. The decision logic is
+pure and lives in `core/hiding/`: [HideSpecsMode](../src/core/hiding/HideSpecsMode.ts) (mode to
+setting), [HiddenStatusSelection](../src/core/hiding/HiddenStatusSelection.ts) (status
+checkboxes, derived from the `SpecStatus` enum),
+[HiddenSpecSelector](../src/core/hiding/HiddenSpecSelector.ts) (specs to hide, per workspace),
+[SpecExcludeGlob](../src/core/hiding/SpecExcludeGlob.ts) (glob escaping),
+[ExcludeReconciler](../src/core/hiding/ExcludeReconciler.ts) (current value + owned keys +
+desired keys to new value + new ownership) and
+[OwnershipRegistry](../src/core/hiding/OwnershipRegistry.ts).
+
+[HiddenSpecsSynchronizer](../src/adapters/HiddenSpecsSynchronizer.ts) orchestrates them
+through ports ([ISettingsWriter](../src/adapters/ports/ISettingsWriter.ts),
+[IOwnershipStore](../src/adapters/ports/IOwnershipStore.ts),
+[IHideSpecsConfigReader](../src/adapters/ports/IHideSpecsConfigReader.ts),
+[IHiddenSpecsNotifier](../src/adapters/ports/IHiddenSpecsNotifier.ts),
+[ISpecSource](../src/adapters/ports/ISpecSource.ts)), reusing the `Debouncer` and the
+diagnostic sink. It subscribes to `SpecRepository.onDidChangeSpecs` and, through the
+composition root, to `kirospectracker.hideSpecs` configuration changes only (never to the
+exclusion settings it writes, so it cannot trigger itself). Runs are debounced, serialised and
+idempotent, and start only after the first full refresh so an empty initial cache is never
+mistaken for deleted specs. The `Vscode*` adapters
+([VscodeSettingsWriter](../src/adapters/VscodeSettingsWriter.ts),
+[VscodeHideSpecsConfigReader](../src/adapters/VscodeHideSpecsConfigReader.ts),
+[VscodeHiddenSpecsNotifier](../src/adapters/VscodeHiddenSpecsNotifier.ts)) are thin shells;
+ownership is persisted by [MementoHiddenSpecsState](../src/adapters/MementoHiddenSpecsState.ts)
+over `workspaceState`.
+
+Discovery invariant: spec discovery reads through `workspace.fs` and a glob file watcher,
+neither of which honors `files.exclude`, so hiding a spec never makes it disappear from the
+extension. `findFiles` (which applies `files.exclude` even with an explicit exclude) must never
+be used for discovery; a unit test fails if `findFiles`, `findFiles2` or `findTextInFiles`
+appear in `src/`. See [configuration.md](configuration.md) for the user-facing behavior.
+
 ## Patterns
 
 - Dependency Inversion: the core depends on ports (`IDocumentPolicy`, `IScheduler`,

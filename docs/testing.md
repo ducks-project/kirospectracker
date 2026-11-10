@@ -29,6 +29,12 @@ npm run test:unit
      "optional" in prose never flips the flag.
   4. Leaf consistency: `requiredTotal + optionalTotal` equals the number of leaf tasks.
   5. State monotonicity: checking more required tasks never moves the status backward.
+- Hide specs ([hide-specs.property.spec.ts](../test/property/hide-specs.property.spec.ts)):
+  every supported spec name yields a glob matching exactly its folder and files under a
+  transcription of the VS Code glob engine
+  ([vscode-glob-oracle.ts](../test/helpers/vscode-glob-oracle.ts)); the reconciler never
+  alters a key it does not own, is idempotent, and only owns present, true keys; the selector
+  accounts for every selected spec (written or skipped).
 
 ```bash
 npm run test:property
@@ -40,6 +46,12 @@ npm run test:property
 - Scope: activation and command registration, a decoration applied to a fixture spec, a
   non-decoration on an unrelated file, and the dashboard view resolving with a strict CSP
   and a nonce.
+- Hide specs by status ([hide-specs.spec.ts](../test/integration/hide-specs.spec.ts)): real
+  writes to the fixture workspace folder settings, read back through `inspect`, preservation of
+  a pre-existing entry, mode switch, Reset, return to `off`, `findFiles` honoring the written
+  globs, and discovery, watcher path and decorations left unaffected. The suite captures the
+  fixture's `.vscode` folder first and restores or removes it in an `after` hook, so no
+  versioned fixture file is left modified, even on failure.
 - On CI Linux the suite runs under `xvfb-run` (virtual display).
 
 ```bash
