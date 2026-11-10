@@ -95,6 +95,14 @@ describe('i18n synchronisation', () => {
         expect(markers(bundleFr[key]), key).to.deep.equal(markers(key));
       });
     });
+    it('keeps two forms in every plural message, and the same English form twice', () => {
+      MESSAGE_KEYS.filter((key) => key.includes('|')).forEach((key) => {
+        const [one, other, ...rest] = key.split('|');
+        expect(one, key).to.equal(other);
+        expect(rest, key).to.deep.equal([]);
+        expect(bundleFr[key].split('|'), key).to.have.length(2);
+      });
+    });
     it('keeps literal identifiers of the English message', () => {
       MESSAGE_KEYS.forEach((key) => {
         ['"kirospectracker.hideSpecs.mode"', '"off"', 'tasks.md'].forEach((literal) => {

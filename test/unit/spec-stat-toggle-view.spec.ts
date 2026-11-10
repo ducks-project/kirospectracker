@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 
 import type { ISpecStats } from '../../src/core/model/ISpecStats';
+import { FRENCH_TRANSLATOR } from '../helpers/french-translator';
 import { SpecStatToggleView } from '../../src/core/status/SpecStatToggleView';
 import { SpecStatusFilter } from '../../src/core/status/SpecStatusFilter';
 
@@ -60,5 +61,38 @@ describe('SpecStatToggleView', () => {
     expect(byKey.get('inProgress')).to.equal(22);
     expect(byKey.get('notStarted')).to.equal(33);
     expect(byKey.get('malformed')).to.equal(44);
+  });
+  it('keeps the English labels identical for every count', () => {
+    [0, 1, 2, 11].forEach((count) => {
+      const stats: ISpecStats = {
+        total: 4 * count,
+        completed: count,
+        inProgress: count,
+        notStarted: count,
+        malformed: count,
+      };
+      const labels = view.build(stats, new SpecStatusFilter()).map((toggle) => toggle.label);
+      expect(labels).to.deep.equal(['Completed', 'In progress', 'Not started', 'Malformed']);
+    });
+  });
+  it('agrees the French labels with the count', () => {
+    const french = new SpecStatToggleView(FRENCH_TRANSLATOR);
+    const stats: ISpecStats = {
+      total: 29,
+      completed: 11,
+      inProgress: 3,
+      notStarted: 14,
+      malformed: 1,
+    };
+    const toggles = french.build(stats, new SpecStatusFilter());
+    expect(toggles.map((toggle) => `${toggle.value} ${toggle.label}`)).to.deep.equal([
+      '11 Terminées',
+      '3 En cours',
+      '14 Non démarrées',
+      '1 Mal formée',
+    ]);
+    const single = french.build({ ...stats, completed: 1, notStarted: 0 }, new SpecStatusFilter());
+    expect(single[0].label).to.equal('Terminée');
+    expect(single[2].label).to.equal('Non démarrée');
   });
 });

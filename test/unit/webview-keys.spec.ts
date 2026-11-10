@@ -22,6 +22,8 @@ class RecordingTranslator implements ITranslator {
 const MAIN_PATH = join(dirname(fileURLToPath(import.meta.url)), '../../src/webview/main.ts');
 /** Matches `tw('literal'` calls in the webview entry point. */
 const TW_CALL = /\btw\(\s*'((?:[^'\\]|\\.)*)'/g;
+/** Matches `twp('literal'` plural calls in the webview entry point. */
+const TWP_CALL = /\btwp\(\s*'((?:[^'\\]|\\.)*)'/g;
 /**
  * The webview may only request messages the host puts in its catalogue.
  */
@@ -40,13 +42,17 @@ describe('webview message keys', () => {
   });
   it('requests only catalogued webview keys through tw() in main.ts', () => {
     const source = readFileSync(MAIN_PATH, 'utf8');
-    const used = [...source.matchAll(TW_CALL)].map((match) => match[1]);
+    const used = [...source.matchAll(TW_CALL), ...source.matchAll(TWP_CALL)].map(
+      (match) => match[1],
+    );
     expect(used.length).to.be.greaterThan(0);
     used.forEach((key) => expect(WEBVIEW_MESSAGE_KEYS as readonly string[]).to.include(key));
   });
   it('uses every webview-only message (no stale catalogue entry)', () => {
     const source = readFileSync(MAIN_PATH, 'utf8');
-    const used = new Set([...source.matchAll(TW_CALL)].map((match) => match[1]));
+    const used = new Set(
+      [...source.matchAll(TW_CALL), ...source.matchAll(TWP_CALL)].map((match) => match[1]),
+    );
     const viaCore = ['Switch to list view', 'Switch to grid view'];
     WEBVIEW_ONLY_KEYS.filter((key) => !viaCore.includes(key)).forEach((key) =>
       expect(used.has(key), key).to.equal(true),
