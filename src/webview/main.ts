@@ -7,6 +7,11 @@ import type {
 import type { IGlobalTaskStats } from '../core/model/IGlobalTaskStats';
 import type { ISpecCardView } from '../core/model/ISpecCardView';
 import type { ISpecStats } from '../core/model/ISpecStats';
+import type { WebviewMessageKey } from '../core/i18n/messages';
+import type { ITranslator } from '../core/ports/ITranslator';
+import { CatalogTranslator } from '../core/i18n/CatalogTranslator';
+import { IDENTITY_TRANSLATOR } from '../core/i18n/IdentityTranslator';
+import { statusLabel } from '../core/status/SpecStatusLabel';
 import type { RunScope } from '../core/ports/ISpecAgentGateway';
 import type { SpecFilterKey } from '../core/model/SpecFilterKey';
 import type { ISpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
@@ -51,9 +56,24 @@ const PERCENT = 100;
 /** Document links rendered per spec, in display order. */
 const DOCUMENT_KINDS: readonly SpecDocumentKind[] = SPEC_DOCUMENT_KINDS;
 
-/** Pure core projectors shared across renders. */
-const statToggleView = new SpecStatToggleView();
-const layoutToggleView = new SpecLayoutToggleView();
+/**
+ * Translator for the webview. It starts as the English identity and is replaced
+ * by a catalogue-backed one when the host posts its `strings` message.
+ */
+let translator: ITranslator = IDENTITY_TRANSLATOR;
+/**
+ * Translate a webview message. The `WebviewMessageKey` type makes the compiler
+ * refuse any message the host does not put in the catalogue sent to the webview.
+ * @param key The English message.
+ * @param args Positional values for `{0}`, `{1}`.
+ * @returns The translated message.
+ */
+function tw(key: WebviewMessageKey, ...args: ReadonlyArray<string | number>): string {
+  return translator.t(key, ...args);
+}
+/** Pure core projectors shared across renders (rebuilt when the strings arrive). */
+let statToggleView = new SpecStatToggleView(translator);
+let layoutToggleView = new SpecLayoutToggleView(translator);
 const folderToggleView = new SpecFolderToggleView();
 
 const vscodeApi = acquireVsCodeApi();
@@ -202,8 +222,8 @@ function renderStatToggle(toggle: ISpecStatToggleView): HTMLElement {
   const button = el('button', toggle.pressed ? 'stat pressed' : 'stat');
   button.setAttribute('type', 'button');
   button.setAttribute('aria-pressed', String(toggle.pressed));
-  button.setAttribute('aria-label', `Filter by ${toggle.label}`);
-  button.title = `Filter by ${toggle.label}`;
+  button.setAttribute('aria-label', tw('Filter by {0}', toggle.label));
+  button.title = tw('Filter by {0}', toggle.label);
   button.appendChild(el('span', 'stat-value', String(toggle.value)));
   button.appendChild(el('span', 'stat-label', toggle.label));
   button.addEventListener('click', () => toggleStatusFilter(toggle.key));
@@ -218,7 +238,7 @@ function renderStatToggle(toggle: ISpecStatToggleView): HTMLElement {
 function renderStats(stats: ISpecStats): HTMLElement {
   const header = el('section', 'stats');
   header.setAttribute('role', 'group');
-  header.setAttribute('aria-label', 'Filter specs by status');
+  header.setAttribute('aria-label', tw('Filter specs by status'));
   statToggleView.build(stats, state.filter).forEach((toggle) => {
     header.appendChild(renderStatToggle(toggle));
   });
@@ -255,30 +275,28 @@ function appendGlobalStatItem(
  */
 function renderGlobalStats(stats: IGlobalTaskStats): HTMLElement {
   const strip = el('section', 'global-stats');
-  strip.setAttribute('aria-label', 'Global task statistics');
-  appendGlobalStatItem(strip, 'global-stat-done', 'done', stats.done);
-  appendGlobalStatItem(strip, 'global-stat-cancelled', 'cancelled', stats.cancelled);
-  appendGlobalStatItem(strip, 'global-stat-inProgress', 'in progress', stats.inProgress);
-  appendGlobalStatItem(strip, 'global-stat-todo', 'to-do', stats.todo);
+  strip.setAttribute('aria-label', tw('Global task statistics'));
+  appendGlobalStatItem(strip, 'global-stat-done', tw('done'), stats.done);
+  appendGlobalStatItem(strip, 'global-stat-cancelled', tw('cancelled'), stats.cancelled);
+  appendGlobalStatItem(strip, 'global-stat-inProgress', tw('in progress'), stats.inProgress);
+  appendGlobalStatItem(strip, 'global-stat-todo', tw('to-do'), stats.todo);
   const percent = Math.round(stats.percentComplete * PERCENT);
   const overall = el('span', 'global-stat global-stat-overall');
-  overall.appendChild(el('span', 'global-stat-value', `${percent}%`));
-  overall.appendChild(el('span', 'global-stat-label', 'resolved'));
+  overall.appendChild(el('span', 'global-stat-value', tw('{0}%', percent)));
+  overall.appendChild(el('span', 'global-stat-label', tw('resolved')));
   strip.appendChild(overall);
   return strip;
 }
 
 /**
  * Render one progress bar.
- * @param label Row label.
- * @param done Done count.
- * @param total Total count.
+ * @param text Translated row text, including the counts.
  * @param ratio Completion ratio in [0, 1].
  * @returns The progress row element.
  */
-function renderProgress(label: string, done: number, total: number, ratio: number): HTMLElement {
+function renderProgress(text: string, ratio: number): HTMLElement {
   const row = el('div', 'progress');
-  row.appendChild(el('span', 'progress-label', `${label}: ${done}/${total}`));
+  row.appendChild(el('span', 'progress-label', text));
   const track = el('div', 'progress-track');
   const fill = el('div', 'progress-fill');
   fill.style.width = `${Math.round(ratio * PERCENT)}%`;
@@ -295,19 +313,19 @@ function renderProgress(label: string, done: number, total: number, ratio: numbe
  * struck through, and in-progress in a subtle style.
  * @param row The breakdown row element.
  * @param cssClass The per-state class driving its theme-aware look.
- * @param label The state label.
+ * @param text The translated text, including the count.
  * @param count The leaf count for this state (required + optional).
  */
 function appendBreakdownItem(
   row: HTMLElement,
   cssClass: string,
-  label: string,
+  text: string,
   count: number,
 ): void {
   if (0 === count) {
     return;
   }
-  row.appendChild(el('span', `task-state ${cssClass}`, `${count} ${label}`));
+  row.appendChild(el('span', `task-state ${cssClass}`, text));
 }
 
 /**
@@ -329,9 +347,9 @@ function renderCardBreakdown(card: ISpecCardView): HTMLElement | undefined {
     return undefined;
   }
   const row = el('div', 'task-states');
-  appendBreakdownItem(row, 'task-state-done', 'done', done);
-  appendBreakdownItem(row, 'task-state-cancelled', 'cancelled', cancelled);
-  appendBreakdownItem(row, 'task-state-inProgress', 'in progress', inProgress);
+  appendBreakdownItem(row, 'task-state-done', tw('{0} done', done), done);
+  appendBreakdownItem(row, 'task-state-cancelled', tw('{0} cancelled', cancelled), cancelled);
+  appendBreakdownItem(row, 'task-state-inProgress', tw('{0} in progress', inProgress), inProgress);
   return row;
 }
 
@@ -377,11 +395,12 @@ function renderLinks(card: ISpecCardView): HTMLElement | undefined {
 function renderStatusBadge(card: ISpecCardView): HTMLElement {
   const key = statusToFilterKey(card.status);
   const pressed = state.filter.isActive(key);
-  const badge = el('button', `card-status badge ${colorTokenForStatus(card.status)}`, card.status);
+  const label = statusLabel(card.status, translator);
+  const badge = el('button', `card-status badge ${colorTokenForStatus(card.status)}`, label);
   badge.setAttribute('type', 'button');
   badge.setAttribute('aria-pressed', String(pressed));
-  badge.setAttribute('aria-label', `Filter by ${card.status} status`);
-  badge.title = `Filter by ${card.status} status`;
+  badge.setAttribute('aria-label', tw('Filter by {0} status', label));
+  badge.title = tw('Filter by {0} status', label);
   badge.addEventListener('click', (event) => {
     // The badge is an inner control: stop the click from also triggering the
     // card-body open gesture.
@@ -430,13 +449,13 @@ function buildRunMenu(menu: HTMLElement, card: ISpecCardView, closeMenu: () => v
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
   menu.appendChild(
-    dropdownItem('Run required tasks', () => {
+    dropdownItem(tw('Run required tasks'), () => {
       closeMenu();
       postRunTasks(card, 'required');
     }),
   );
   menu.appendChild(
-    dropdownItem('Run required and optional tasks', () => {
+    dropdownItem(tw('Run required and optional tasks'), () => {
       closeMenu();
       postRunTasks(card, 'required-and-optional');
     }),
@@ -454,7 +473,7 @@ function disabledRunSplit(primary: HTMLElement, toggle: HTMLElement): HTMLElemen
   group.setAttribute('role', 'group');
   primary.setAttribute('disabled', 'true');
   toggle.setAttribute('disabled', 'true');
-  group.title = 'A malformed spec cannot be run';
+  group.title = tw('A malformed spec cannot be run');
   group.appendChild(primary);
   group.appendChild(toggle);
   return group;
@@ -523,20 +542,20 @@ function handleToggleKey(
  * @returns The split-button element.
  */
 function renderRunButton(card: ISpecCardView): HTMLElement {
-  const primary = el('button', 'run run-primary', 'Run tasks');
+  const primary = el('button', 'run run-primary', tw('Run tasks'));
   primary.setAttribute('type', 'button');
-  primary.setAttribute('aria-label', `Run required tasks for ${card.name}`);
+  primary.setAttribute('aria-label', tw('Run required tasks for {0}', card.name));
   const toggle = el('button', 'run run-toggle', '\u25BE');
   toggle.setAttribute('type', 'button');
   toggle.setAttribute('aria-haspopup', 'true');
   toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-label', `Choose run scope for ${card.name}`);
+  toggle.setAttribute('aria-label', tw('Choose run scope for {0}', card.name));
   if ('Malformed' === card.status) {
     return disabledRunSplit(primary, toggle);
   }
   const group = el('div', 'run-split');
   group.setAttribute('role', 'group');
-  group.setAttribute('aria-label', `Run tasks for ${card.name}`);
+  group.setAttribute('aria-label', tw('Run tasks for {0}', card.name));
   const menu = el('div', 'run-menu');
   wireRunSplit(card, primary, toggle, menu);
   group.appendChild(primary);
@@ -551,12 +570,12 @@ function renderRunButton(card: ISpecCardView): HTMLElement {
  * @returns The button element.
  */
 function renderSyncButton(card: ISpecCardView): HTMLElement {
-  const sync = el('button', 'run sync', 'Sync Files');
+  const sync = el('button', 'run sync', tw('Sync Files'));
   sync.setAttribute('type', 'button');
-  sync.setAttribute('aria-label', `Sync files for ${card.name}`);
+  sync.setAttribute('aria-label', tw('Sync files for {0}', card.name));
   if ('Malformed' === card.status) {
     sync.setAttribute('disabled', 'true');
-    sync.title = 'A malformed spec cannot be synced';
+    sync.title = tw('A malformed spec cannot be synced');
     return sync;
   }
   sync.addEventListener('click', (event) => {
@@ -616,7 +635,7 @@ function wireCardBody(article: HTMLElement, card: ISpecCardView): void {
   article.classList.add('card-clickable');
   article.setAttribute('role', 'button');
   article.setAttribute('tabindex', '0');
-  article.setAttribute('aria-label', `Open ${entry} for ${card.name}`);
+  article.setAttribute('aria-label', tw('Open {0} for {1}', entry, card.name));
   article.addEventListener('click', () => openCardEntry(card, entry));
   article.addEventListener('keydown', (event) => {
     if (!ACTIVATION_KEYS.has(event.key)) {
@@ -721,17 +740,13 @@ function appendCardProgress(article: HTMLElement, card: ISpecCardView): void {
   const { progress } = card;
   article.appendChild(
     renderProgress(
-      'Required',
-      progress.requiredDone,
-      progress.requiredTotal,
+      tw('Required: {0}/{1}', progress.requiredDone, progress.requiredTotal),
       progress.requiredRatio,
     ),
   );
   article.appendChild(
     renderProgress(
-      'Optional',
-      progress.optionalDone,
-      progress.optionalTotal,
+      tw('Optional: {0}/{1}', progress.optionalDone, progress.optionalTotal),
       progress.optionalRatio,
     ),
   );
@@ -758,8 +773,8 @@ function renderOwnerLabel(card: ISpecCardView): HTMLElement {
   const owner = el('button', 'card-owner', card.ownerLabel);
   owner.setAttribute('type', 'button');
   owner.setAttribute('aria-pressed', String(pressed));
-  owner.setAttribute('aria-label', `Filter by ${card.ownerLabel} folder`);
-  owner.title = `Filter by ${card.ownerLabel} folder`;
+  owner.setAttribute('aria-label', tw('Filter by {0} folder', card.ownerLabel));
+  owner.title = tw('Filter by {0} folder', card.ownerLabel);
   owner.addEventListener('click', (event) => {
     // Inner control: do not also trigger the card-body open gesture.
     event.stopPropagation();
@@ -913,7 +928,7 @@ function renderSearch(): HTMLElement {
   const wrapper = el('div', 'search-box');
   const search = document.createElement('input');
   search.type = 'search';
-  search.placeholder = 'Search specs by name';
+  search.placeholder = tw('Search specs by name');
   search.value = state.query;
   search.className = 'search';
   search.addEventListener('input', () => {
@@ -922,8 +937,8 @@ function renderSearch(): HTMLElement {
   });
   const clear = el('button', 'search-clear');
   clear.setAttribute('type', 'button');
-  clear.setAttribute('aria-label', 'Clear search');
-  clear.title = 'Clear search';
+  clear.setAttribute('aria-label', tw('Clear search'));
+  clear.title = tw('Clear search');
   clear.appendChild(icon('close'));
   clear.addEventListener('click', () => {
     state.query = '';
@@ -953,7 +968,7 @@ function buildFolderMenu(menu: HTMLElement, closeMenu: () => void): void {
     state.folderFilter,
   );
   if (0 === items.length) {
-    const empty = el('span', 'folder-menu-empty', 'No folders to filter');
+    const empty = el('span', 'folder-menu-empty', tw('No folders to filter'));
     menu.appendChild(empty);
     return;
   }
@@ -1033,8 +1048,8 @@ function renderFolderFilter(): HTMLElement {
   button.setAttribute('aria-haspopup', 'true');
   button.setAttribute('aria-expanded', 'false');
   button.setAttribute('aria-pressed', String(!state.folderFilter.isEmpty()));
-  button.setAttribute('aria-label', 'Filter by folder');
-  button.title = 'Filter by folder';
+  button.setAttribute('aria-label', tw('Filter by folder'));
+  button.title = tw('Filter by folder');
   button.appendChild(icon('filter'));
   const menu = el('div', 'folder-menu');
   menu.setAttribute('role', 'menu');
@@ -1059,7 +1074,7 @@ function renderToolbar(): HTMLElement {
   toolbar.appendChild(renderFolderFilter());
   const toggles = el('div', 'layout-toggles');
   toggles.setAttribute('role', 'group');
-  toggles.setAttribute('aria-label', 'Dashboard layout');
+  toggles.setAttribute('aria-label', tw('Dashboard layout'));
   toggles.appendChild(renderLayoutToggle());
   toolbar.appendChild(toggles);
   return toolbar;
@@ -1104,8 +1119,8 @@ function renderContent(content: HTMLElement): void {
   content.replaceChildren();
   cardNodes.clear();
   const [active, done] = partition(filtered());
-  const activeGroup = renderGroup('Active specs', active);
-  const doneGroup = renderGroup('Completed specs', done);
+  const activeGroup = renderGroup(tw('Active specs'), active);
+  const doneGroup = renderGroup(tw('Completed specs'), done);
   if (undefined !== activeGroup) {
     content.appendChild(activeGroup);
   }
@@ -1252,8 +1267,33 @@ document.addEventListener('click', () => {
   });
 });
 
+/** Whether a `render` has been applied, so a late `strings` message can redraw. */
+let hasRendered = false;
+/**
+ * Adopt the translated catalogue the host posted and rebuild the UI in that
+ * language. The persistent toolbar is dropped so it is rebuilt with the new
+ * strings; a first `render` after this message builds it directly translated.
+ * @param messages The translated templates keyed by English message.
+ */
+function applyStrings(messages: Readonly<Record<string, string>>): void {
+  translator = new CatalogTranslator(messages);
+  statToggleView = new SpecStatToggleView(translator);
+  layoutToggleView = new SpecLayoutToggleView(translator);
+  const app = document.getElementById('app');
+  if (null === app) {
+    return;
+  }
+  app.replaceChildren();
+  if (hasRendered) {
+    render();
+  }
+}
 window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage>) => {
   const message = event.data;
+  if ('strings' === message.type) {
+    applyStrings(message.messages);
+    return;
+  }
   if ('render' === message.type) {
     state.cards = message.cards;
     state.stats = message.stats;
@@ -1263,6 +1303,7 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
     // later hover can retry a spec whose reply was lost or whose entry document
     // appeared after the first hover.
     hoverController.reset();
+    hasRendered = true;
     render();
     return;
   }
@@ -1285,9 +1326,6 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
     hoverController.receive(message.folderPath, message.introduction);
   }
 });
-
-render();
-
 // Signal the host that the listener above is wired. VS Code disposes and
 // re-creates this webview when the view is hidden and shown again, so on every
 // (re)load the document boots with an empty DOM; this handshake tells the host
