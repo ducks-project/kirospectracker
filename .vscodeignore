@@ -12,6 +12,7 @@ media/screenshots/**
 .kiro/**
 .agents/**
 .history/**
+.worktrees/**
 
 # Sources and build-only outputs (dist/ is the shipped bundle, out/ is test-only)
 src/**

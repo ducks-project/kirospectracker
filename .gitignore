@@ -38,5 +38,8 @@ coverage/
 # Agent task artifacts (scaffolding plan, FEAT descriptors, verdicts): never versioned.
 .agents
 
+# Local git worktrees used to develop a feature branch next to the main checkout.
+.worktrees/
+
 # VS Code multi-root workspace file
 *.code-workspace
