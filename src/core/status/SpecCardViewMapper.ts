@@ -1,5 +1,7 @@
 import type { ISpecCardView } from '../model/ISpecCardView';
 import type { ISpecSnapshot } from '../model/ISpecSnapshot';
+import type { ITranslator } from '../ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../i18n/IdentityTranslator';
 import { deriveSpecOwnerLabel } from './SpecOwnerLabel';
 
 /**
@@ -12,18 +14,25 @@ import { deriveSpecOwnerLabel } from './SpecOwnerLabel';
  * both the full render and a single scoped update.
  */
 export class SpecCardViewMapper {
+  private readonly translator: ITranslator;
+  /**
+   * Build the mapper.
+   * @param translator The translator for the owner-label fallback (English by default).
+   */
+  public constructor(translator: ITranslator = IDENTITY_TRANSLATOR) {
+    this.translator = translator;
+  }
   /**
    * Project a single snapshot to its lean card view.
    * @param snapshot The full spec snapshot.
    * @returns The lean card view with no tasks.
    */
-  // eslint-disable-next-line class-methods-use-this
   public map(snapshot: ISpecSnapshot): ISpecCardView {
     return {
       name: snapshot.name,
       folderPath: snapshot.folderPath,
       folderKey: snapshot.workspacePath,
-      ownerLabel: deriveSpecOwnerLabel(snapshot.workspacePath),
+      ownerLabel: deriveSpecOwnerLabel(snapshot.workspacePath, this.translator),
       documents: snapshot.documents,
       entryDocument: snapshot.entryDocument,
       status: snapshot.status,

@@ -1,4 +1,7 @@
 import type { ISpecStats } from '../model/ISpecStats';
+import type { MessageKey } from '../i18n/messages';
+import type { ITranslator } from '../ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../i18n/IdentityTranslator';
 import type { SpecFilterKey } from '../model/SpecFilterKey';
 import type { SpecStatusFilter } from './SpecStatusFilter';
 import { SPEC_FILTER_KEYS } from '../model/SpecFilterKey';
@@ -15,8 +18,8 @@ export interface ISpecStatToggleView {
   readonly pressed: boolean;
 }
 
-/** Filter-key-to-label table, in the stat header display order. */
-const STAT_LABELS: Readonly<Record<SpecFilterKey, string>> = {
+/** Filter-key-to-label-message table, in the stat header display order. */
+export const STAT_LABEL_KEYS: Readonly<Record<SpecFilterKey, MessageKey>> = {
   completed: 'Completed',
   inProgress: 'In progress',
   notStarted: 'Not started',
@@ -61,8 +64,14 @@ function valueFor(key: SpecFilterKey, stats: ISpecStats): number {
  * unit-testable in the core.
  */
 export class SpecStatToggleView {
-  /** Filter-key-to-label table shared across calls. */
-  private readonly labels: Readonly<Record<SpecFilterKey, string>> = STAT_LABELS;
+  private readonly translator: ITranslator;
+  /**
+   * Build the mapper.
+   * @param translator The translator for the toggle labels (English by default).
+   */
+  public constructor(translator: ITranslator = IDENTITY_TRANSLATOR) {
+    this.translator = translator;
+  }
 
   /**
    * Build the ordered stat toggles for the current stats and filter.
@@ -73,7 +82,7 @@ export class SpecStatToggleView {
   public build(stats: ISpecStats, filter: SpecStatusFilter): readonly ISpecStatToggleView[] {
     return SPEC_FILTER_KEYS.map((key) => ({
       key,
-      label: this.labels[key],
+      label: this.translator.t(STAT_LABEL_KEYS[key]),
       value: valueFor(key, stats),
       pressed: filter.isActive(key),
     }));

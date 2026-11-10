@@ -1,4 +1,7 @@
 import type { ISpecProgress } from '../model/ISpecProgress';
+import type { ITranslator } from '../ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../i18n/IdentityTranslator';
+import { statusLabel } from './SpecStatusLabel';
 import type { ISpecDecoration, SpecDecorationColor } from './ISpecDecoration';
 import { SpecStatus } from '../model/SpecStatus';
 
@@ -9,28 +12,32 @@ const PERCENT = 100;
 interface IStatusStyle {
   readonly badge: string;
   readonly color: SpecDecorationColor;
-  readonly label: string;
 }
 
-/** Status-to-style table (badge ≤ 2 chars, theme color key, label). */
+/** Status-to-style table (badge ≤ 2 chars, theme color key). */
 const STYLES: Readonly<Record<SpecStatus, IStatusStyle>> = {
-  [SpecStatus.Malformed]: { badge: '!', color: 'error', label: 'Malformed' },
-  [SpecStatus.NotStarted]: { badge: '○', color: 'muted', label: 'Not started' },
-  [SpecStatus.InProgress]: { badge: '~', color: 'warn', label: 'In progress' },
-  [SpecStatus.Completed]: { badge: '✓', color: 'ok', label: 'Completed' },
-  [SpecStatus.FullyCompleted]: { badge: '✓', color: 'okVivid', label: 'Fully completed' },
+  [SpecStatus.Malformed]: { badge: '!', color: 'error' },
+  [SpecStatus.NotStarted]: { badge: '○', color: 'muted' },
+  [SpecStatus.InProgress]: { badge: '~', color: 'warn' },
+  [SpecStatus.Completed]: { badge: '✓', color: 'ok' },
+  [SpecStatus.FullyCompleted]: { badge: '✓', color: 'okVivid' },
 };
 
 /**
  * Format the required/optional counts into a compact progress string.
  * @param progress The computed progress.
+ * @param translator The translator rendering the whole template.
  * @returns A string like `8/8 required (100%) · 2/3 optional`.
  */
-function formatProgress(progress: ISpecProgress): string {
-  const percent = Math.round(progress.requiredRatio * PERCENT);
-  const required = `${progress.requiredDone}/${progress.requiredTotal} required (${percent}%)`;
-  const optional = `${progress.optionalDone}/${progress.optionalTotal} optional`;
-  return `${required} · ${optional}`;
+function formatProgress(progress: ISpecProgress, translator: ITranslator): string {
+  return translator.t(
+    '{0}/{1} required ({2}%) · {3}/{4} optional',
+    progress.requiredDone,
+    progress.requiredTotal,
+    Math.round(progress.requiredRatio * PERCENT),
+    progress.optionalDone,
+    progress.optionalTotal,
+  );
 }
 
 /**
@@ -44,6 +51,14 @@ function formatProgress(progress: ISpecProgress): string {
 export class SpecDecorationMapper {
   /** Status-to-style table shared across calls. */
   private readonly styles: Readonly<Record<SpecStatus, IStatusStyle>> = STYLES;
+  private readonly translator: ITranslator;
+  /**
+   * Build the mapper.
+   * @param translator The translator for the tooltip text (English by default).
+   */
+  public constructor(translator: ITranslator = IDENTITY_TRANSLATOR) {
+    this.translator = translator;
+  }
 
   /**
    * Map a status and progress to a decoration descriptor.
@@ -56,7 +71,11 @@ export class SpecDecorationMapper {
     return {
       badge: style.badge,
       color: style.color,
-      tooltip: `${style.label} — ${formatProgress(progress)}`,
+      tooltip: this.translator.t(
+        '{0} — {1}',
+        statusLabel(status, this.translator),
+        formatProgress(progress, this.translator),
+      ),
     };
   }
 }

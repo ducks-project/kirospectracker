@@ -1,4 +1,6 @@
 import type { DashboardLayout } from '../model/IDashboardMessage';
+import type { ITranslator } from '../ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../i18n/IdentityTranslator';
 
 /** Semantic glyph identifiers the webview renders as representative icons. */
 export type SpecLayoutGlyph = 'list' | 'grid';
@@ -40,19 +42,28 @@ const OFF_LAYOUT: DashboardLayout = 'list';
  * host; the webview only renders the decision.
  */
 export class SpecLayoutToggleView {
+  private readonly translator: ITranslator;
+  /**
+   * Build the mapper.
+   * @param translator The translator for the toggle label (English by default).
+   */
+  public constructor(translator: ITranslator = IDENTITY_TRANSLATOR) {
+    this.translator = translator;
+  }
   /**
    * Describe the single layout toggle button for the active layout.
    * @param active The currently active layout.
    * @returns The flipping toggle view (next layout, glyph, label, pressed).
    */
-  // eslint-disable-next-line class-methods-use-this
   public describeToggle(active: DashboardLayout): ISpecLayoutToggleView {
     const pressed = ON_LAYOUT === active;
     const nextLayout = pressed ? OFF_LAYOUT : ON_LAYOUT;
     return {
       nextLayout,
       glyph: nextLayout,
-      label: `Switch to ${nextLayout} view`,
+      label: this.translator.t(
+        'grid' === nextLayout ? 'Switch to grid view' : 'Switch to list view',
+      ),
       pressed,
     };
   }

@@ -66,3 +66,14 @@ describe('SpecGrouper', () => {
     expect(grouper.group([])).to.deep.equal([]);
   });
 });
+/**
+ * Group labels come from the injected translator while statuses stay identifiers.
+ */
+describe('SpecGrouper with a translator', () => {
+  const grouper = new SpecGrouper({ t: (key) => ('In progress' === key ? 'En cours' : key) });
+  it('translates the label but keeps the status identifier', () => {
+    const [group] = grouper.group([snapshotOf('a', SpecStatus.InProgress)]);
+    expect(group.label).to.equal('En cours');
+    expect(group.status).to.equal(SpecStatus.InProgress);
+  });
+});

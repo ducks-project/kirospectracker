@@ -63,3 +63,24 @@ describe('SpecDecorationMapper', () => {
     expect(decoration.tooltip).to.contain('2/3 optional');
   });
 });
+/**
+ * The tooltip is built from whole translated templates.
+ */
+describe('SpecDecorationMapper with a translator', () => {
+  const french: Record<string, string> = {
+    'Fully completed': 'Entièrement terminé',
+    '{0} — {1}': '{0} — {1}',
+    '{0}/{1} required ({2}%) · {3}/{4} optional': '{0}/{1} requis ({2} %) · {3}/{4} facultatif',
+  };
+  const mapper = new SpecDecorationMapper({
+    t: (key, ...args) =>
+      (french[key] ?? key).replace(/\{(\d+)\}/g, (_m, index: string) =>
+        String(args[Number(index)]),
+      ),
+  });
+  it('renders the status label and progress through the translator', () => {
+    expect(mapper.map(SpecStatus.FullyCompleted, PROGRESS).tooltip).to.equal(
+      'Entièrement terminé — 8/8 requis (100 %) · 2/3 facultatif',
+    );
+  });
+});
