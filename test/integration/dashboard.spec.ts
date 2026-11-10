@@ -188,6 +188,18 @@ describe('Spec dashboard (Node host)', () => {
     expect(render).to.have.property('cards');
   });
 
+  it('posts the translated catalogue before the render, with the host language', async () => {
+    const posted: DashboardOutboundMessage[] = [];
+    const webview = makeWebview(posted);
+    api.dashboard.resolveWebviewView(makeView(webview));
+    await waitFor(() => posted.some((message) => 'render' === message.type));
+    const types = posted.map((message) => message.type);
+    expect(types.indexOf('strings')).to.be.greaterThan(-1);
+    expect(types.indexOf('strings')).to.be.lessThan(types.indexOf('render'));
+    const strings = posted.find((message) => 'strings' === message.type);
+    expect(strings).to.have.property('language', vscode.env.language);
+    expect(webview.html).to.contain(`<html lang="${vscode.env.language}">`);
+  });
   it('posts a single specUpdated message on a scoped spec change', async () => {
     const posted: DashboardOutboundMessage[] = [];
     api.dashboard.resolveWebviewView(makeView(makeWebview(posted)));
