@@ -1,5 +1,4 @@
-/** Name of a VS Code exclusion setting the extension may write to. */
-export type ExcludeSettingKey = 'files.exclude' | 'search.exclude';
+import type { ExcludeSettingKey } from './ExcludeSettingKey';
 
 /**
  * Value of the `kirospectracker.hideSpecs.mode` setting: which editor surfaces
@@ -13,12 +12,6 @@ export enum HideSpecsMode {
   /** Specs are hidden from Explorer, Search and Quick Open (`files.exclude`). */
   Everywhere = 'everywhere',
 }
-
-/** Every exclusion setting the extension may own entries in. */
-export const MANAGED_EXCLUDE_SETTINGS: readonly ExcludeSettingKey[] = [
-  'files.exclude',
-  'search.exclude',
-];
 
 /** Exclusion setting each mode writes to; `undefined` when the mode writes nothing. */
 const SETTING_BY_MODE: Readonly<Record<HideSpecsMode, ExcludeSettingKey | undefined>> = {

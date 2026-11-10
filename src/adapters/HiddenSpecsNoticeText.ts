@@ -1,4 +1,4 @@
-import type { ExcludeSettingKey } from '../core/hiding/HideSpecsMode';
+import type { ExcludeSettingKey } from '../core/hiding/ExcludeSettingKey';
 import type { MessageKey } from '../core/i18n/messages';
 /**
  * Pick the catalogue message of the first-write notice.

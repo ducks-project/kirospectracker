@@ -1,11 +1,8 @@
 import { Debouncer } from '../core/Debouncer';
 import type { IScheduler } from '../core/ports/IScheduler';
 import { ExcludeReconciler } from '../core/hiding/ExcludeReconciler';
-import {
-  type ExcludeSettingKey,
-  HideSpecsModeMapper,
-  MANAGED_EXCLUDE_SETTINGS,
-} from '../core/hiding/HideSpecsMode';
+import { type ExcludeSettingKey, MANAGED_EXCLUDE_SETTINGS } from '../core/hiding/ExcludeSettingKey';
+import { HideSpecsModeMapper } from '../core/hiding/HideSpecsMode';
 import { HiddenSpecSelector, type ISkippedSpec } from '../core/hiding/HiddenSpecSelector';
 import type { OwnershipRegistry } from '../core/hiding/OwnershipRegistry';
 import type { IFirstWriteNoticeLedger } from './ports/IFirstWriteNoticeLedger';

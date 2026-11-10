@@ -1,5 +1,6 @@
 import type { ExcludeValue } from '../../src/core/hiding/ExcludeReconciler';
-import { type ExcludeSettingKey, HideSpecsMode } from '../../src/core/hiding/HideSpecsMode';
+import type { ExcludeSettingKey } from '../../src/core/hiding/ExcludeSettingKey';
+import { HideSpecsMode } from '../../src/core/hiding/HideSpecsMode';
 import { DEFAULT_HIDDEN_STATUSES } from '../../src/core/hiding/HiddenStatusSelection';
 import type { SpecChangeDelta } from '../../src/core/model/ISpecChangeDelta';
 import type { IHideSpecsConfig } from '../../src/core/model/IHideSpecsConfig';

@@ -1,4 +1,4 @@
-import type { ExcludeSettingKey } from '../../core/hiding/HideSpecsMode';
+import type { ExcludeSettingKey } from '../../core/hiding/ExcludeSettingKey';
 import type { ExcludeValue } from '../../core/hiding/ExcludeReconciler';
 
 /** Outcome of a write: whether the settings of the folder were really updated. */

@@ -1,4 +1,4 @@
-import type { ExcludeSettingKey } from './HideSpecsMode';
+import type { ExcludeSettingKey } from './ExcludeSettingKey';
 
 /** Serialisable shape: workspace path → setting key → owned keys. */
 export type OwnershipRecord = Readonly<Record<string, Readonly<Record<string, readonly string[]>>>>;

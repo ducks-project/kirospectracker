@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { ExcludeValue } from '../core/hiding/ExcludeReconciler';
-import type { ExcludeSettingKey } from '../core/hiding/HideSpecsMode';
+import type { ExcludeSettingKey } from '../core/hiding/ExcludeSettingKey';
 import type { ISettingsWriter, SettingsWriteResult } from './ports/ISettingsWriter';
 
 /**

@@ -1,4 +1,4 @@
-import type { ExcludeSettingKey } from '../../core/hiding/HideSpecsMode';
+import type { ExcludeSettingKey } from '../../core/hiding/ExcludeSettingKey';
 
 /** What the first-write notice describes. */
 export interface IFirstWriteNotice {
