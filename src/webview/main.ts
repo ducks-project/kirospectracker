@@ -34,6 +34,7 @@ import { SPEC_DOCUMENT_KINDS } from '../core/model/SpecDocumentKind';
 import { SpecStatusFilter } from '../core/status/SpecStatusFilter';
 import { colorTokenForStatus } from '../core/status/SpecStatusColor';
 import { statusToFilterKey } from '../core/model/SpecFilterKey';
+import { resolveTrustedOrigin } from './resolveTrustedOrigin';
 
 /** Persisted webview state surviving re-renders and view reloads. */
 interface IWebviewState {
@@ -1306,6 +1307,11 @@ function applyRender(message: IRenderMessage): void {
   render();
 }
 window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage>) => {
+  // Only the webview host (same origin as this document) may drive the
+  // dashboard; ignore anything else before reading its data (CWE-940).
+  if (event.origin !== resolveTrustedOrigin(window.location.origin)) {
+    return;
+  }
   const message = event.data;
   if ('strings' === message.type) {
     applyStrings(message.messages);
