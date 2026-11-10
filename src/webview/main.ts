@@ -14,6 +14,7 @@ import type { ISpecStatToggleView } from '../core/status/SpecStatToggleView';
 import type { ISpecFolderToggleView } from '../core/status/SpecFolderToggleView';
 import type { IScheduler, ScheduleHandle } from '../core/ports/IScheduler';
 import { planDashboardRender } from './DashboardRenderPlanner';
+import { visibleDocumentKinds } from './visibleDocumentKinds';
 import { HoverIntroductionController } from './HoverIntroductionController';
 import type { IHoverPanelView } from './IHoverPanelView';
 import { DomHoverPanelView } from './DomHoverPanelView';
@@ -335,29 +336,28 @@ function renderCardBreakdown(card: ISpecCardView): HTMLElement | undefined {
 }
 
 /**
- * Render the document links for a spec, disabling absent documents.
+ * Render the document links for a spec: only present documents get a link.
  * @param card The spec card view.
- * @returns The links container element.
+ * @returns The links container, or `undefined` when the spec has no document.
  */
-function renderLinks(card: ISpecCardView): HTMLElement {
+function renderLinks(card: ISpecCardView): HTMLElement | undefined {
+  const kinds = visibleDocumentKinds(card.documents, DOCUMENT_KINDS);
+  if (0 === kinds.length) {
+    return undefined;
+  }
   const links = el('div', 'links');
-  DOCUMENT_KINDS.forEach((kind) => {
-    const present = Boolean(card.documents[kind]);
-    const link = el('button', present ? 'link' : 'link disabled', kind);
-    if (present) {
-      link.addEventListener('click', (event) => {
-        // Inner control: do not also trigger the card-body open gesture.
-        event.stopPropagation();
-        vscodeApi.postMessage({
-          type: 'openDocument',
-          folderPath: card.folderPath,
-          document: kind,
-        });
+  kinds.forEach((kind) => {
+    const link = el('button', 'link', kind);
+    link.setAttribute('type', 'button');
+    link.addEventListener('click', (event) => {
+      // Inner control: do not also trigger the card-body open gesture.
+      event.stopPropagation();
+      vscodeApi.postMessage({
+        type: 'openDocument',
+        folderPath: card.folderPath,
+        document: kind,
       });
-    } else {
-      link.setAttribute('disabled', 'true');
-      link.title = 'Document not present';
-    }
+    });
     links.appendChild(link);
   });
   return links;
@@ -689,6 +689,28 @@ document.addEventListener('keydown', (event: KeyboardEvent): void => {
     hoverController.leave();
   }
 });
+
+/** Class of the floating hover panel, whose own inner scroll must not dismiss it. */
+const HOVER_PANEL_CLASS = 'card-hover-panel';
+
+/**
+ * Dismiss the hover panel when the page scrolls. The dashboard scrolls the
+ * document itself, but the listener is registered in the capture phase (scroll
+ * does not bubble) so an inner scrolling container is caught too. A scroll inside
+ * the panel's own text is ignored. `leave()` is idempotent and cheap, and resets
+ * the controller (active target, pending debounced request).
+ */
+document.addEventListener(
+  'scroll',
+  (event: Event): void => {
+    const { target } = event;
+    if (target instanceof Element && null !== target.closest(`.${HOVER_PANEL_CLASS}`)) {
+      return;
+    }
+    hoverController.leave();
+  },
+  { capture: true, passive: true },
+);
 /**
  * Append the required/optional progress bars and the per-state breakdown row to
  * a card.
@@ -759,7 +781,10 @@ function renderCard(card: ISpecCardView): HTMLElement {
   article.appendChild(header);
   article.appendChild(renderOwnerLabel(card));
   appendCardProgress(article, card);
-  article.appendChild(renderLinks(card));
+  const links = renderLinks(card);
+  if (undefined !== links) {
+    article.appendChild(links);
+  }
   article.appendChild(renderActions(card));
   wireCardBody(article, card);
   wireCardHover(article, card);

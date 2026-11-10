@@ -3,7 +3,7 @@ import type { DashboardInboundMessage } from '../core/model/IDashboardMessage';
 import type { IHoverPanelView } from './IHoverPanelView';
 
 /** Debounce delay, in milliseconds, before a hovered card requests its intro. */
-const HOVER_REQUEST_DELAY_MS = 150;
+export const HOVER_REQUEST_DELAY_MS = 300;
 
 /** Posts an inbound message back to the host. */
 export type PostMessage = (message: DashboardInboundMessage) => void;
@@ -55,7 +55,7 @@ export class HoverIntroductionController {
    * @param scheduler The delayed-scheduling source backing the hover debounce.
    * @param postMessage Sends an inbound message to the host.
    * @param panel The hover preview panel view.
-   * @param delayMs The debounce window in milliseconds (defaults to 150).
+   * @param delayMs The debounce window in milliseconds (defaults to {@link HOVER_REQUEST_DELAY_MS}).
    */
   public constructor(
     scheduler: IScheduler,

@@ -555,10 +555,6 @@ body {
   margin: 0.4rem 0;
 }
 
-.link.disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
 
 .run {
   margin-top: 0.3rem;

@@ -3,7 +3,10 @@ import { expect } from 'chai';
 import type { DashboardInboundMessage } from '../../src/core/model/IDashboardMessage';
 import type { IScheduler, ScheduleHandle } from '../../src/core/ports/IScheduler';
 import type { IHoverPanelView } from '../../src/webview/IHoverPanelView';
-import { HoverIntroductionController } from '../../src/webview/HoverIntroductionController';
+import {
+  HOVER_REQUEST_DELAY_MS,
+  HoverIntroductionController,
+} from '../../src/webview/HoverIntroductionController';
 
 /**
  * Manual scheduler recording pending callbacks so a test can flush them,
@@ -14,8 +17,10 @@ class ManualScheduler implements IScheduler {
 
   private nextId = 0;
 
+  public readonly delays: number[] = [];
   public schedule(callback: () => void, delayMs: number): ScheduleHandle {
     expect(delayMs).to.be.a('number');
+    this.delays.push(delayMs);
     const id = this.nextId;
     this.nextId += 1;
     this.tasks.set(id, callback);
@@ -217,5 +222,48 @@ describe('HoverIntroductionController', () => {
     expect(panel.visible).to.equal(true);
     controller.invalidate(folderPath);
     expect(panel.visible).to.equal(false);
+  });
+  it('debounces with the exported HOVER_REQUEST_DELAY_MS (300 ms)', () => {
+    const { controller, scheduler } = build();
+    controller.enter(folderPath);
+    expect(scheduler.delays).to.deep.equal([HOVER_REQUEST_DELAY_MS]);
+    expect(HOVER_REQUEST_DELAY_MS).to.equal(300);
+  });
+  it('a scroll-style leave hides the panel, cancels the pending request and clears the target', () => {
+    const { controller, scheduler, panel, posted } = build();
+    controller.enter(folderPath);
+    controller.leave();
+    expect(scheduler.pendingCount).to.equal(0);
+    scheduler.flush();
+    expect(posted).to.have.length(0);
+    controller.receive(folderPath, 'Late');
+    expect(panel.visible).to.equal(false);
+  });
+  it('is idempotent when leave fires repeatedly on scroll', () => {
+    const { controller, panel } = build();
+    controller.leave();
+    controller.leave();
+    expect(panel.visible).to.equal(false);
+  });
+  it('reopens from the cache on a hover following a scroll dismissal', () => {
+    const { controller, scheduler, panel, posted } = build();
+    controller.enter(folderPath);
+    scheduler.flush();
+    controller.receive(folderPath, 'Intro');
+    controller.leave();
+    expect(panel.visible).to.equal(false);
+    controller.enter(folderPath);
+    expect(panel.visible).to.equal(true);
+    expect(panel.shownText).to.equal('Intro');
+    scheduler.flush();
+    expect(posted).to.have.length(1);
+  });
+  it('re-requests after a scroll dismissal when the request never fired', () => {
+    const { controller, scheduler, posted } = build();
+    controller.enter(folderPath);
+    controller.leave();
+    controller.enter(folderPath);
+    scheduler.flush();
+    expect(posted).to.have.length(1);
   });
 });
