@@ -9,16 +9,12 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.14.0 — Document and enforce the real one-concept-per-file rule [Planned]
+## v0.15.0 — Split webview/main.ts into view modules [Planned]
 
-- [ ] Write the project's actual file-cohesion rule into the TypeScript steering: a file
-      carries one cohesive concept (one main public class per file), while the members of a
-      single discriminated union or the pure helpers of a type may live together. The
-      strict "one declaration per file" habit was never a written project rule.
-- [ ] Fix only genuine anomalies (a file mixing two unrelated responsibilities) against that
-      rule; deliberately leave legitimate groupings such as `IDashboardMessage.ts` (one
-      message union) and `TaskState.ts` (a type plus its pure derivations) untouched, to
-      avoid cosmetic churn and import/test regressions.
+- [ ] Split `src/webview/main.ts` (about 1,350 lines mixing state, DOM helpers, cards,
+      toolbar, filters, stats, hover wiring and message handling) into cohesive view
+      modules, after a dedicated design: its shared module state and the absence of unit
+      tests on the rendering make it a medium-to-high risk change.
 
 ## v1.0.0 — First stable release [Planned]
 

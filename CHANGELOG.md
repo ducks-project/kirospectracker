@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-10
+
+### Added
+
+- Document the project's file-cohesion rule in a dedicated steering file
+  (`.kiro/steering/file-cohesion.md`): a file carries one cohesive concept rather than a single
+  declaration, with the cases where declarations may live together (members of one
+  discriminated union, a type and its pure helpers, the input or result types of a single class,
+  a port and its value types) and the cases where they must be split.
+- Enforce the mechanical part of that rule with the ESLint `max-classes-per-file` rule (one class
+  per file in `src/`).
+
+### Changed
+
+- Version, in English, the steering files that `CONTRIBUTING.md` references (file cohesion,
+  TypeScript conventions, VS Code extension guidelines, testing strategy), so its links now work
+  for every contributor. The other `.kiro/` files stay local and unversioned.
+- Move `ExcludeSettingKey` and `MANAGED_EXCLUDE_SETTINGS` out of `HideSpecsMode.ts` into their
+  own `ExcludeSettingKey.ts`, the only genuine cohesion anomaly found by an audit of `src/`, and
+  remove a duplicated `OPEN_DOCUMENT_COMMAND_ID` constant. No behaviour change.
+
 ## [0.13.1] - 2026-11-10
 
 ### Fixed
@@ -432,7 +453,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.13.1...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/ducks-project/kirospectracker/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/ducks-project/kirospectracker/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/ducks-project/kirospectracker/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ducks-project/kirospectracker/compare/v0.11.0...v0.12.0
