@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-10
+
+### Fixed
+
+- Exclude local `.worktrees/` checkouts from the packaged extension and from version control,
+  so a `vsce package` run while a worktree exists no longer ships its content.
+
+### Security
+
+- Ignore dashboard webview messages whose `event.origin` is not the webview's own origin
+  (CWE-940), resolving the CodeQL `js/missing-origin-check` alert. Measured on Kiro 1.4.121 and
+  VS Code 1.145.2, the webview host posts every message with the webview's own origin, so the
+  legitimate traffic is unaffected.
+
 ## [0.13.0] - 2026-11-10
 
 ### Added
@@ -418,7 +432,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.13.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/ducks-project/kirospectracker/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/ducks-project/kirospectracker/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ducks-project/kirospectracker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/ducks-project/kirospectracker/compare/v0.10.0...v0.11.0
