@@ -7,6 +7,13 @@ import { extractDocumentIntroduction } from '../../src/core/parsing/DocumentIntr
 const HEADING_LINE = /^#{1,6}\s+/;
 
 /**
+ * Match a line the extractor treats as a heading: up to three leading spaces, one to six
+ * hashes, then whitespace. It is applied to the UNTRIMMED generated body, because trimming
+ * would strip the trailing space of an empty heading such as `# ` and hide it from the filter.
+ */
+const EXTRACTOR_HEADING_LIKE = /^\s{0,3}#{1,6}\s/;
+
+/**
  * Property-based specification for {@link extractDocumentIntroduction}.
  */
 describe('extractDocumentIntroduction (properties)', () => {
@@ -59,13 +66,18 @@ describe('extractDocumentIntroduction (properties)', () => {
           .string({ minLength: 1 })
           .filter(
             (body) =>
-              0 < body.trim().length && !body.includes('\n') && !HEADING_LINE.test(body.trim()),
+              0 < body.trim().length && !body.includes('\n') && !EXTRACTOR_HEADING_LIKE.test(body),
           ),
         (body) => {
           const content = `# Title\n\nPreamble.\n\n## Introduction\n\n${body}\n\n## Next\n`;
           expect(extractDocumentIntroduction(content)).to.equal(body.trim());
         },
       ),
+      // Boundary pinned as an always-run example (examples bypass the generator filter): a line
+      // indented by four spaces is NOT a heading, so `    # ` is a valid section body. The
+      // earlier flaky counterexample `# ` (an empty heading, which closes the section) is now
+      // excluded by the filter and covered by the dedicated unit test.
+      { examples: [['    # ']] },
     );
   });
 });

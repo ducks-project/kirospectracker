@@ -32,6 +32,18 @@ describe('extractDocumentIntroduction', () => {
     expect(extractDocumentIntroduction(content)).to.equal('The intro body.');
   });
 
+  it('treats an empty heading as the end of the Introduction section', () => {
+    // `# ` is an empty ATX heading: it closes the section, leaving an empty body, so the
+    // extractor falls back to the first non-heading paragraph of the document.
+    const content = '# Title\n\nPreamble.\n\n## Introduction\n\n# \n\n## Next\n';
+    expect(extractDocumentIntroduction(content)).to.equal('Preamble.');
+  });
+
+  it('keeps a four-space indented hash line as section body (not a heading)', () => {
+    const content = '# Title\n\nPreamble.\n\n## Introduction\n\n    # \n\n## Next\n';
+    expect(extractDocumentIntroduction(content)).to.equal('#');
+  });
+
   it('matches the Introduction heading case-insensitively', () => {
     const content = '# Title\n\n## INTRODUCTION\n\nUpper-cased heading body.\n';
     expect(extractDocumentIntroduction(content)).to.equal('Upper-cased heading body.');
