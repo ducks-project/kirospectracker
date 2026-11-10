@@ -52,7 +52,8 @@
       "rules": {
         "import/no-commonjs": ["error", { "allowConditionalRequire": false }],
         "@typescript-eslint/no-require-imports": "error",
-        "@typescript-eslint/no-var-requires": "error"
+        "@typescript-eslint/no-var-requires": "error",
+        "max-classes-per-file": ["error", 1]
       }
     },
     {
