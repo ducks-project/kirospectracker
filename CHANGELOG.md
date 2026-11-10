@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-10
+
+### Fixed
+
+- Agree the French counters with their number: the dashboard spec counters ("1 Terminée",
+  "11 Terminées"), the per-card and global task counters ("1 terminée", "17 terminées", no more
+  "(s)" notation), the tree group labels and the aggregate Explorer tooltip. Zero and one take
+  the singular. The card status badge stays singular, and the English text is unchanged.
+
+### Changed
+
+- Use an English screenshot of the dashboard in the README.
+
 ## [0.14.0] - 2026-11-10
 
 ### Added
@@ -453,7 +466,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.14.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/ducks-project/kirospectracker/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/ducks-project/kirospectracker/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/ducks-project/kirospectracker/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/ducks-project/kirospectracker/compare/v0.12.0...v0.13.0
