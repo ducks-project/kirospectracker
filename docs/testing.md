@@ -58,6 +58,42 @@ npm run test:property
 npm run test:integration
 ```
 
+### Localization
+
+- Synchronisation unit tests ([i18n-sync.spec.ts](../test/unit/i18n-sync.spec.ts)): every `%id%`
+  of `package.json` exists in `package.nls.json` (no orphan, none unresolved); the French files
+  have the same keys, `{n}` markers and inline code as English; `l10n/bundle.l10n.fr.json` holds
+  exactly the typed catalogue keys; the three JSON files are sorted by key; `package.json`
+  declares `"l10n": "./l10n"` and the folder exists; the `hideSpecs.statuses` keys equal the
+  `SpecStatus` values. [webview-keys.spec.ts](../test/unit/webview-keys.spec.ts) checks that
+  `main.ts` only requests catalogued webview keys. Tests that read a manifest title resolve it
+  through [manifest-nls.ts](../test/helpers/manifest-nls.ts).
+- Real French run: [localization.spec.ts](../test/integration/localization.spec.ts) checks English
+  output by default and, when `KIRO_SPEC_TRACKER_TEST_LOCALE=fr` is set, the French command title and
+  a `vscode.l10n.t` string. `test/runTest.ts` reads these optional variables (unset keeps the
+  default CI behaviour):
+
+| Variable                                | Effect                                             |
+| --------------------------------------- | -------------------------------------------------- |
+| `KIRO_SPEC_TRACKER_TEST_EXECUTABLE`     | Editor executable to launch (for example Kiro)     |
+| `KIRO_SPEC_TRACKER_TEST_LOCALE`         | Passes `--locale=<value>`                          |
+| `KIRO_SPEC_TRACKER_TEST_USER_DATA_DIR`  | Passes `--user-data-dir=<dir>` (disposable)        |
+| `KIRO_SPEC_TRACKER_TEST_EXTENSIONS_DIR` | Passes `--extensions-dir=<dir>` (disposable)       |
+| `KIRO_SPEC_TRACKER_TEST_EXTRA_ARGS`     | Extra whitespace-separated flags (`--disable-gpu`) |
+
+- French needs the language pack in the disposable profile: copy the pack folder into the
+  extensions directory and write a `languagepacks.json` in the user data directory whose
+  `translations` paths point at that copy. Never reuse the real profile.
+
+```bash
+KIRO_SPEC_TRACKER_TEST_EXECUTABLE=/usr/share/kiro/kiro KIRO_SPEC_TRACKER_TEST_LOCALE=fr \
+KIRO_SPEC_TRACKER_TEST_USER_DATA_DIR=/tmp/i18n/ud KIRO_SPEC_TRACKER_TEST_EXTENSIONS_DIR=/tmp/i18n/ex \
+KIRO_SPEC_TRACKER_TEST_EXTRA_ARGS="--disable-gpu" xvfb-run -a npm run test:integration
+```
+
+- Not covered: the web target, sub-locales such as `fr-CA`, and the visual rendering of the
+  French dashboard (to check by hand in a French IDE).
+
 ### Smoke test
 
 - A minimal, fast check that the extension activates and its commands are registered. It

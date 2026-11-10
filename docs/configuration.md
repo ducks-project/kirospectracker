@@ -54,6 +54,8 @@ One checkbox per spec status in the Settings UI. A spec is hidden when its statu
 | `Completed`      | `true`  | Every required task is done                             |
 | `FullyCompleted` | `true`  | Every required and optional task is done                |
 
+The checkbox descriptions are translated, but the keys above are identifiers and are never translated.
+
 In `settings.json` the same setting is a plain object, and a missing key keeps its default:
 
 ```json

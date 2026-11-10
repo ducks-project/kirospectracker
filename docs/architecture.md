@@ -413,6 +413,43 @@ appear in `src/`. See [configuration.md](configuration.md) for the user-facing b
   message strings live once in [SpecAgentMessages](../src/core/SpecAgentMessages.ts) (data
   table + DRY).
 
+## Internationalization
+
+French is the first locale; English stays the default and the source language.
+
+- **Port and single catalogue.** [ITranslator](../src/core/ports/ITranslator.ts) is the only way
+  `core/` obtains user-facing text. The English sentence is the key, with positional `{0}`, `{1}`
+  markers (the `vscode.l10n.t` dialect), never concatenated fragments. Every key lives once in
+  [messages.ts](../src/core/i18n/messages.ts), split into shared, host-only and webview-only
+  groups, so the compiler refuses an unknown key and a webview request outside its group.
+- **Adapters.** The host uses `VscodeTranslator` (`vscode.l10n.t`, reading `l10n/bundle.l10n.<locale>.json`).
+  Classes of `core/` and `adapters/` take an optional translator that defaults to
+  `IdentityTranslator` (English), so tests and the web fallback need no host.
+- **Manifest.** `package.json` uses `%id%` placeholders resolved by `package.nls.json` and
+  `package.nls.fr.json`.
+- **Webview catalogue.** The webview has no `vscode.l10n`. The host builds the catalogue
+  (`buildWebviewCatalog`, the raw translated templates) and posts a typed `strings` message
+  immediately before each `render` (on resolve and on the `ready` handshake). The webview builds a
+  `CatalogTranslator` (same pure `formatMessage`), rebuilds its toolbar in that language and
+  falls back to English for a missing key. `<html lang>` comes from `vscode.env.language`; the
+  CSP is unchanged and text is only set through `textContent` and attributes.
+- **Status label versus identifier.** `SpecStatus` values stay identifiers (settings keys, CSS
+  classes, filter keys). The displayed label comes from `statusLabel(status, translator)`; the
+  card badge shows the label (for example "Fully completed"), never the identifier.
+- **Plurals and numbers.** Plurals use distinct whole-sentence keys chosen by a pure function
+  (`hiddenSpecsNoticeKey`); percentages live inside templates (`{0}%`), so French can write `{0} %`.
+- **Left in English on purpose.** The agent prompts ([SpecAgentMessages](../src/core/SpecAgentMessages.ts),
+  [RunPromptBuilder](../src/core/RunPromptBuilder.ts)), the diagnostic channel, the document names
+  and the identifiers.
+- **French conventions** (aligned on the VS Code French language pack): impersonal tone
+  (infinitive for actions, for example "Exécuter les tâches", "Masquer les specs"); "spec" and
+  "dashboard" kept in English; a no-break space (U+00A0) before `:`, `?`, `;` and `%` and inside
+  guillemets (`« {0} »`); typographic apostrophe `’`; "Presse-papiers" capitalized; command
+  titles prefixed "Kiro Spec Tracker : ..." like the pack's "Category : Title"; identifiers, backticked
+  code and `#setting#` links copied verbatim.
+- **Synchronisation** is guaranteed by tests, not tooling: see
+  [i18n-sync.spec.ts](../test/unit/i18n-sync.spec.ts).
+
 ## Security boundary
 
 - Only `adapters/` and `extension.ts` import `vscode`; `core/` is pure and portable.

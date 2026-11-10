@@ -21,6 +21,7 @@ settings only if you opt in to hiding specs by status.
 - [Agent actions (beta)](#agent-actions-beta)
 - [Usage](#usage)
 - [Settings](#settings)
+- [Languages](#languages)
 - [Security and privacy](#security-and-privacy)
 - [Requirements](#requirements)
 - [Contributing](#contributing)
@@ -150,6 +151,21 @@ Hiding writes entries to the `files.exclude` or `search.exclude` setting of the 
 folder, and has side effects (the Kiro agent's search no longer finds hidden specs, the Quick
 Open history is purged). The full reference, the ownership and cleanup rules and the
 **Reset Hidden Specs** command are in [docs/configuration.md](docs/configuration.md).
+
+## Languages
+
+The interface is in English. French is available as the first translation: it is used only
+when the IDE display language is French, which requires the French language pack of the IDE
+(for example "French Language Pack for Visual Studio Code"; see the command "Configure
+Display Language"). Without the pack, or with any other language, everything stays in English.
+
+- Translated: the commands, views and settings descriptions, the dashboard, the tree, the
+  Explorer tooltips and the notifications of the extension.
+- Not translated: the words "spec" and "dashboard", the document names (requirements, design,
+  tasks, notes, bugfix), the setting keys and values (including the `hideSpecs.statuses` keys),
+  the prompts sent to the Kiro agent, and the diagnostic output channel.
+- The web target (`dist/browser`) uses the same API (`vscode.l10n`) but its translated
+  rendering has not been verified.
 
 ## Security and privacy
 
