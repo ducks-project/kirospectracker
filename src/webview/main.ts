@@ -762,16 +762,20 @@ document.addEventListener(
   },
   { capture: true, passive: true },
 );
-// A click outside the popin and its icon closes the preview. The icon stops its
-// own click propagation, so this only sees clicks elsewhere.
-document.addEventListener('click', (event: MouseEvent): void => {
-  const { target } = event;
-  const selector = `.${HOVER_PANEL_CLASS}, .${PREVIEW_ICON_CLASS}`;
-  if (target instanceof Element && null !== target.closest(selector)) {
-    return;
-  }
-  hoverController.close();
-});
+// A click outside the popin and its icon closes the preview. Registered in the
+// capture phase so inner controls that stop propagation cannot hide the click.
+document.addEventListener(
+  'click',
+  (event: MouseEvent): void => {
+    const { target } = event;
+    const selector = `.${HOVER_PANEL_CLASS}, .${PREVIEW_ICON_CLASS}`;
+    if (target instanceof Element && null !== target.closest(selector)) {
+      return;
+    }
+    hoverController.close();
+  },
+  { capture: true },
+);
 /**
  * Append the required/optional progress bars and the per-state breakdown row to
  * a card.
