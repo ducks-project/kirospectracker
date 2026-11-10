@@ -16,4 +16,6 @@ export interface ISpecDocuments {
 
   /** Whether `notes.md` is present. */
   readonly notes: boolean;
+  /** Whether `bugfix.md` (the bugfix spec entry document) is present. */
+  readonly bugfix: boolean;
 }

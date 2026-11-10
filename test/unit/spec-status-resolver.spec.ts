@@ -7,7 +7,13 @@ import { SpecStatusResolver } from '../../src/core/status/SpecStatusResolver';
 import { TasksOnlyDocumentPolicy } from '../../src/core/status/TasksOnlyDocumentPolicy';
 
 /** All documents present. */
-const ALL_DOCS: ISpecDocuments = { tasks: true, requirements: true, design: true, notes: true };
+const ALL_DOCS: ISpecDocuments = {
+  tasks: true,
+  requirements: true,
+  design: true,
+  notes: true,
+  bugfix: false,
+};
 
 /**
  * Build a progress value object from counts, deriving the ratios.

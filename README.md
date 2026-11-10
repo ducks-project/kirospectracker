@@ -40,7 +40,13 @@ or run a spec. It is read-only, fully local, and ships no telemetry and no netwo
   discreet global strip reports task-level statistics across all specs (done,
   cancelled, in-progress and to-do counts, plus an overall resolved percentage). Completed
   specs are set apart but stay visible. Each spec links to its `requirements.md`, `design.md`,
-  `tasks.md` and `notes.md` when present.
+  `tasks.md`, `notes.md` and `bugfix.md` when present. Clicking a card (and hovering it for
+  the introduction preview) uses the spec's _entry document_, read from its `.config.kiro`:
+  `specType: bugfix` opens `bugfix.md`, else `workflowType: design-first` opens `design.md`,
+  else `requirements.md`. When `.config.kiro` is absent, unreadable or has unknown values, or
+  the resolved document is missing, the first present of `requirements.md`, `design.md`,
+  `tasks.md` is used. The `.config.kiro` format is not publicly documented by Kiro, so this is
+  best-effort and isolated behind a dedicated port.
 - **Specs-by-status tree** — a lightweight activity-bar tree grouping specs by status for
   quick navigation, with a right-click context menu to open a spec's documents or run its
   tasks.

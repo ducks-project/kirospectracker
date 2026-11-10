@@ -68,7 +68,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
    * @param htmlBuilder The pure CSP HTML shell builder.
    * @param nonceFactory The per-render nonce factory.
    * @param actions The handler for inbound dashboard intents.
-   * @param introductionLoader The lazy loader serving requirements introductions on hover.
+   * @param introductionLoader The lazy loader serving entry-document introductions on hover.
    */
   public constructor(
     extensionUri: vscode.Uri,
@@ -228,7 +228,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
   }
 
   /**
-   * Load a spec's requirements introduction lazily and post it back, correlated
+   * Load the introduction of a spec's entry document lazily and post it back, correlated
    * to the request by `folderPath`.
    *
    * It reuses the shared {@link SpecIntroductionLoader} (and its bounded cache),
@@ -237,7 +237,12 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
    * @param folderPath Absolute path of the hovered spec folder.
    */
   private sendIntroduction(folderPath: string): void {
-    this.introductionLoader.load(folderPath).then((introduction) => {
+    const entry = this.repository.getSpec(folderPath)?.entryDocument;
+    const loading =
+      undefined === entry
+        ? Promise.resolve(undefined)
+        : this.introductionLoader.load(folderPath, entry);
+    loading.then((introduction) => {
       const message: IIntroductionMessage = { type: 'introduction', folderPath, introduction };
       this.view?.webview.postMessage(message).then(undefined, undefined);
     }, undefined);

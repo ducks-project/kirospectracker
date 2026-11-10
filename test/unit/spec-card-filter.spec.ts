@@ -19,7 +19,8 @@ function cardOf(name: string, status: SpecStatus, folderKey = '/ws'): ISpecCardV
     folderPath: `${folderKey}/.kiro/specs/${name}`,
     folderKey,
     ownerLabel: 'ws',
-    documents: { tasks: true, requirements: false, design: false, notes: false },
+    documents: { tasks: true, requirements: false, design: false, notes: false, bugfix: false },
+    entryDocument: undefined,
     status,
     progress: {
       requiredDone: 0,

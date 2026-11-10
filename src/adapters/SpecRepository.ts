@@ -1,13 +1,16 @@
 import type { IGlobalTaskStats } from '../core/model/IGlobalTaskStats';
-import type { ISpecDocuments } from '../core/model/ISpecDocuments';
 import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
 import type { ITaskItem } from '../core/model/ITaskItem';
 import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
 import type { ISpecRawInput, SpecSnapshotFactory } from '../core/SpecSnapshotFactory';
+import type { ISpecConfigReader } from '../core/ports/ISpecConfigReader';
 import type { ISpecChangeNotifier } from './ports/ISpecChangeNotifier';
 import type { ISpecFileSystem } from './ports/ISpecFileSystem';
 import { GlobalTaskStatsCalculator } from '../core/status/GlobalTaskStatsCalculator';
 import { mapWithLimit } from '../core/BoundedMap';
+import { buildSpecDocuments, documentFileName } from '../core/SpecDocumentFiles';
+import { SPEC_DOCUMENT_KINDS } from '../core/model/SpecDocumentKind';
+import { NullSpecConfigReader } from './config/NullSpecConfigReader';
 
 /** Default number of spec reads kept in flight during a cold scan. */
 const DEFAULT_READ_CONCURRENCY = 12;
@@ -23,14 +26,6 @@ const HISTORY_DIRECTORY = '.history';
 
 /** Path separator used to enforce a folder boundary when matching paths. */
 const PATH_SEPARATOR = '/';
-
-/** Canonical and annex document file names read for each spec. */
-const DOCUMENT_FILES = {
-  tasks: 'tasks.md',
-  requirements: 'requirements.md',
-  design: 'design.md',
-  notes: 'notes.md',
-} as const;
 
 /**
  * Host-agnostic repository discovering and caching Kiro specs.
@@ -74,6 +69,7 @@ export class SpecRepository {
   private readonly disposeNotifier: () => void;
 
   private readonly cap: number;
+  private readonly configReader: ISpecConfigReader;
 
   /**
    * Build a repository over the file-system and change-notifier ports.
@@ -81,17 +77,20 @@ export class SpecRepository {
    * @param factory The pure snapshot factory.
    * @param notifier The change notifier firing on spec file changes.
    * @param cap Maximum number of spec reads kept in flight during discovery.
+   * @param configReader Reader of `.config.kiro` (Null Object by default).
    */
   public constructor(
     fileSystem: ISpecFileSystem,
     factory: SpecSnapshotFactory,
     notifier: ISpecChangeNotifier,
     cap: number = DEFAULT_READ_CONCURRENCY,
+    configReader: ISpecConfigReader = new NullSpecConfigReader(),
   ) {
     this.fileSystem = fileSystem;
     this.factory = factory;
     this.notifier = notifier;
     this.cap = cap;
+    this.configReader = configReader;
     this.disposeNotifier = this.notifier.onDidChange((changedPath) => {
       this.handleChange(changedPath).catch(() => undefined);
     });
@@ -135,6 +134,14 @@ export class SpecRepository {
     return Array.from(this.cache.values());
   }
 
+  /**
+   * Look up one cached snapshot in O(1).
+   * @param folderPath Absolute path of the spec folder.
+   * @returns The snapshot, or `undefined` when the spec is not cached.
+   */
+  public getSpec(folderPath: string): ISpecSnapshot | undefined {
+    return this.cache.get(folderPath);
+  }
   /**
    * Return the aggregate task statistics across every cached spec.
    *
@@ -188,19 +195,26 @@ export class SpecRepository {
     folderPath: string,
     name: string,
   ): Promise<ISpecSnapshot> {
-    const [tasksContent, requirements, design, notes] = await Promise.all([
-      this.fileSystem.readFile(this.fileSystem.join(folderPath, DOCUMENT_FILES.tasks)),
-      this.fileSystem.readFile(this.fileSystem.join(folderPath, DOCUMENT_FILES.requirements)),
-      this.fileSystem.readFile(this.fileSystem.join(folderPath, DOCUMENT_FILES.design)),
-      this.fileSystem.readFile(this.fileSystem.join(folderPath, DOCUMENT_FILES.notes)),
+    const [contents, config] = await Promise.all([
+      Promise.all(
+        SPEC_DOCUMENT_KINDS.map((kind) =>
+          this.fileSystem.readFile(this.fileSystem.join(folderPath, documentFileName(kind))),
+        ),
+      ),
+      this.configReader.read(folderPath),
     ]);
-    const documents: ISpecDocuments = {
-      tasks: undefined !== tasksContent,
-      requirements: undefined !== requirements,
-      design: undefined !== design,
-      notes: undefined !== notes,
+    const documents = buildSpecDocuments(
+      (kind) => undefined !== contents[SPEC_DOCUMENT_KINDS.indexOf(kind)],
+    );
+    const tasksContent = contents[SPEC_DOCUMENT_KINDS.indexOf('tasks')];
+    const input: ISpecRawInput = {
+      name,
+      folderPath,
+      workspacePath,
+      tasksContent,
+      documents,
+      config,
     };
-    const input: ISpecRawInput = { name, folderPath, workspacePath, tasksContent, documents };
     const { snapshot, tasks } = this.factory.createWithTasks(input);
     this.rememberTaskStats(snapshot.folderPath, tasks);
     return snapshot;

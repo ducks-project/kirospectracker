@@ -9,7 +9,8 @@ const SNAPSHOT: ISpecSnapshot = {
   name: 'alpha',
   folderPath: '/ws/.kiro/specs/alpha',
   workspacePath: '/ws',
-  documents: { tasks: true, requirements: true, design: false, notes: false },
+  documents: { tasks: true, requirements: true, design: false, notes: false, bugfix: false },
+  entryDocument: undefined,
   status: SpecStatus.InProgress,
   progress: {
     requiredRatio: 0.5,

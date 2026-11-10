@@ -44,6 +44,17 @@ export class BoundedCache<K, V> {
   }
 
   /**
+   * Remove one key.
+   * @param key The key to drop.
+   */
+  public delete(key: K): void {
+    this.entries.delete(key);
+  }
+  /** Remove every entry. */
+  public clear(): void {
+    this.entries.clear();
+  }
+  /**
    * Cache a value, evicting the oldest entry when the capacity is exceeded.
    * @param key The key to store.
    * @param value The value to associate with the key.

@@ -2,9 +2,9 @@ import type { RunScope } from '../ports/ISpecAgentGateway';
 import type { IGlobalTaskStats } from './IGlobalTaskStats';
 import type { ISpecCardView } from './ISpecCardView';
 import type { ISpecStats } from './ISpecStats';
+import type { SpecDocumentKind } from './SpecDocumentKind';
 
-/** Document keys the webview can request to open. */
-export type SpecDocumentKind = 'requirements' | 'design' | 'tasks' | 'notes';
+export type { SpecDocumentKind } from './SpecDocumentKind';
 
 /** Layout modes the dashboard can render. */
 export type DashboardLayout = 'list' | 'grid';
@@ -31,10 +31,10 @@ export interface IToggleLayoutMessage {
 }
 
 /**
- * Outbound message: the requirements introduction requested for a card.
+ * Outbound message: the entry-document introduction requested for a card.
  *
  * The response is correlated to its request by `folderPath`; `introduction` is
- * `undefined` when no introduction can be derived (absent/empty `requirements.md`).
+ * `undefined` when no introduction can be derived (no entry document, or an absent/empty one).
  */
 export interface IIntroductionMessage {
   readonly type: 'introduction';
@@ -69,7 +69,7 @@ export interface ISetLayoutMessage {
 }
 
 /**
- * Inbound message: request the requirements introduction of a card on hover.
+ * Inbound message: request the entry-document introduction of a card on hover.
  *
  * The host loads it lazily (best-effort) and replies with a correlated
  * {@link IIntroductionMessage}.

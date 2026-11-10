@@ -51,4 +51,12 @@ describe('BoundedCache', () => {
     expect(cache.has('a')).to.equal(true);
     expect(cache.get('a')).to.equal(undefined);
   });
+  it('deletes one key and clears all entries', () => {
+    const cache = new BoundedCache<string, number>(3);
+    cache.set('a', 1).set('b', 2);
+    cache.delete('a');
+    expect(cache.has('a')).to.equal(false);
+    cache.clear();
+    expect(cache.has('b')).to.equal(false);
+  });
 });

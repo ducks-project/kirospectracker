@@ -12,7 +12,7 @@ const calculator = new SpecProgressCalculator();
 const resolver = new SpecStatusResolver(new TasksOnlyDocumentPolicy());
 
 /** All documents present. */
-const ALL_DOCS = { tasks: true, requirements: true, design: true, notes: true };
+const ALL_DOCS = { tasks: true, requirements: true, design: true, notes: true, bugfix: false };
 
 /** Arbitrary over the four task states. */
 const stateArb = fc.constantFrom<TaskState>('todo', 'done', 'cancelled', 'inProgress');

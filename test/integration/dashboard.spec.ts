@@ -264,24 +264,25 @@ describe('Spec dashboard (Node host)', () => {
     expect(reply.introduction).to.equal('An in-progress fixture spec.');
   });
 
-  it('answers with an undefined introduction when requirements.md is absent', async () => {
-    const completed = api.repository.getSpecs().find((spec) => 'completed' === spec.name);
-    expect(completed).to.not.equal(undefined);
+  it('answers with an undefined introduction when the spec has no entry document', async () => {
+    const unknownFolder = path.join(
+      api.repository.getSpecs()[0].folderPath,
+      '..',
+      'does-not-exist',
+    );
     const posted: DashboardOutboundMessage[] = [];
     const drivable = makeDrivableWebview(posted);
     api.dashboard.resolveWebviewView(makeView(drivable.webview));
-
     drivable.send({
       type: 'requestIntroduction',
-      folderPath: completed!.folderPath,
+      folderPath: unknownFolder,
     } as unknown as InboundMessage);
-
     await waitFor(() => posted.some((message) => 'introduction' === message.type));
     const reply = posted.find((message) => 'introduction' === message.type) as {
       readonly folderPath: string;
       readonly introduction: string | undefined;
     };
-    expect(reply.folderPath).to.equal(completed!.folderPath);
+    expect(reply.folderPath).to.equal(unknownFolder);
     expect(reply.introduction).to.equal(undefined);
   });
 });

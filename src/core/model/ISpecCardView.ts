@@ -1,5 +1,6 @@
 import type { ISpecDocuments } from './ISpecDocuments';
 import type { ISpecProgress } from './ISpecProgress';
+import type { SpecDocumentKind } from './SpecDocumentKind';
 import type { SpecStatus } from './SpecStatus';
 
 /**
@@ -41,4 +42,9 @@ export interface ISpecCardView {
 
   /** Separate required/optional progress ratios and counts. */
   readonly progress: ISpecProgress;
+  /**
+   * Document the card click and hover introduction open, resolved from
+   * `.config.kiro` with a fallback; `undefined` when no document is available.
+   */
+  readonly entryDocument: SpecDocumentKind | undefined;
 }

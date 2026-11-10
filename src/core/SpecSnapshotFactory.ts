@@ -1,9 +1,12 @@
+import type { ISpecConfig } from './model/ISpecConfig';
 import type { ISpecDocuments } from './model/ISpecDocuments';
 import type { ISpecSnapshot } from './model/ISpecSnapshot';
 import type { ITaskItem } from './model/ITaskItem';
 import type { TasksMarkdownParser } from './parsing/TasksMarkdownParser';
 import type { SpecProgressCalculator } from './status/SpecProgressCalculator';
 import type { SpecStatusResolver } from './status/SpecStatusResolver';
+import { EntryDocumentResolver } from './EntryDocumentResolver';
+import { EMPTY_SPEC_CONFIG } from './parsing/SpecConfigParser';
 
 /** Raw text inputs read from a spec folder, any of which may be absent. */
 export interface ISpecRawInput {
@@ -17,6 +20,8 @@ export interface ISpecRawInput {
   readonly tasksContent: string | undefined;
   /** Presence of the annex documents. */
   readonly documents: ISpecDocuments;
+  /** Tolerant `.config.kiro` content; defaults to empty (fallback resolution). */
+  readonly config?: ISpecConfig;
 }
 
 /** A snapshot paired with the task tree parsed to build it. */
@@ -40,21 +45,25 @@ export class SpecSnapshotFactory {
   private readonly calculator: SpecProgressCalculator;
 
   private readonly resolver: SpecStatusResolver;
+  private readonly entryResolver: EntryDocumentResolver;
 
   /**
    * Build a factory from the core collaborators.
    * @param parser Parser turning `tasks.md` text into tasks.
    * @param calculator Calculator deriving the progress ratios.
    * @param resolver Resolver mapping documents + progress to a status.
+   * @param entryResolver Resolver of the entry document (click and hover).
    */
   public constructor(
     parser: TasksMarkdownParser,
     calculator: SpecProgressCalculator,
     resolver: SpecStatusResolver,
+    entryResolver: EntryDocumentResolver = new EntryDocumentResolver(),
   ) {
     this.parser = parser;
     this.calculator = calculator;
     this.resolver = resolver;
+    this.entryResolver = entryResolver;
   }
 
   /**
@@ -85,6 +94,10 @@ export class SpecSnapshotFactory {
         folderPath: input.folderPath,
         workspacePath: input.workspacePath,
         documents: input.documents,
+        entryDocument: this.entryResolver.resolve(
+          input.config ?? EMPTY_SPEC_CONFIG,
+          input.documents,
+        ),
         status,
         progress,
       },

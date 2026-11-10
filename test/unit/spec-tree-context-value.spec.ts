@@ -15,6 +15,7 @@ const ALL_DOCS: ISpecDocuments = {
   requirements: true,
   design: true,
   notes: true,
+  bugfix: true,
 };
 
 /** Only tasks present. */
@@ -23,6 +24,7 @@ const TASKS_ONLY: ISpecDocuments = {
   requirements: false,
   design: false,
   notes: false,
+  bugfix: false,
 };
 
 /**
@@ -87,6 +89,13 @@ describe('buildSpecTreeContextValue', () => {
   it('keeps the gating set as the vocabulary minus the bare spec base token', () => {
     expect(SPEC_TREE_MENU_GATING_TOKENS).to.deep.equal(
       SPEC_TREE_CONTEXT_TOKENS.filter((token) => 'spec' !== token),
+    );
+  });
+  it('emits the doc-bugfix token only when bugfix.md is present', () => {
+    const present = buildSpecTreeContextValue({ ...ALL_DOCS, bugfix: true }, SpecStatus.Completed);
+    expect(present.split(' ')).to.include('doc-bugfix');
+    expect(buildSpecTreeContextValue(TASKS_ONLY, SpecStatus.Completed).split(' ')).to.not.include(
+      'doc-bugfix',
     );
   });
 });

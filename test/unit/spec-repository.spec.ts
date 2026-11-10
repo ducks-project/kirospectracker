@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 
 import type { SpecChangeDelta } from '../../src/core/model/ISpecChangeDelta';
+import { KiroSpecConfigReader } from '../../src/adapters/config/KiroSpecConfigReader';
 import { SpecRepository } from '../../src/adapters/SpecRepository';
 import { SpecSnapshotFactory } from '../../src/core/SpecSnapshotFactory';
 import { SpecStatus } from '../../src/core/model/SpecStatus';
@@ -41,12 +42,13 @@ function seededFileSystem(): FakeSpecFileSystem {
 }
 
 /**
- * Flush pending microtasks so a fire-and-forget change handler can settle.
- * @returns A promise resolving on the next microtask turn.
+ * Let a fire-and-forget change handler settle (all its pending reads resolve).
+ * @returns A promise resolving after the next macrotask turn.
  */
 async function flush(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
 }
 
 /**
@@ -224,6 +226,73 @@ describe('SpecRepository', () => {
       todo: 0,
       total: 0,
       percentComplete: 0,
+    });
+  });
+  describe('entry document', () => {
+    const root = `${WORKSPACE}/.kiro/specs`;
+    /** Seed one spec with every document and the given config text. */
+    function withConfig(config: string | undefined): FakeSpecFileSystem {
+      const files = new Map<string, string>([
+        [`${root}/alpha/tasks.md`, '- [ ] 1. Todo'],
+        [`${root}/alpha/requirements.md`, '# Req'],
+        [`${root}/alpha/design.md`, '# Design'],
+      ]);
+      if (undefined !== config) {
+        files.set(`${root}/alpha/.config.kiro`, config);
+      }
+      return new FakeSpecFileSystem([WORKSPACE], files, new Set([`${root}/alpha`]));
+    }
+    it('keeps the requirements fallback without a config reader or config file', async () => {
+      const fs = withConfig('{"workflowType":"design-first"}');
+      const repository = new SpecRepository(fs, makeFactory(), fs);
+      await repository.refresh();
+      expect(repository.getSpec(`${root}/alpha`)?.entryDocument).to.equal('requirements');
+    });
+    it('resolves design for a design-first config', async () => {
+      const fs = withConfig('{"workflowType":"design-first","specType":"feature"}');
+      const repository = new SpecRepository(
+        fs,
+        makeFactory(),
+        fs,
+        undefined,
+        new KiroSpecConfigReader(fs),
+      );
+      await repository.refresh();
+      expect(repository.getSpec(`${root}/alpha`)?.entryDocument).to.equal('design');
+    });
+    it('falls back to requirements when no .config.kiro exists', async () => {
+      const fs = withConfig(undefined);
+      const repository = new SpecRepository(
+        fs,
+        makeFactory(),
+        fs,
+        undefined,
+        new KiroSpecConfigReader(fs),
+      );
+      await repository.refresh();
+      expect(repository.getSpec(`${root}/alpha`)?.entryDocument).to.equal('requirements');
+    });
+    it('reacts to .config.kiro and bugfix.md changes', async () => {
+      const fs = withConfig('{"specType":"feature"}');
+      const repository = new SpecRepository(
+        fs,
+        makeFactory(),
+        fs,
+        undefined,
+        new KiroSpecConfigReader(fs),
+      );
+      await repository.refresh();
+      const deltas: SpecChangeDelta[] = [];
+      repository.onDidChangeSpecs((delta) => deltas.push(delta));
+      fs.setFile(`${root}/alpha/bugfix.md`, '# Bug');
+      fs.setFile(`${root}/alpha/.config.kiro`, '{"specType":"bugfix"}');
+      fs.emit(`${root}/alpha/.config.kiro`);
+      await flush();
+      await flush();
+      const alpha = repository.getSpec(`${root}/alpha`);
+      expect(alpha?.documents.bugfix).to.equal(true);
+      expect(alpha?.entryDocument).to.equal('bugfix');
+      expect(deltas).to.deep.equal([{ type: 'specChanged', folderPath: `${root}/alpha` }]);
     });
   });
 });

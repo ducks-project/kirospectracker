@@ -172,8 +172,8 @@ mappings in `core/` makes the least-covered DOM/CSS layer thin and the logic uni
 property-testable without a VS Code host.
 
 Each spec card is itself a view over the card view-model: its body is a keyboard-accessible
-button reusing the existing `openDocument` intent to open `requirements.md` (a disabled no-op
-when that document is absent), and its inner controls stop click propagation so only the card
+button reusing the existing `openDocument` intent to open the spec's entry document (a
+disabled no-op when none exists), and its inner controls stop click propagation so only the card
 background is the open gesture. The status shown on the card is a clickable badge that toggles
 the same [SpecStatusFilter](../src/core/status/SpecStatusFilter.ts) as its matching toolbar
 stat toggle, so the two surfaces stay in sync. The state-representative badge colors come from
@@ -390,3 +390,17 @@ notice reappears next launch while the integration stays enabled).
   [VscodeCommandGateway](../src/adapters/VscodeCommandGateway.ts) and
   [VscodeAgentBetaNotice](../src/adapters/VscodeAgentBetaNotice.ts) wrappers; the beta notice
   uses the native, stable `window.showInformationMessage` API.
+
+## Entry document resolution
+
+The document opened on card click, and read for the hover introduction, is resolved once per
+snapshot on the host. The undocumented `.config.kiro` is isolated behind the
+[ISpecConfigReader](../src/core/ports/ISpecConfigReader.ts) port (adapter `KiroSpecConfigReader`,
+Null Object `NullSpecConfigReader`), parsed tolerantly by the pure `parseSpecConfig`, and mapped to
+a document by the [EntryDocumentResolver](../src/core/EntryDocumentResolver.ts), a Strategy over the
+ordered `ENTRY_DOCUMENT_RULES` table with a `requirements → design → tasks` fallback. The result is
+`ISpecSnapshot.entryDocument`, projected to `ISpecCardView.entryDocument`, so the webview decides
+click and hover locally with no extra message or per-render disk read. The document kinds live in
+one registry (`SPEC_DOCUMENT_KINDS`). `SpecIntroductionLoader` caches per resolved file path and is
+invalidated from the repository change events; the webview drops a card's hover cache on
+`specUpdated`.

@@ -33,7 +33,8 @@ function makeSnapshot(name: string): ISpecSnapshot {
     name,
     folderPath: `/ws/.kiro/specs/${name}`,
     workspacePath: '/ws',
-    documents: { tasks: true, requirements: true, design: false, notes: false },
+    documents: { tasks: true, requirements: true, design: false, notes: false, bugfix: false },
+    entryDocument: 'design',
     status: SpecStatus.InProgress,
     progress: PROGRESS,
   };
@@ -54,6 +55,7 @@ describe('SpecCardViewMapper', () => {
       folderKey: '/ws',
       ownerLabel: 'ws',
       documents: snapshot.documents,
+      entryDocument: 'design',
       status: SpecStatus.InProgress,
       progress: PROGRESS,
     });

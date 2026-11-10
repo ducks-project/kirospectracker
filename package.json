@@ -59,6 +59,11 @@
         "icon": "$(book)"
       },
       {
+        "command": "kirospectracker.tree.openBugfix",
+        "title": "Open Bugfix",
+        "icon": "$(bug)"
+      },
+      {
         "command": "kirospectracker.tree.openDesign",
         "title": "Open Design",
         "icon": "$(symbol-structure)"
@@ -97,6 +102,10 @@
         },
         {
           "command": "kirospectracker.tree.openRequirements",
+          "when": "false"
+        },
+        {
+          "command": "kirospectracker.tree.openBugfix",
           "when": "false"
         },
         {
@@ -163,6 +172,11 @@
           "command": "kirospectracker.tree.openNotes",
           "when": "view == kirospectracker.tree && viewItem =~ /(^| )doc-notes( |$)/",
           "group": "navigation@4"
+        },
+        {
+          "command": "kirospectracker.tree.openBugfix",
+          "when": "view == kirospectracker.tree && viewItem =~ /(^| )doc-bugfix( |$)/",
+          "group": "navigation@5"
         },
         {
           "command": "kirospectracker.tree.syncFiles",

@@ -21,7 +21,14 @@ const cardArb: fc.Arbitrary<ISpecCardView> = fc.record({
   folderKey: folderKeyArb,
   ownerLabel: fc.string(),
   status: fc.constantFrom(...Object.values(SpecStatus)),
-  documents: fc.constant({ tasks: true, requirements: false, design: false, notes: false }),
+  entryDocument: fc.constant(undefined),
+  documents: fc.constant({
+    tasks: true,
+    requirements: false,
+    design: false,
+    notes: false,
+    bugfix: false,
+  }),
   progress: fc.constant({
     requiredDone: 0,
     requiredTotal: 0,

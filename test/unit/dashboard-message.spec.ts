@@ -56,4 +56,8 @@ describe('Dashboard introduction hover protocol', () => {
     };
     expect(reply.introduction).to.equal(undefined);
   });
+  it('types openDocument with the bugfix kind', () => {
+    const open: DashboardInboundMessage = { type: 'openDocument', folderPath, document: 'bugfix' };
+    expect(open.type).to.equal('openDocument');
+  });
 });

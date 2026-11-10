@@ -9,7 +9,7 @@ const HOVER_REQUEST_DELAY_MS = 150;
 export type PostMessage = (message: DashboardInboundMessage) => void;
 
 /**
- * Drives the requirements-introduction hover preview on the webview side.
+ * Drives the entry-document introduction hover preview on the webview side.
  *
  * It owns the three pieces of state the hover feature needs — which folder paths
  * have already asked the host for an introduction, which replies have arrived
@@ -128,6 +128,18 @@ export class HoverIntroductionController {
     this.introductions.clear();
   }
 
+  /**
+   * Drop the request gate and cached reply of one card, e.g. when its entry
+   * document may have changed. The panel is hidden if that card is hovered.
+   * @param folderPath Absolute path of the changed spec folder.
+   */
+  public invalidate(folderPath: string): void {
+    this.requested.delete(folderPath);
+    this.introductions.delete(folderPath);
+    if (folderPath === this.activeFolderPath) {
+      this.leave();
+    }
+  }
   /**
    * Request a card's introduction from the host, at most once per card. The host
    * memoises the result, so a client-side gate is enough to avoid re-posting the

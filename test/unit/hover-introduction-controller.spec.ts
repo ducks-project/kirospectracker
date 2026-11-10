@@ -191,4 +191,31 @@ describe('HoverIntroductionController', () => {
     controller.receive(folderPath, 'The alpha intro.');
     expect(panel.shownFor).to.not.equal(folderPath);
   });
+  it('invalidate drops the request gate and cache of one card only', () => {
+    const { controller, scheduler, posted } = build();
+    const other = '/ws/.kiro/specs/beta';
+    controller.enter(folderPath);
+    scheduler.flush();
+    controller.receive(folderPath, 'Intro');
+    controller.leave();
+    controller.enter(other);
+    scheduler.flush();
+    controller.receive(other, 'Other');
+    controller.leave();
+    controller.invalidate(folderPath);
+    controller.enter(folderPath);
+    scheduler.flush();
+    controller.enter(other);
+    scheduler.flush();
+    expect(posted.filter((m) => 'requestIntroduction' === m.type)).to.have.length(3);
+  });
+  it('invalidate hides the panel when the card is the active one', () => {
+    const { controller, scheduler, panel } = build();
+    controller.enter(folderPath);
+    scheduler.flush();
+    controller.receive(folderPath, 'Intro');
+    expect(panel.visible).to.equal(true);
+    controller.invalidate(folderPath);
+    expect(panel.visible).to.equal(false);
+  });
 });

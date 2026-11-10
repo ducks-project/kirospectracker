@@ -1,5 +1,6 @@
 import type { ISpecDocuments } from '../model/ISpecDocuments';
-import type { SpecDocumentKind } from '../model/IDashboardMessage';
+import type { SpecDocumentKind } from '../model/SpecDocumentKind';
+import { SPEC_DOCUMENT_KINDS } from '../model/SpecDocumentKind';
 import { SpecStatus } from '../model/SpecStatus';
 
 /** Base token marking a tree node as a spec leaf (always present). */
@@ -31,12 +32,7 @@ const AGENT_ACTION_TOKENS: readonly string[] = [
 const DOCUMENT_TOKEN_PREFIX = 'doc-';
 
 /** Document kinds whose presence is encoded, in menu display order. */
-const CONTEXT_DOCUMENT_KINDS: readonly SpecDocumentKind[] = [
-  'requirements',
-  'design',
-  'tasks',
-  'notes',
-];
+const CONTEXT_DOCUMENT_KINDS: readonly SpecDocumentKind[] = SPEC_DOCUMENT_KINDS;
 
 /**
  * Build the per-document presence token for a document kind.
@@ -66,7 +62,7 @@ export const SPEC_TREE_CONTEXT_TOKENS: readonly string[] = [
 
 /**
  * Subset of {@link SPEC_TREE_CONTEXT_TOKENS} that gates a `view/item/context`
- * menu entry: the four `doc-<kind>` tokens (one per "Open" action) and the three
+ * menu entry: one `doc-<kind>` token per document kind (one per "Open" action) and the three
  * agent-action tokens (Sync Files, Run required, Run required and optional). The
  * `spec` base token gates nothing on its own, so it is deliberately absent. Each
  * listed token MUST have a matching, word-anchored `when` clause in the manifest;

@@ -36,6 +36,7 @@ const ALL_DOCUMENTS_PRESENT: ISpecDocuments = {
   requirements: true,
   design: true,
   notes: true,
+  bugfix: false,
 };
 
 /** Required leaf-task total used to synthesise a plausible progress ratio. */
@@ -81,6 +82,7 @@ function makeSnapshots(count: number): readonly ISpecSnapshot[] {
       folderPath,
       workspacePath: '/workspace',
       documents: ALL_DOCUMENTS_PRESENT,
+      entryDocument: 'requirements',
       status: STATUS_CYCLE[index % STATUS_CYCLE.length],
       progress: makeProgress(index),
     });

@@ -23,6 +23,7 @@ import { SpecFolderFilter } from '../core/status/SpecFolderFilter';
 import { SpecFolderToggleView } from '../core/status/SpecFolderToggleView';
 import { SpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
 import { SpecStatToggleView } from '../core/status/SpecStatToggleView';
+import { SPEC_DOCUMENT_KINDS } from '../core/model/SpecDocumentKind';
 import { SpecStatusFilter } from '../core/status/SpecStatusFilter';
 import { colorTokenForStatus } from '../core/status/SpecStatusColor';
 import { statusToFilterKey } from '../core/model/SpecFilterKey';
@@ -47,7 +48,7 @@ declare function acquireVsCodeApi(): IWebviewApi;
 const PERCENT = 100;
 
 /** Document links rendered per spec, in display order. */
-const DOCUMENT_KINDS: readonly SpecDocumentKind[] = ['requirements', 'design', 'tasks', 'notes'];
+const DOCUMENT_KINDS: readonly SpecDocumentKind[] = SPEC_DOCUMENT_KINDS;
 
 /** Pure core projectors shared across renders. */
 const statToggleView = new SpecStatToggleView();
@@ -582,46 +583,48 @@ function renderActions(card: ISpecCardView): HTMLElement {
 const ACTIVATION_KEYS: ReadonlySet<string> = new Set(['Enter', ' ']);
 
 /**
- * Open a spec's `requirements.md` through the existing openDocument intent.
- * @param card The spec card view.
+ * Open a spec's resolved entry document through the existing openDocument intent.
+ * @param card The spec card view (with a resolved entry document).
+ * @param entry The entry document to open.
  */
-function openCardRequirements(card: ISpecCardView): void {
+function openCardEntry(card: ISpecCardView, entry: SpecDocumentKind): void {
   vscodeApi.postMessage({
     type: 'openDocument',
     folderPath: card.folderPath,
-    document: 'requirements',
+    document: entry,
   });
 }
 
 /**
- * Make the card body a keyboard-accessible button opening the spec's
- * `requirements.md`.
+ * Make the card body a keyboard-accessible button opening the spec's entry
+ * document (resolved on the host from `.config.kiro`, with a fallback).
  *
  * Only the card background is the open gesture: inner controls (document links,
  * run button, status badge) stop click propagation, so a click on them never
- * also opens the card. When `requirements.md` is absent the card-body open is a
+ * also opens the card. When no entry document exists the card-body open is a
  * disabled no-op (no role, no tabstop, no handler). The actual open reuses the
  * existing openDocument postMessage path.
  * @param article The card element.
  * @param card The spec card view.
  */
 function wireCardBody(article: HTMLElement, card: ISpecCardView): void {
-  if (!card.documents.requirements) {
+  const entry = card.entryDocument;
+  if (undefined === entry) {
     article.classList.add('card-disabled');
     return;
   }
   article.classList.add('card-clickable');
   article.setAttribute('role', 'button');
   article.setAttribute('tabindex', '0');
-  article.setAttribute('aria-label', `Open requirements for ${card.name}`);
-  article.addEventListener('click', () => openCardRequirements(card));
+  article.setAttribute('aria-label', `Open ${entry} for ${card.name}`);
+  article.addEventListener('click', () => openCardEntry(card, entry));
   article.addEventListener('keydown', (event) => {
     if (!ACTIVATION_KEYS.has(event.key)) {
       return;
     }
     // Prevent the space key from scrolling and activate the open gesture.
     event.preventDefault();
-    openCardRequirements(card);
+    openCardEntry(card, entry);
   });
 }
 
@@ -661,16 +664,16 @@ const hoverController = new HoverIntroductionController(
 
 /**
  * Wire a card's hover/focus affordance to the hover controller, so it lazily
- * requests its requirements introduction and drives the floating preview panel.
+ * requests its entry-document introduction and drives the floating preview panel.
  *
- * It only wires a spec that actually has a `requirements.md`. Leaving or blurring
+ * It only wires a spec that has a resolved entry document. Leaving or blurring
  * the card hides the panel; inner controls already stop propagation, so this
  * never interferes with the card-body open gesture.
  * @param article The card element.
  * @param card The spec card view.
  */
 function wireCardHover(article: HTMLElement, card: ISpecCardView): void {
-  if (!card.documents.requirements) {
+  if (undefined === card.entryDocument) {
     return;
   }
   const enter = (): void => hoverController.enter(card.folderPath);
@@ -1231,8 +1234,8 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
     state.stats = message.stats;
     state.globalTaskStats = message.globalTaskStats;
     // A full re-render means the specs were re-discovered (workspace change, a
-    // `requirements.md` added), so clear the hover request gate and cache: a
-    // later hover can retry a spec whose reply was lost or whose requirements
+    // entry document added), so clear the hover request gate and cache: a
+    // later hover can retry a spec whose reply was lost or whose entry document
     // appeared after the first hover.
     hoverController.reset();
     render();
@@ -1241,6 +1244,9 @@ window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage
   if ('specUpdated' === message.type) {
     state.stats = message.stats;
     state.globalTaskStats = message.globalTaskStats;
+    // The entry document may have changed (`.config.kiro`, `bugfix.md` added):
+    // drop this card's hover caches so the next hover re-asks the host.
+    hoverController.invalidate(message.card.folderPath);
     applySpecUpdate(message.card);
     return;
   }

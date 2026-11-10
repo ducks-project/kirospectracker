@@ -17,6 +17,7 @@ import { TasksOnlyDocumentPolicy } from './core/status/TasksOnlyDocumentPolicy';
 import { TasksMarkdownParser } from './core/parsing/TasksMarkdownParser';
 import { SpecGrouper } from './core/status/SpecGrouper';
 import { SpecRepository } from './adapters/SpecRepository';
+import { KiroSpecConfigReader } from './adapters/config/KiroSpecConfigReader';
 import { SpecIntroductionLoader } from './adapters/SpecIntroductionLoader';
 import { SpecFileDecorationProvider } from './adapters/SpecFileDecorationProvider';
 import {
@@ -56,6 +57,7 @@ const TREE_OPEN_COMMAND_IDS: Readonly<Record<SpecDocumentKind, string>> = {
   design: 'kirospectracker.tree.openDesign',
   tasks: 'kirospectracker.tree.openTasks',
   notes: 'kirospectracker.tree.openNotes',
+  bugfix: 'kirospectracker.tree.openBugfix',
 };
 
 /** Tree context-menu command id syncing the targeted spec's task files. */
@@ -230,7 +232,7 @@ function createDashboardActions(
  * @param repository The spec repository supplying snapshots.
  * @param stats The pure aggregate-stats calculator.
  * @param actions The handler for inbound dashboard intents.
- * @param introductions The lazy loader serving requirements introductions on hover.
+ * @param introductions The lazy loader serving entry-document introductions on hover.
  * @returns The wired dashboard provider.
  */
 function createDashboard(
@@ -262,13 +264,45 @@ function createTree(repository: SpecRepository): SpecTreeDataProvider {
 }
 
 /**
+ * Build the hover introduction loader and keep its cache in sync with the
+ * repository, so a changed spec never serves a stale introduction.
+ * @param context The extension context owning the subscription.
+ * @param repository The spec repository emitting change deltas.
+ * @param fileSystem The file-system port the loader reads through.
+ * @returns The subscribed loader.
+ */
+function createIntroductionLoader(
+  context: vscode.ExtensionContext,
+  repository: SpecRepository,
+  fileSystem: VscodeSpecFileSystem,
+): SpecIntroductionLoader {
+  const loader = new SpecIntroductionLoader(fileSystem);
+  const dispose = repository.onDidChangeSpecs((delta) => loader.onSpecsChanged(delta));
+  context.subscriptions.push({ dispose });
+  return loader;
+}
+/**
+ * Build the spec repository, reading `.config.kiro` through its dedicated adapter.
+ * @param fileSystem The host file-system wrapper (also the change notifier).
+ * @returns The wired repository.
+ */
+function createRepository(fileSystem: VscodeSpecFileSystem): SpecRepository {
+  return new SpecRepository(
+    fileSystem,
+    createSnapshotFactory(),
+    fileSystem,
+    undefined,
+    new KiroSpecConfigReader(fileSystem),
+  );
+}
+/**
  * Construct every collaborator for the given extension context.
  * @param context The extension context supplying the base URI.
  * @returns The fully wired collaborators.
  */
 function buildWiring(context: vscode.ExtensionContext): IWiring {
   const fileSystem = new VscodeSpecFileSystem();
-  const repository = new SpecRepository(fileSystem, createSnapshotFactory(), fileSystem);
+  const repository = createRepository(fileSystem);
   const gateway = new VscodeWorkspaceGateway();
   const stats = new SpecStatsCalculator();
   const openDocument = new OpenDocumentCommand(repository, gateway);
@@ -277,7 +311,7 @@ function buildWiring(context: vscode.ExtensionContext): IWiring {
   // Start on the always-valid Null Object; detection may later upgrade it.
   const agentActions = new SpecAgentActions(repository, agentFallback, gateway);
   const actions = createDashboardActions(openDocument, agentActions);
-  const loader = new SpecIntroductionLoader(fileSystem);
+  const loader = createIntroductionLoader(context, repository, fileSystem);
   const dashboard = createDashboard(context, repository, stats, actions, loader);
   const decorations = new SpecFileDecorationProvider(repository, new SpecDecorationMapper(), stats);
   return {

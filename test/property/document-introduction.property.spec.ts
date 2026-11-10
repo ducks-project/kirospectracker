@@ -1,19 +1,19 @@
 import { expect } from 'chai';
 import * as fc from 'fast-check';
 
-import { extractRequirementsIntroduction } from '../../src/core/parsing/RequirementsIntroduction';
+import { extractDocumentIntroduction } from '../../src/core/parsing/DocumentIntroduction';
 
 /** Match any ATX heading line, used to assert the result carries no heading. */
 const HEADING_LINE = /^#{1,6}\s+/;
 
 /**
- * Property-based specification for {@link extractRequirementsIntroduction}.
+ * Property-based specification for {@link extractDocumentIntroduction}.
  */
-describe('extractRequirementsIntroduction (properties)', () => {
+describe('extractDocumentIntroduction (properties)', () => {
   it('is total: any string input yields a string or undefined and never throws', () => {
     fc.assert(
       fc.property(fc.string(), (content) => {
-        const result = extractRequirementsIntroduction(content);
+        const result = extractDocumentIntroduction(content);
         expect(undefined === result || 'string' === typeof result).to.equal(true);
       }),
     );
@@ -22,7 +22,7 @@ describe('extractRequirementsIntroduction (properties)', () => {
   it('is total over multi-line arbitrary text', () => {
     fc.assert(
       fc.property(fc.array(fc.string(), { maxLength: 40 }), (lines) => {
-        expect(() => extractRequirementsIntroduction(lines.join('\n'))).to.not.throw();
+        expect(() => extractDocumentIntroduction(lines.join('\n'))).to.not.throw();
       }),
     );
   });
@@ -30,7 +30,7 @@ describe('extractRequirementsIntroduction (properties)', () => {
   it('never returns a result containing a heading line', () => {
     fc.assert(
       fc.property(fc.array(fc.string(), { maxLength: 40 }), (lines) => {
-        const result = extractRequirementsIntroduction(lines.join('\n'));
+        const result = extractDocumentIntroduction(lines.join('\n'));
         if (undefined === result) {
           return;
         }
@@ -43,7 +43,7 @@ describe('extractRequirementsIntroduction (properties)', () => {
   it('never returns an empty or whitespace-only string', () => {
     fc.assert(
       fc.property(fc.string(), (content) => {
-        const result = extractRequirementsIntroduction(content);
+        const result = extractDocumentIntroduction(content);
         if (undefined === result) {
           return;
         }
@@ -63,7 +63,7 @@ describe('extractRequirementsIntroduction (properties)', () => {
           ),
         (body) => {
           const content = `# Title\n\nPreamble.\n\n## Introduction\n\n${body}\n\n## Next\n`;
-          expect(extractRequirementsIntroduction(content)).to.equal(body.trim());
+          expect(extractDocumentIntroduction(content)).to.equal(body.trim());
         },
       ),
     );

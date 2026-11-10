@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import * as fc from 'fast-check';
 
 import type { ISpecSnapshot } from '../../src/core/model/ISpecSnapshot';
+import { SPEC_DOCUMENT_KINDS } from '../../src/core/model/SpecDocumentKind';
 import { SpecStatus } from '../../src/core/model/SpecStatus';
 import { SpecCardViewMapper } from '../../src/core/status/SpecCardViewMapper';
 import { deriveSpecOwnerLabel } from '../../src/core/status/SpecOwnerLabel';
@@ -39,7 +40,9 @@ const snapshotArb: fc.Arbitrary<ISpecSnapshot> = fc.record({
     requirements: fc.boolean(),
     design: fc.boolean(),
     notes: fc.boolean(),
+    bugfix: fc.boolean(),
   }),
+  entryDocument: fc.constantFrom(...SPEC_DOCUMENT_KINDS, undefined),
   status: statusArb,
   progress: progressArb,
 });
@@ -52,6 +55,7 @@ describe('SpecCardViewMapper (properties)', () => {
     fc.assert(
       fc.property(snapshotArb, (snapshot) => {
         const card = mapper.map(snapshot);
+        expect(card.entryDocument).to.equal(snapshot.entryDocument);
         expect(card.status).to.equal(snapshot.status);
         expect(card.progress).to.deep.equal(snapshot.progress);
         expect(card.folderKey).to.equal(snapshot.workspacePath);

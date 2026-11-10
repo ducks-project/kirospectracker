@@ -59,17 +59,20 @@ describe('Spec decorations (Node host)', () => {
     await vscode.workspace.fs.writeFile(inProgressTasksUri, originalTasksContent);
   });
 
-  it('discovers the five fixture specs', () => {
+  it('discovers the eight fixture specs', () => {
     const names = api.repository
       .getSpecs()
       .map((spec) => spec.name)
       .sort();
     expect(names).to.deep.equal([
+      'bugfix-spec',
       'cancelled-completed',
       'completed',
+      'design-first-spec',
       'in-progress',
       'malformed',
       'not-started',
+      'requirements-first-spec',
     ]);
   });
 
