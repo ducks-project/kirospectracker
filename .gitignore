@@ -26,8 +26,9 @@ coverage/
 .history
 
 # Kiro steering and specs.
-# NOTE: .kiro is ignored for now, so the project steering files are NOT versioned yet.
-# Whether to version them (and which ones) is a decision left to the maintainer later.
+# NOTE: .kiro stays ignored, except the four steering files referenced by CONTRIBUTING.md
+# (typescript-conventions, vscode-extension-guidelines, testing-strategy, file-cohesion),
+# which are tracked with `git add -f`.
 .kiro
 
 # Exception: integration-test fixtures ship their own throwaway .kiro/specs trees,

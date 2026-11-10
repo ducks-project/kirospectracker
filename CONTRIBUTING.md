@@ -25,9 +25,13 @@ steering files:
 - [TypeScript conventions](./.kiro/steering/typescript-conventions.md)
 - [VS Code extension guidelines](./.kiro/steering/vscode-extension-guidelines.md)
 - [Testing strategy](./.kiro/steering/testing-strategy.md)
+- [File cohesion](./.kiro/steering/file-cohesion.md)
 
 In short: strict TypeScript, no `any`, interfaces prefixed with `I`, early return, Yoda
-style, short functions, ES modules, and comments and JSDoc in English.
+style, short functions, ES modules, one cohesive concept per file, and comments and
+JSDoc in English.
+
+The other files under `.kiro/` stay local and are not versioned.
 
 ## Running the tests
 
