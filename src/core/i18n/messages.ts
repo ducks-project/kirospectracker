@@ -77,6 +77,8 @@ export const WEBVIEW_ONLY_KEYS = [
   'Filter by {0} folder',
   'Filter by folder',
   'Open {0} for {1}',
+  'Preview {0}',
+  'Close preview',
   'Run tasks',
   'Run required tasks',
   'Run required and optional tasks',

@@ -26,6 +26,9 @@ import { visibleDocumentKinds } from './visibleDocumentKinds';
 import { HoverIntroductionController } from './HoverIntroductionController';
 import type { IHoverPanelView } from './IHoverPanelView';
 import { DomHoverPanelView } from './DomHoverPanelView';
+import { createHoverCloseButton } from './HoverCloseButton';
+import { createPreviewIconButton } from './PreviewIconButton';
+import { PREVIEW_ICON_CLASS } from './previewDomNames';
 import type { IHoverAnchor, IHoverDom, IHoverPanelElement } from './DomHoverPanelView';
 import { SpecCardFilter } from '../core/status/SpecCardFilter';
 import { SpecFolderFilter } from '../core/status/SpecFolderFilter';
@@ -178,7 +181,11 @@ const ICON_PATHS: Readonly<Record<string, string>> = {
   close: 'M4 3L3 4l3.5 3.5L3 11l1 1 3.5-3.5L11 12l1-1-3.5-3.5L12 4l-1-1-3.5 3.5L4 3z',
   // A funnel, i.e. a filter glyph (matching the Extensions view affordance).
   filter: 'M1 2h14v2l-5 5v5l-4-2V9L1 4V2z',
+  // An eye (almond outline plus pupil), i.e. a preview glyph; drawn for the even-odd rule.
+  eye: 'M8 3C4.5 3 2 6 1 8c1 2 3.5 5 7 5s6-3 7-5c-1-2-3.5-5-7-5zM8 4.2C5.4 4.2 3.4 6.4 2.4 8c1 1.6 3 3.8 5.6 3.8s4.6-2.2 5.6-3.8C12.6 6.4 10.6 4.2 8 4.2zM8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z',
 };
+/** Glyphs whose sub-paths overlap and need the even-odd fill rule. */
+const EVEN_ODD_GLYPHS: ReadonlySet<string> = new Set(['eye']);
 
 /**
  * Build a static, decorative SVG icon for a known glyph name.
@@ -200,6 +207,9 @@ function icon(glyph: string): SVGElement {
   const path = document.createElementNS(SVG_NS, 'path');
   path.setAttribute('d', ICON_PATHS[glyph] ?? '');
   path.setAttribute('fill', 'currentColor');
+  if (EVEN_ODD_GLYPHS.has(glyph)) {
+    path.setAttribute('fill-rule', 'evenodd');
+  }
   svg.appendChild(path);
   return svg;
 }
@@ -675,12 +685,17 @@ function wireCardBody(article: HTMLElement, card: ISpecCardView): void {
  * mounted card nodes.
  */
 const hoverDom: IHoverDom = {
-  findAnchor: (folderPath: string): IHoverAnchor | undefined => cardNodes.get(folderPath),
+  findAnchor: (folderPath: string): IHoverAnchor | undefined =>
+    cardNodes.get(folderPath)?.querySelector<HTMLElement>(`.${PREVIEW_ICON_CLASS}`) ?? undefined,
   createPanel: (): IHoverPanelElement => el('div', 'card-hover-panel'),
   mountPanel: (panel: IHoverPanelElement): void => {
     document.body.appendChild(panel as HTMLElement);
   },
   createIntro: (text: string): unknown => el('p', 'card-hover-intro', text),
+  createCloseButton: (): unknown =>
+    createHoverCloseButton(tw('Close preview'), () => hoverController.close()),
+  isFocusInside: (panel: IHoverPanelElement): boolean =>
+    (panel as HTMLElement).contains(document.activeElement),
   viewport: () => ({ width: window.innerWidth, height: window.innerHeight }),
 };
 /** DOM-backed adapter driving the floating preview panel. */
@@ -705,33 +720,27 @@ const hoverController = new HoverIntroductionController(
 );
 
 /**
- * Wire a card's hover/focus affordance to the hover controller, so it lazily
- * requests its entry-document introduction and drives the floating preview panel.
- *
- * It only wires a spec that has a resolved entry document. Leaving or blurring
- * the card hides the panel; inner controls already stop propagation, so this
- * never interferes with the card-body open gesture.
- * @param article The card element.
+ * Build a card's eye button opening its entry-document introduction preview,
+ * or nothing when the spec has no resolved entry document.
  * @param card The spec card view.
+ * @returns The preview button, or `undefined` without an entry document.
  */
-function wireCardHover(article: HTMLElement, card: ISpecCardView): void {
+function renderPreviewIcon(card: ISpecCardView): HTMLElement | undefined {
   if (undefined === card.entryDocument) {
-    return;
+    return undefined;
   }
-  const enter = (): void => hoverController.enter(card.folderPath);
-  const leave = (): void => hoverController.leave();
-  article.addEventListener('mouseenter', enter);
-  article.addEventListener('focus', enter);
-  article.addEventListener('mouseleave', leave);
-  article.addEventListener('blur', leave);
+  return createPreviewIconButton({
+    folderPath: card.folderPath,
+    label: tw('Preview {0}', card.name),
+    glyph: icon('eye'),
+    controls: hoverController,
+  });
 }
-
 document.addEventListener('keydown', (event: KeyboardEvent): void => {
   if ('Escape' === event.key) {
-    hoverController.leave();
+    hoverController.close();
   }
 });
-
 /** Class of the floating hover panel, whose own inner scroll must not dismiss it. */
 const HOVER_PANEL_CLASS = 'card-hover-panel';
 
@@ -749,10 +758,20 @@ document.addEventListener(
     if (target instanceof Element && null !== target.closest(`.${HOVER_PANEL_CLASS}`)) {
       return;
     }
-    hoverController.leave();
+    hoverController.close();
   },
   { capture: true, passive: true },
 );
+// A click outside the popin and its icon closes the preview. The icon stops its
+// own click propagation, so this only sees clicks elsewhere.
+document.addEventListener('click', (event: MouseEvent): void => {
+  const { target } = event;
+  const selector = `.${HOVER_PANEL_CLASS}, .${PREVIEW_ICON_CLASS}`;
+  if (target instanceof Element && null !== target.closest(selector)) {
+    return;
+  }
+  hoverController.close();
+});
 /**
  * Append the required/optional progress bars and the per-state breakdown row to
  * a card.
@@ -814,7 +833,13 @@ function renderOwnerLabel(card: ISpecCardView): HTMLElement {
 function renderCard(card: ISpecCardView): HTMLElement {
   const article = el('article', `card status-${card.status}`);
   const header = el('div', 'card-header');
-  header.appendChild(el('h2', 'card-title', card.name));
+  const heading = el('div', 'card-heading');
+  heading.appendChild(el('h2', 'card-title', card.name));
+  const preview = renderPreviewIcon(card);
+  if (undefined !== preview) {
+    heading.appendChild(preview);
+  }
+  header.appendChild(heading);
   header.appendChild(renderStatusBadge(card));
   article.appendChild(header);
   article.appendChild(renderOwnerLabel(card));
@@ -825,7 +850,6 @@ function renderCard(card: ISpecCardView): HTMLElement {
   }
   article.appendChild(renderActions(card));
   wireCardBody(article, card);
-  wireCardHover(article, card);
   return article;
 }
 

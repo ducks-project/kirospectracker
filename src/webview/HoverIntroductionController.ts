@@ -2,8 +2,8 @@ import type { IScheduler, ScheduleHandle } from '../core/ports/IScheduler';
 import type { DashboardInboundMessage } from '../core/model/IDashboardMessage';
 import type { IHoverPanelView } from './IHoverPanelView';
 
-/** Debounce delay, in milliseconds, before a hovered card requests its intro. */
-export const HOVER_REQUEST_DELAY_MS = 300;
+/** Debounce delay, in milliseconds, before a hovered preview icon requests its intro. */
+export const HOVER_REQUEST_DELAY_MS = 150;
 
 /** Posts an inbound message back to the host. */
 export type PostMessage = (message: DashboardInboundMessage) => void;
@@ -13,8 +13,8 @@ export type PostMessage = (message: DashboardInboundMessage) => void;
  *
  * It owns the three pieces of state the hover feature needs — which folder paths
  * have already asked the host for an introduction, which replies have arrived
- * (including the "no derivable introduction" case), and which card is currently
- * hovered — and keeps them all `vscode`/DOM-free by depending on an injected
+ * (including the "no derivable introduction" case), and which preview icon is
+ * currently hovered, focused or pinned — and keeps them all `vscode`/DOM-free by depending on an injected
  * {@link IScheduler}, a {@link PostMessage} and an {@link IHoverPanelView}.
  *
  * Request laziness is preserved: a card's introduction is requested at most once
@@ -23,6 +23,15 @@ export type PostMessage = (message: DashboardInboundMessage) => void;
  * is {@link reset}, called on a full repository re-render, which clears both the
  * request gate and the cache so a spec whose `requirements.md` appeared after the
  * first hover — or whose first reply was lost — can be retried.
+ *
+ * State machine (one preview at a time):
+ * - Idle: nothing active.
+ * - Hovering: {@link enter} on an icon; the popin is shown (non-interactive)
+ *   once the introduction is known. {@link leave} returns to Idle.
+ * - Pinned: {@link togglePin} on the active or another icon; {@link leave} is
+ *   ignored. {@link close} (close button, Escape, outside click, scroll) or a
+ *   second {@link togglePin} on the same icon returns to Idle.
+ * Entering another icon while Pinned replaces the pinned preview.
  */
 export class HoverIntroductionController {
   private readonly scheduler: IScheduler;
@@ -47,8 +56,12 @@ export class HoverIntroductionController {
   /** Pending hover-request cancel handle, cleared when the pointer leaves early. */
   private pendingRequest: ScheduleHandle | undefined;
 
-  /** Folder path of the card currently hovered, driving the panel's content. */
+  /** Folder path of the icon currently hovered, focused or pinned, driving the panel. */
   private activeFolderPath: string | undefined;
+  /** Whether the active preview is pinned (survives the pointer leaving the icon). */
+  private pinned = false;
+  /** Whether a close is in progress, so a focus returned to the icon does not reopen. */
+  private closing = false;
 
   /**
    * Build a controller over its injected collaborators.
@@ -70,33 +83,65 @@ export class HoverIntroductionController {
   }
 
   /**
-   * Handle a pointer/focus entering a card: mark it active, show any cached
-   * introduction, and debounce a one-shot request to the host.
-   * @param folderPath Absolute path of the hovered spec folder.
+   * Handle a pointer/focus entering a preview icon: mark it active, show any
+   * cached introduction, and debounce a one-shot request to the host. Ignored
+   * while a close is returning focus to the icon, and when that icon is already
+   * pinned. Entering another icon replaces a pinned preview.
+   * @param folderPath Absolute path of the spec folder whose icon is entered.
    */
   public enter(folderPath: string): void {
+    if (this.closing || (this.pinned && folderPath === this.activeFolderPath)) {
+      return;
+    }
+    this.pinned = false;
     this.activeFolderPath = folderPath;
+    this.hidePanel();
     this.showCached(folderPath);
-    this.pendingRequest?.();
+    this.cancelPending();
     this.pendingRequest = this.scheduler.schedule(() => {
       this.pendingRequest = undefined;
       this.request(folderPath);
     }, this.delayMs);
   }
-
   /**
-   * Handle a pointer/focus leaving a card: cancel a still-pending request and
-   * hide the panel.
+   * Handle a pointer/focus leaving a preview icon: cancel a still-pending
+   * request and hide the panel, unless the preview is pinned.
    */
   public leave(): void {
-    if (undefined !== this.pendingRequest) {
-      this.pendingRequest();
-      this.pendingRequest = undefined;
+    if (this.pinned) {
+      return;
     }
-    this.activeFolderPath = undefined;
-    this.panel.hide();
+    this.close();
   }
-
+  /**
+   * Handle a click (or Enter/Space) on a preview icon: pin its preview, or
+   * unpin and close it when it is already pinned. Pinning requests the
+   * introduction immediately instead of waiting for the hover delay.
+   * @param folderPath Absolute path of the spec folder whose icon was activated.
+   */
+  public togglePin(folderPath: string): void {
+    if (this.pinned && folderPath === this.activeFolderPath) {
+      this.close();
+      return;
+    }
+    this.cancelPending();
+    this.activeFolderPath = folderPath;
+    this.pinned = true;
+    this.hidePanel();
+    this.request(folderPath);
+    this.showCached(folderPath);
+  }
+  /**
+   * Unconditionally close the preview, pinned or not: cancel a pending request,
+   * clear the active target and hide the panel. Idempotent and cheap, so it can
+   * serve the close button, Escape, outside clicks and scroll.
+   */
+  public close(): void {
+    this.cancelPending();
+    this.activeFolderPath = undefined;
+    this.pinned = false;
+    this.hidePanel();
+  }
   /**
    * Handle a host `introduction` reply: cache it, then show it when its card is
    * still the one being hovered. An `undefined` introduction is cached as `null`
@@ -109,7 +154,7 @@ export class HoverIntroductionController {
     if (folderPath !== this.activeFolderPath || undefined === introduction) {
       return;
     }
-    this.panel.showText(folderPath, introduction);
+    this.panel.showText(folderPath, introduction, this.pinned);
   }
 
   /**
@@ -123,7 +168,7 @@ export class HoverIntroductionController {
    * never arrived, and a `requirements.md` created after the first hover.
    */
   public reset(): void {
-    this.leave();
+    this.close();
     this.requested.clear();
     this.introductions.clear();
   }
@@ -137,14 +182,14 @@ export class HoverIntroductionController {
     this.requested.delete(folderPath);
     this.introductions.delete(folderPath);
     if (folderPath === this.activeFolderPath) {
-      this.leave();
+      this.close();
     }
   }
   /**
    * Request a card's introduction from the host, at most once per card. The host
    * memoises the result, so a client-side gate is enough to avoid re-posting the
    * same request until the next {@link reset}.
-   * @param folderPath Absolute path of the hovered spec folder.
+   * @param folderPath Absolute path of the spec folder.
    */
   private request(folderPath: string): void {
     if (this.requested.has(folderPath)) {
@@ -165,6 +210,23 @@ export class HoverIntroductionController {
     if (undefined === cached || null === cached) {
       return;
     }
-    this.panel.showText(folderPath, cached);
+    this.panel.showText(folderPath, cached, this.pinned);
+  }
+  /**
+   * Hide the panel while ignoring the focus event its hiding may trigger when it
+   * returns focus to the icon, which would otherwise reopen the preview.
+   */
+  private hidePanel(): void {
+    this.closing = true;
+    try {
+      this.panel.hide();
+    } finally {
+      this.closing = false;
+    }
+  }
+  /** Cancel a still-pending debounced request, if any. */
+  private cancelPending(): void {
+    this.pendingRequest?.();
+    this.pendingRequest = undefined;
   }
 }

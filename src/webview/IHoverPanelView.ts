@@ -9,12 +9,14 @@
  */
 export interface IHoverPanelView {
   /**
-   * Show the panel anchored to a card, filled with the given introduction text.
-   * @param anchorFolderPath Folder path of the card the panel is anchored to.
+   * Show the panel anchored to a card's preview icon, filled with the given
+   * introduction text.
+   * @param anchorFolderPath Folder path of the card whose icon the panel is anchored to.
    * @param introduction The introduction text, rendered as inert text.
+   * @param pinned Whether the panel is pinned: interactive, with a close button.
    */
-  showText(anchorFolderPath: string, introduction: string): void;
+  showText(anchorFolderPath: string, introduction: string, pinned: boolean): void;
 
-  /** Hide the panel. */
+  /** Hide the panel, giving focus back to the icon when it was inside a pinned panel. */
   hide(): void;
 }
