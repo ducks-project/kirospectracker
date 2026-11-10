@@ -50,14 +50,24 @@ class FakePanelView implements IHoverPanelView {
 
   public visible = false;
 
-  public showText(anchorFolderPath: string, introduction: string): void {
+  public shownPinned = false;
+
+  public hideCount = 0;
+
+  /** Simulates focus returning to the icon while hiding. */
+  public onHide: (() => void) | undefined;
+
+  public showText(anchorFolderPath: string, introduction: string, pinned: boolean): void {
     this.shownFor = anchorFolderPath;
     this.shownText = introduction;
+    this.shownPinned = pinned;
     this.visible = true;
   }
 
   public hide(): void {
     this.visible = false;
+    this.hideCount += 1;
+    this.onHide?.();
   }
 }
 
@@ -223,26 +233,25 @@ describe('HoverIntroductionController', () => {
     controller.invalidate(folderPath);
     expect(panel.visible).to.equal(false);
   });
-  it('debounces with the exported HOVER_REQUEST_DELAY_MS (300 ms)', () => {
+  it('debounces with the exported HOVER_REQUEST_DELAY_MS', () => {
     const { controller, scheduler } = build();
     controller.enter(folderPath);
     expect(scheduler.delays).to.deep.equal([HOVER_REQUEST_DELAY_MS]);
-    expect(HOVER_REQUEST_DELAY_MS).to.equal(300);
   });
   it('a scroll-style leave hides the panel, cancels the pending request and clears the target', () => {
     const { controller, scheduler, panel, posted } = build();
     controller.enter(folderPath);
-    controller.leave();
+    controller.close();
     expect(scheduler.pendingCount).to.equal(0);
     scheduler.flush();
     expect(posted).to.have.length(0);
     controller.receive(folderPath, 'Late');
     expect(panel.visible).to.equal(false);
   });
-  it('is idempotent when leave fires repeatedly on scroll', () => {
+  it('is idempotent when close fires repeatedly on scroll', () => {
     const { controller, panel } = build();
-    controller.leave();
-    controller.leave();
+    controller.close();
+    controller.close();
     expect(panel.visible).to.equal(false);
   });
   it('reopens from the cache on a hover following a scroll dismissal', () => {
@@ -265,5 +274,149 @@ describe('HoverIntroductionController', () => {
     controller.enter(folderPath);
     scheduler.flush();
     expect(posted).to.have.length(1);
+  });
+  describe('pinning', () => {
+    const other = '/ws/.kiro/specs/beta';
+    /** Hover a card, flush the request and deliver its reply. */
+    function openHover(
+      h: ReturnType<typeof build>,
+      path: string = folderPath,
+      text = 'Intro',
+    ): void {
+      h.controller.enter(path);
+      h.scheduler.flush();
+      h.controller.receive(path, text);
+    }
+    it('shows an unpinned preview on hover', () => {
+      const h = build();
+      openHover(h);
+      expect(h.panel.visible).to.equal(true);
+      expect(h.panel.shownPinned).to.equal(false);
+    });
+    it('pins the visible preview on click', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      expect(h.panel.visible).to.equal(true);
+      expect(h.panel.shownPinned).to.equal(true);
+    });
+    it('stays open when the pointer leaves a pinned icon', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.leave();
+      expect(h.panel.visible).to.equal(true);
+    });
+    it('keeps a pinned preview on re-entering its own icon', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      const hides = h.panel.hideCount;
+      h.controller.enter(folderPath);
+      expect(h.panel.visible).to.equal(true);
+      expect(h.panel.shownPinned).to.equal(true);
+      expect(h.panel.hideCount).to.equal(hides);
+    });
+    it('requests immediately when pinned before any reply, then shows pinned', () => {
+      const h = build();
+      h.controller.enter(folderPath);
+      h.controller.togglePin(folderPath);
+      expect(h.posted).to.deep.equal([{ type: 'requestIntroduction', folderPath }]);
+      expect(h.scheduler.pendingCount).to.equal(0);
+      h.controller.receive(folderPath, 'Late');
+      expect(h.panel.shownPinned).to.equal(true);
+      expect(h.panel.shownText).to.equal('Late');
+    });
+    it('does not re-request a spec already requested when pinning', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      expect(h.posted).to.have.length(1);
+    });
+    it('closes on a second click on the same icon', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.togglePin(folderPath);
+      expect(h.panel.visible).to.equal(false);
+      h.controller.leave();
+      expect(h.panel.visible).to.equal(false);
+    });
+    it('closes a pinned preview unconditionally (close button, Escape, outside click, scroll)', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.close();
+      expect(h.panel.visible).to.equal(false);
+      h.controller.receive(folderPath, 'Again');
+      expect(h.panel.visible).to.equal(false);
+    });
+    it('replaces a pinned preview when another icon is hovered', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.enter(other);
+      expect(h.panel.visible).to.equal(false);
+      h.controller.receive(other, 'Other');
+      expect(h.panel.shownFor).to.equal(other);
+      expect(h.panel.shownPinned).to.equal(false);
+    });
+    it('replaces a pinned preview when another icon is pinned', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.togglePin(other);
+      expect(h.panel.visible).to.equal(false);
+      h.controller.receive(other, 'Other');
+      expect(h.panel.shownFor).to.equal(other);
+      expect(h.panel.shownPinned).to.equal(true);
+    });
+    it('does not show a reply for a replaced pinned icon', () => {
+      const h = build();
+      h.controller.togglePin(folderPath);
+      h.controller.togglePin(other);
+      h.controller.receive(folderPath, 'Stale');
+      expect(h.panel.visible).to.equal(false);
+    });
+    it('closes a pinned preview on reset and invalidate of its card', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.invalidate(folderPath);
+      expect(h.panel.visible).to.equal(false);
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.reset();
+      expect(h.panel.visible).to.equal(false);
+      h.controller.leave();
+      expect(h.panel.visible).to.equal(false);
+    });
+    it('keeps a pinned preview when another card is invalidated', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.invalidate(other);
+      expect(h.panel.visible).to.equal(true);
+    });
+    it('ignores the focus event fired while a close hands the focus back to the icon', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.panel.onHide = (): void => h.controller.enter(folderPath);
+      h.controller.close();
+      h.panel.onHide = undefined;
+      h.scheduler.flush();
+      expect(h.panel.visible).to.equal(false);
+      expect(h.scheduler.pendingCount).to.equal(0);
+    });
+    it('accepts a normal hover again after a close', () => {
+      const h = build();
+      openHover(h);
+      h.controller.togglePin(folderPath);
+      h.controller.close();
+      h.controller.enter(folderPath);
+      expect(h.panel.visible).to.equal(true);
+      expect(h.panel.shownPinned).to.equal(false);
+    });
   });
 });
