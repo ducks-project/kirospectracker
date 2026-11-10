@@ -5,6 +5,7 @@ import * as path from 'path';
 import { HideSpecsMode } from '../../src/core/hiding/HideSpecsMode';
 import { DEFAULT_HIDDEN_STATUSES } from '../../src/core/hiding/HiddenStatusSelection';
 import { SpecStatus } from '../../src/core/model/SpecStatus';
+import { resolveNls } from '../helpers/manifest-nls';
 import { RESET_HIDDEN_SPECS_COMMAND_ID } from '../../src/adapters/commands/ResetHiddenSpecsCommand';
 
 const MANIFEST_PATH = path.resolve(
@@ -64,7 +65,7 @@ describe('package.json hideSpecs contribution', () => {
     const command = manifest.contributes.commands.find(
       (c) => RESET_HIDDEN_SPECS_COMMAND_ID === c.command,
     );
-    expect(command?.title).to.equal('Kiro Spec Tracker: Reset Hidden Specs');
+    expect(resolveNls(command?.title ?? '')).to.equal('Kiro Spec Tracker: Reset Hidden Specs');
     const hidden = manifest.contributes.menus.commandPalette.find(
       (entry) => RESET_HIDDEN_SPECS_COMMAND_ID === entry.command,
     );
