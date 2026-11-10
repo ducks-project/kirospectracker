@@ -9,6 +9,42 @@ import { runTests } from '@vscode/test-electron';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
+ * Read an optional, non-empty environment variable.
+ * @param name The variable name.
+ * @returns Its value, or `undefined` when unset or empty.
+ */
+function optionalEnv(name: string): string | undefined {
+  const value = process.env[name];
+  return undefined === value || '' === value ? undefined : value;
+}
+/**
+ * Build the optional launch options from the `KIRO_SPEC_TRACKER_TEST_*`
+ * variables, so a local run can target another editor build (for example the
+ * installed Kiro) under a chosen display language with a disposable profile.
+ * With none set the result is empty and the default (CI) behaviour is unchanged.
+ * @returns The executable path, extra launch arguments and the expected locale.
+ */
+function readOptions(): { executable?: string; args: string[]; locale?: string } {
+  const args: string[] = [];
+  const locale = optionalEnv('KIRO_SPEC_TRACKER_TEST_LOCALE');
+  const userDataDir = optionalEnv('KIRO_SPEC_TRACKER_TEST_USER_DATA_DIR');
+  const extensionsDir = optionalEnv('KIRO_SPEC_TRACKER_TEST_EXTENSIONS_DIR');
+  const extra = optionalEnv('KIRO_SPEC_TRACKER_TEST_EXTRA_ARGS');
+  if (undefined !== locale) {
+    args.push(`--locale=${locale}`);
+  }
+  if (undefined !== userDataDir) {
+    args.push(`--user-data-dir=${userDataDir}`);
+  }
+  if (undefined !== extensionsDir) {
+    args.push(`--extensions-dir=${extensionsDir}`);
+  }
+  if (undefined !== extra) {
+    args.push(...extra.split(/\s+/).filter((flag) => '' !== flag));
+  }
+  return { executable: optionalEnv('KIRO_SPEC_TRACKER_TEST_EXECUTABLE'), args, locale };
+}
+/**
  * Entry point launching the VS Code integration test suite under a headless
  * editor instance (`@vscode/test-electron`). On Linux CI this process is wrapped
  * in `xvfb-run` to provide a virtual display.
@@ -23,10 +59,15 @@ async function main(): Promise<void> {
     const extensionTestsPath = path.resolve(extensionDevelopmentPath, 'out/test/integration/index');
     const workspacePath = path.resolve(extensionDevelopmentPath, 'test/fixtures/workspace');
 
+    const options = readOptions();
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
-      launchArgs: [workspacePath, '--disable-extensions'],
+      ...(undefined === options.executable ? {} : { vscodeExecutablePath: options.executable }),
+      ...(undefined === options.locale
+        ? {}
+        : { extensionTestsEnv: { KIRO_SPEC_TRACKER_TEST_LOCALE: options.locale } }),
+      launchArgs: [workspacePath, '--disable-extensions', ...options.args],
     });
   } catch (error) {
     // eslint-disable-next-line no-console
