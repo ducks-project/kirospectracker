@@ -6,6 +6,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-10
+
+### Added
+
+- Add a French translation of the extension, shown when the editor's display language is
+  French through a language pack (as with the VS Code French language pack in Kiro); without
+  such a pack the extension stays in English. It covers the manifest (command titles, views and
+  settings, through `package.nls.json` / `package.nls.fr.json`), the host and core messages
+  (notifications, tooltips, tree labels, through `vscode.l10n` and `l10n/bundle.l10n.fr.json`)
+  and the dashboard. The French wording follows the impersonal style of the VS Code French
+  language pack; "spec", "dashboard", the document names (`requirements`, `design`, `tasks`,
+  `notes`, `bugfix`), the prompts sent to the Kiro agent and the diagnostic output channel stay
+  in English.
+- Translate strings through a core `ITranslator` port backed by a `VscodeTranslator` adapter,
+  so the core stays free of the `vscode` API, with a single typed English catalogue as the
+  source of every message. The dashboard webview, which has no access to the translation API,
+  receives its translated catalogue from the host in a `strings` message posted before each
+  render, and its `<html lang>` follows the display language.
+- Add tests guarding the catalogues: every manifest placeholder resolves, the English and
+  French files carry the same keys and the same template markers, and the French bundle covers
+  the whole catalogue. The integration test harness can run under a chosen editor executable and
+  locale through `KIRO_SPEC_TRACKER_TEST_*` environment variables, used to check the French
+  rendering under Kiro.
+
+### Changed
+
+- Show a readable status label on the dashboard card badge (for example "Fully completed"
+  instead of the `FullyCompleted` identifier), in every language. The `SpecStatus` values and
+  the keys of the `kirospectracker.hideSpecs.statuses` setting are unchanged.
+
 ## [0.12.0] - 2026-11-10
 
 ### Added
@@ -388,7 +418,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.12.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/ducks-project/kirospectracker/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ducks-project/kirospectracker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/ducks-project/kirospectracker/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ducks-project/kirospectracker/compare/v0.9.0...v0.10.0

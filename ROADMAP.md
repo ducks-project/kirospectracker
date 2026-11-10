@@ -9,14 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.13.0 — Internationalization (French as first locale) [Planned]
-
-- [ ] Externalize all user-facing strings: manifest strings via `package.nls.json` /
-      `package.nls.<locale>.json` and runtime strings via the `vscode.l10n` API with an
-      `l10n/` bundle, with no behavioural change.
-- [ ] Ship French as the first non-default locale and verify the display language is
-      honoured in Kiro specifically (locale propagation and bundle loading).
-
 ## v0.14.0 — Document and enforce the real one-concept-per-file rule [Planned]
 
 - [ ] Write the project's actual file-cohesion rule into the TypeScript steering: a file
