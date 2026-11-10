@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 
 import type { AgentBetaNoticeChoice } from '../core/AgentBetaNoticeDecider';
 import { AgentBetaNoticeDecider } from '../core/AgentBetaNoticeDecider';
-
+import type { ITranslator } from '../core/ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../core/i18n/IdentityTranslator';
 /** Configuration section owning the agent-integration settings. */
 const CONFIG_SECTION = 'kirospectracker.agentIntegration';
 
@@ -14,20 +15,6 @@ const ACKNOWLEDGED_KEY = 'kirospectracker.agentIntegration.betaNoticeAcknowledge
 
 /** Settings query focusing the extension's settings. */
 const SETTINGS_QUERY = '@ext:ducks-project.kirospectracker';
-
-/** Non-modal beta notice text (ROADMAP v0.7.0 suggested message). */
-const NOTICE_MESSAGE =
-  "Kiro Spec Tracker's Sync Files and Run tasks actions adapt on a best-effort basis to the " +
-  'editor and are in beta: they may change and can be disabled at any time.';
-
-/** "Keep enabled" button label. */
-const KEEP_LABEL = 'Keep enabled';
-
-/** "Disable" button label. */
-const DISABLE_LABEL = 'Disable';
-
-/** "Settings" button label. */
-const SETTINGS_LABEL = 'Settings';
 
 /**
  * Thin host wrapper surfacing the agent-integration beta notice through the
@@ -43,18 +30,21 @@ export class VscodeAgentBetaNotice {
   private readonly context: vscode.ExtensionContext;
 
   private readonly decider: AgentBetaNoticeDecider;
-
+  private readonly translator: ITranslator;
   /**
    * Build the notice over the extension context and the pure decider.
    * @param context The extension context owning the global state.
    * @param decider The pure decision helper.
+   * @param translator The translator for the notice and its buttons (English by default).
    */
   public constructor(
     context: vscode.ExtensionContext,
     decider: AgentBetaNoticeDecider = new AgentBetaNoticeDecider(),
+    translator: ITranslator = IDENTITY_TRANSLATOR,
   ) {
     this.context = context;
     this.decider = decider;
+    this.translator = translator;
   }
 
   /**
@@ -83,21 +73,26 @@ export class VscodeAgentBetaNotice {
    * Show the non-modal toast and map the clicked button to a canonical choice.
    * @returns The user's choice, or `undefined` when dismissed.
    */
-  // eslint-disable-next-line class-methods-use-this
   private async promptChoice(): Promise<AgentBetaNoticeChoice> {
+    // One translated constant per label, used both for display and comparison.
+    const keepLabel = this.translator.t('Keep enabled');
+    const disableLabel = this.translator.t('Disable');
+    const settingsLabel = this.translator.t('Settings');
     const clicked = await vscode.window.showInformationMessage(
-      NOTICE_MESSAGE,
-      KEEP_LABEL,
-      DISABLE_LABEL,
-      SETTINGS_LABEL,
+      this.translator.t(
+        "Kiro Spec Tracker's Sync Files and Run tasks actions adapt on a best-effort basis to the editor and are in beta: they may change and can be disabled at any time.",
+      ),
+      keepLabel,
+      disableLabel,
+      settingsLabel,
     );
-    if (KEEP_LABEL === clicked) {
+    if (keepLabel === clicked) {
       return 'keep';
     }
-    if (DISABLE_LABEL === clicked) {
+    if (disableLabel === clicked) {
       return 'disable';
     }
-    if (SETTINGS_LABEL === clicked) {
+    if (settingsLabel === clicked) {
       return 'settings';
     }
     return undefined;

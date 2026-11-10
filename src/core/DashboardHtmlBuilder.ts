@@ -10,8 +10,12 @@ export interface IDashboardHtmlInput {
   readonly scriptUri: string;
   /** URI (as string) of the bundled dashboard stylesheet. */
   readonly styleUri: string;
+  /** Display language written to `<html lang>` (defaults to `en`). */
+  readonly language?: string;
 }
 
+/** Language written to `<html lang>` when none is given. */
+const DEFAULT_LANGUAGE = 'en';
 /**
  * Pure builder producing the dashboard webview HTML shell with a strict CSP.
  *
@@ -42,10 +46,11 @@ export class DashboardHtmlBuilder {
     const source = this.escaper.escape(input.cspSource);
     const script = this.escaper.escape(input.scriptUri);
     const style = this.escaper.escape(input.styleUri);
+    const language = this.escaper.escape(input.language ?? DEFAULT_LANGUAGE);
     const csp =
       `default-src 'none'; img-src ${source}; ` +
       `style-src ${source} 'nonce-${nonce}'; script-src 'nonce-${nonce}';`;
-    return DashboardHtmlBuilder.document(csp, nonce, script, style);
+    return DashboardHtmlBuilder.document(csp, nonce, script, style, language);
   }
 
   /**
@@ -54,12 +59,19 @@ export class DashboardHtmlBuilder {
    * @param nonce The escaped nonce.
    * @param script The escaped script URI.
    * @param style The escaped stylesheet URI.
+   * @param language The escaped display language.
    * @returns The HTML document string.
    */
-  private static document(csp: string, nonce: string, script: string, style: string): string {
+  private static document(
+    csp: string,
+    nonce: string,
+    script: string,
+    style: string,
+    language: string,
+  ): string {
     return [
       '<!DOCTYPE html>',
-      '<html lang="en">',
+      `<html lang="${language}">`,
       '<head>',
       '<meta charset="UTF-8" />',
       `<meta http-equiv="Content-Security-Policy" content="${csp}" />`,

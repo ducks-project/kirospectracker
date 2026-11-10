@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 
 import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
 import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
+import type { ITranslator } from '../core/ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../core/i18n/IdentityTranslator';
 import type { SpecDecorationColor } from '../core/status/ISpecDecoration';
 import type { SpecDecorationMapper } from '../core/status/SpecDecorationMapper';
 import type { SpecStatsCalculator } from '../core/status/SpecStatsCalculator';
@@ -37,7 +39,7 @@ export class SpecFileDecorationProvider implements vscode.FileDecorationProvider
   private readonly mapper: SpecDecorationMapper;
 
   private readonly stats: SpecStatsCalculator;
-
+  private readonly translator: ITranslator;
   private readonly emitter: vscode.EventEmitter<vscode.Uri[]> = new vscode.EventEmitter<
     vscode.Uri[]
   >();
@@ -52,15 +54,18 @@ export class SpecFileDecorationProvider implements vscode.FileDecorationProvider
    * @param repository The spec repository supplying cached snapshots.
    * @param mapper The pure status-to-decoration mapper.
    * @param stats The pure aggregate-stats calculator for the root summary.
+   * @param translator The translator for the summary tooltip (English by default).
    */
   public constructor(
     repository: SpecRepository,
     mapper: SpecDecorationMapper,
     stats: SpecStatsCalculator,
+    translator: ITranslator = IDENTITY_TRANSLATOR,
   ) {
     this.repository = repository;
     this.mapper = mapper;
     this.stats = stats;
+    this.translator = translator;
     this.disposeRepositoryListener = this.repository.onDidChangeSpecs((delta) =>
       this.handleDelta(delta),
     );
@@ -111,9 +116,13 @@ export class SpecFileDecorationProvider implements vscode.FileDecorationProvider
       return undefined;
     }
     const counts = this.stats.calculate(this.repository.getSpecs());
-    const tooltip =
-      `Kiro specs — ${counts.completed} completed, ${counts.inProgress} in progress, ` +
-      `${counts.notStarted} not started, ${counts.malformed} malformed`;
+    const tooltip = this.translator.t(
+      'Kiro specs — {0} completed, {1} in progress, {2} not started, {3} malformed',
+      counts.completed,
+      counts.inProgress,
+      counts.notStarted,
+      counts.malformed,
+    );
     return { badge: SUMMARY_BADGE, tooltip };
   }
 

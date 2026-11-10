@@ -50,4 +50,32 @@ describe('DashboardHtmlBuilder', () => {
   it('declares no network origin in the CSP', () => {
     expect(buildHtml()).to.not.match(/https?:\/\/(?!host)/);
   });
+  it('declares English as the default document language', () => {
+    expect(buildHtml()).to.contain('<html lang="en">');
+  });
+  it('writes the given display language and escapes it', () => {
+    const builder = new DashboardHtmlBuilder(new HtmlEscaper());
+    const input = {
+      nonce: 'abc123',
+      cspSource: 'vscode-resource://host',
+      scriptUri: 'a',
+      styleUri: 'b',
+    };
+    expect(builder.build({ ...input, language: 'fr' })).to.contain('<html lang="fr">');
+    expect(builder.build({ ...input, language: 'fr"><script>x()</script>' })).to.not.contain(
+      '<script>x()',
+    );
+  });
+  it('keeps the CSP identical whatever the language', () => {
+    const csp = (html: string): string =>
+      /Content-Security-Policy" content="([^"]*)"/.exec(html)![1];
+    const builder = new DashboardHtmlBuilder(new HtmlEscaper());
+    const input = {
+      nonce: 'abc123',
+      cspSource: 'vscode-resource://host',
+      scriptUri: 'a',
+      styleUri: 'b',
+    };
+    expect(csp(builder.build({ ...input, language: 'fr' }))).to.equal(csp(builder.build(input)));
+  });
 });

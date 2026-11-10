@@ -1,4 +1,6 @@
 import type { ISpecAgentGateway } from '../../core/ports/ISpecAgentGateway';
+import type { ITranslator } from '../../core/ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../../core/i18n/IdentityTranslator';
 import type { IAgentDiagnosticSink } from '../ports/IAgentDiagnosticSink';
 import type { IAgentErrorReporter } from '../ports/IAgentErrorReporter';
 import type { IAgentNotifier } from '../ports/IAgentNotifier';
@@ -21,6 +23,7 @@ import { UnavailableAgentGateway } from './UnavailableAgentGateway';
  * @param diagnostics The observability sink passed to the Kiro adapter.
  * @param fallback The Null-Object fallback (already wired over the honest MVP).
  * @param enabled Whether the agent integration is enabled (the setting).
+ * @param translator The translator for the toasts (English by default).
  * @returns The selected gateway.
  */
 export async function createSpecAgentGateway(
@@ -30,13 +33,14 @@ export async function createSpecAgentGateway(
   diagnostics: IAgentDiagnosticSink,
   fallback: UnavailableAgentGateway,
   enabled: boolean,
+  translator: ITranslator = IDENTITY_TRANSLATOR,
 ): Promise<ISpecAgentGateway> {
   if (!enabled) {
     return fallback;
   }
   const ids = await commands.getCommands();
   if (KiroChatAgentGateway.isSupported(ids)) {
-    return new KiroChatAgentGateway(commands, reporter, notifier, diagnostics);
+    return new KiroChatAgentGateway(commands, reporter, notifier, diagnostics, translator);
   }
   return fallback;
 }

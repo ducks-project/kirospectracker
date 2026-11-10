@@ -17,6 +17,18 @@ export interface IRenderMessage {
   readonly globalTaskStats: IGlobalTaskStats;
 }
 
+/**
+ * Outbound message: the translated message catalogue for the webview.
+ *
+ * The webview cannot reach `vscode.l10n`, so the host sends the translated
+ * templates (English message to raw `{n}` template) before each `render`.
+ */
+export interface IStringsMessage {
+  readonly type: 'strings';
+  /** Display language of the host (`vscode.env.language`). */
+  readonly language: string;
+  readonly messages: Readonly<Record<string, string>>;
+}
 /** Outbound message: update a single changed card and the aggregate stats. */
 export interface ISpecUpdatedMessage {
   readonly type: 'specUpdated';
@@ -94,6 +106,7 @@ export interface IReadyMessage {
 
 /** Union of messages the extension sends to the webview. */
 export type DashboardOutboundMessage =
+  | IStringsMessage
   | IRenderMessage
   | IToggleLayoutMessage
   | ISpecUpdatedMessage

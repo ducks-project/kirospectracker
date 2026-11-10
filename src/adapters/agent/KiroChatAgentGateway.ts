@@ -8,6 +8,8 @@ import type { IAgentDiagnosticSink } from '../ports/IAgentDiagnosticSink';
 import type { IAgentErrorReporter } from '../ports/IAgentErrorReporter';
 import type { IAgentNotifier } from '../ports/IAgentNotifier';
 import type { ICommandGateway } from '../ports/ICommandGateway';
+import type { ITranslator } from '../../core/ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../../core/i18n/IdentityTranslator';
 import { runMessageForScope, SPEC_AGENT_MESSAGES } from '../../core/SpecAgentMessages';
 import { composeMessageWithFolderContext } from '../../core/SpecAgentContext';
 
@@ -213,7 +215,7 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
   private readonly notifier: IAgentNotifier;
 
   private readonly diagnostics: IAgentDiagnosticSink;
-
+  private readonly translator: ITranslator;
   /**
    * How the created session was activated on the current `send`. Set by the
    * preferred create path and consumed by {@link logDiagnostic} and
@@ -236,17 +238,20 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
    * @param reporter The channel surfacing a best-effort failure.
    * @param notifier The channel confirming an honest success/affordance.
    * @param diagnostics The observability sink for the concise diagnostic line.
+   * @param translator The translator for the user-facing toasts (English by default).
    */
   public constructor(
     commands: ICommandGateway,
     reporter: IAgentErrorReporter,
     notifier: IAgentNotifier,
     diagnostics: IAgentDiagnosticSink,
+    translator: ITranslator = IDENTITY_TRANSLATOR,
   ) {
     this.commands = commands;
     this.reporter = reporter;
     this.notifier = notifier;
     this.diagnostics = diagnostics;
+    this.translator = translator;
   }
 
   /**
@@ -315,7 +320,10 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.reporter.showError(
-        `Kiro Spec Tracker: the agent action could not be completed (${detail}).`,
+        this.translator.t(
+          'Kiro Spec Tracker: the agent action could not be completed ({0}).',
+          detail,
+        ),
       );
     }
   }
@@ -532,23 +540,31 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
       return;
     }
     if ('focusInput-submit' === path) {
-      this.notifier.notifyInfo(`Kiro Spec Tracker: sent to Kiro chat \u2014 "${message}".`);
+      this.notifier.notifyInfo(
+        this.translator.t('Kiro Spec Tracker: sent to Kiro chat \u2014 "{0}".', message),
+      );
       return;
     }
     if ('focusInput-fill' === path) {
       this.notifier.notifyInfo(
-        `Kiro Spec Tracker: filled the chat with "${message}" \u2014 press Enter to run it.`,
+        this.translator.t(
+          'Kiro Spec Tracker: filled the chat with "{0}" \u2014 press Enter to run it.',
+          message,
+        ),
       );
       return;
     }
     if ('chat-open' === path) {
       this.notifier.notifyInfo(
-        `Kiro Spec Tracker: opened the chat with "${message}" \u2014 you may need to send it.`,
+        this.translator.t(
+          'Kiro Spec Tracker: opened the chat with "{0}" \u2014 you may need to send it.',
+          message,
+        ),
       );
       return;
     }
     this.reporter.showError(
-      'Kiro Spec Tracker: no Kiro chat command is available to run this action.',
+      this.translator.t('Kiro Spec Tracker: no Kiro chat command is available to run this action.'),
     );
   }
 
@@ -561,12 +577,11 @@ export class KiroChatAgentGateway implements ISpecAgentGateway {
    */
   private createPathToast(message: string): string {
     if ('none' === this.activation) {
-      return (
-        `Kiro Spec Tracker: sent to Kiro chat \u2014 if it did not come to the front, ` +
-        `open it from Session History.`
+      return this.translator.t(
+        'Kiro Spec Tracker: sent to Kiro chat \u2014 if it did not come to the front, open it from Session History.',
       );
     }
-    return `Kiro Spec Tracker: sent to Kiro chat \u2014 "${message}".`;
+    return this.translator.t('Kiro Spec Tracker: sent to Kiro chat \u2014 "{0}".', message);
   }
 
   /**

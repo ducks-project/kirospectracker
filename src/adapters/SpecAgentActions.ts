@@ -1,5 +1,7 @@
 import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
 import type { RunScope, ISpecAgentGateway } from '../core/ports/ISpecAgentGateway';
+import type { ITranslator } from '../core/ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../core/i18n/IdentityTranslator';
 import type { IAgentErrorReporter } from './ports/IAgentErrorReporter';
 import type { SpecRepository } from './SpecRepository';
 
@@ -20,7 +22,7 @@ export class SpecAgentActions {
   private gateway: ISpecAgentGateway;
 
   private readonly reporter: IAgentErrorReporter;
-
+  private readonly translator: ITranslator;
   /**
    * Build the actions over the repository, the gateway and the error reporter.
    *
@@ -31,15 +33,18 @@ export class SpecAgentActions {
    * @param repository The spec repository supplying cached snapshots.
    * @param gateway The agent gateway (Strategy chosen at composition time).
    * @param reporter The channel used when the folder resolves to no spec.
+   * @param translator The translator for user messages (English by default).
    */
   public constructor(
     repository: SpecRepository,
     gateway: ISpecAgentGateway,
     reporter: IAgentErrorReporter,
+    translator: ITranslator = IDENTITY_TRANSLATOR,
   ) {
     this.repository = repository;
     this.gateway = gateway;
     this.reporter = reporter;
+    this.translator = translator;
   }
 
   /**
@@ -58,7 +63,7 @@ export class SpecAgentActions {
   public async syncTasks(folderPath: string): Promise<void> {
     const snapshot = this.findSpec(folderPath);
     if (undefined === snapshot) {
-      this.reporter.showError(`No spec found at ${folderPath}.`);
+      this.reporter.showError(this.translator.t('No spec found at {0}.', folderPath));
       return;
     }
     await this.gateway.syncTasks(snapshot);
@@ -72,7 +77,7 @@ export class SpecAgentActions {
   public async runTasks(folderPath: string, scope: RunScope): Promise<void> {
     const snapshot = this.findSpec(folderPath);
     if (undefined === snapshot) {
-      this.reporter.showError(`No spec found at ${folderPath}.`);
+      this.reporter.showError(this.translator.t('No spec found at {0}.', folderPath));
       return;
     }
     await this.gateway.runTasks(snapshot, scope);

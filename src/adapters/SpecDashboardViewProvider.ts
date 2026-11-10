@@ -5,10 +5,13 @@ import type {
   IIntroductionMessage,
   IRenderMessage,
   ISpecUpdatedMessage,
+  IStringsMessage,
 } from '../core/model/IDashboardMessage';
 import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
 import type { DashboardHtmlBuilder } from '../core/DashboardHtmlBuilder';
 import type { NonceFactory } from '../core/NonceFactory';
+import type { ITranslator } from '../core/ports/ITranslator';
+import { buildWebviewCatalog } from '../core/i18n/WebviewCatalog';
 import type { SpecCardViewMapper } from '../core/status/SpecCardViewMapper';
 import type { SpecStatsCalculator } from '../core/status/SpecStatsCalculator';
 import type { IDashboardActions } from './ports/IDashboardActions';
@@ -54,7 +57,8 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
   private readonly actions: IDashboardActions;
 
   private readonly introductionLoader: SpecIntroductionLoader;
-
+  private readonly translator: ITranslator;
+  private readonly language: string;
   private view: vscode.WebviewView | undefined;
 
   private disposeRepositoryListener: (() => void) | undefined;
@@ -69,6 +73,8 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
    * @param nonceFactory The per-render nonce factory.
    * @param actions The handler for inbound dashboard intents.
    * @param introductionLoader The lazy loader serving entry-document introductions on hover.
+   * @param translator The host translator whose catalogue is sent to the webview.
+   * @param language The host display language (`vscode.env.language`).
    */
   public constructor(
     extensionUri: vscode.Uri,
@@ -79,6 +85,8 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     nonceFactory: NonceFactory,
     actions: IDashboardActions,
     introductionLoader: SpecIntroductionLoader,
+    translator: ITranslator,
+    language: string,
   ) {
     this.extensionUri = extensionUri;
     this.repository = repository;
@@ -88,6 +96,8 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
     this.nonceFactory = nonceFactory;
     this.actions = actions;
     this.introductionLoader = introductionLoader;
+    this.translator = translator;
+    this.language = language;
   }
 
   /**
@@ -148,6 +158,7 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
       cspSource: webview.cspSource,
       scriptUri: asset(SCRIPT_FILE),
       styleUri: asset(STYLE_FILE),
+      language: this.language,
     });
   }
 
@@ -179,12 +190,21 @@ export class SpecDashboardViewProvider implements vscode.WebviewViewProvider, IL
   }
 
   /**
-   * Post the current card views and stats to the webview.
+   * Post the translated catalogue, then the current card views and stats.
+   *
+   * The `strings` message always precedes the `render` so the webview builds
+   * its UI directly in the user's language.
    */
   private postRender(): void {
     if (undefined === this.view) {
       return;
     }
+    const strings: IStringsMessage = {
+      type: 'strings',
+      language: this.language,
+      messages: buildWebviewCatalog(this.translator),
+    };
+    this.view.webview.postMessage(strings).then(undefined, undefined);
     const snapshots = this.repository.getSpecs();
     const message: IRenderMessage = {
       type: 'render',

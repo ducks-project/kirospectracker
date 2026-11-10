@@ -1,5 +1,7 @@
 import type { SpecDocumentKind } from '../../core/model/IDashboardMessage';
 import type { ISpecSnapshot } from '../../core/model/ISpecSnapshot';
+import type { ITranslator } from '../../core/ports/ITranslator';
+import { IDENTITY_TRANSLATOR } from '../../core/i18n/IdentityTranslator';
 import type { IWorkspaceGateway } from '../ports/IWorkspaceGateway';
 import type { SpecRepository } from '../SpecRepository';
 import { documentFileName } from '../../core/SpecDocumentFiles';
@@ -18,15 +20,21 @@ export class OpenDocumentCommand {
   private readonly repository: SpecRepository;
 
   private readonly gateway: IWorkspaceGateway;
-
+  private readonly translator: ITranslator;
   /**
    * Build the command over the repository and the workspace gateway.
    * @param repository The spec repository.
    * @param gateway The workspace gateway performing the open.
+   * @param translator The translator for user messages (English by default).
    */
-  public constructor(repository: SpecRepository, gateway: IWorkspaceGateway) {
+  public constructor(
+    repository: SpecRepository,
+    gateway: IWorkspaceGateway,
+    translator: ITranslator = IDENTITY_TRANSLATOR,
+  ) {
     this.repository = repository;
     this.gateway = gateway;
+    this.translator = translator;
   }
 
   /**
@@ -37,11 +45,13 @@ export class OpenDocumentCommand {
   public async execute(folderPath: string, document: SpecDocumentKind): Promise<void> {
     const snapshot = this.findSpec(folderPath);
     if (undefined === snapshot) {
-      this.gateway.showError(`No spec found at ${folderPath}.`);
+      this.gateway.showError(this.translator.t('No spec found at {0}.', folderPath));
       return;
     }
     if (!snapshot.documents[document]) {
-      this.gateway.showError(`The ${document} document is not present for "${snapshot.name}".`);
+      this.gateway.showError(
+        this.translator.t('The {0} document is not present for "{1}".', document, snapshot.name),
+      );
       return;
     }
     await this.gateway.openDocument(`${folderPath}/${documentFileName(document)}`);

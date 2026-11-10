@@ -5,6 +5,7 @@ import type {
   DashboardOutboundMessage,
   IIntroductionMessage,
   IRequestIntroductionMessage,
+  IStringsMessage,
 } from '../../src/core/model/IDashboardMessage';
 
 /**
@@ -59,5 +60,19 @@ describe('Dashboard introduction hover protocol', () => {
   it('types openDocument with the bugfix kind', () => {
     const open: DashboardInboundMessage = { type: 'openDocument', folderPath, document: 'bugfix' };
     expect(open.type).to.equal('openDocument');
+  });
+});
+/**
+ * The host sends its translated catalogue to the webview as a typed message.
+ */
+describe('Dashboard strings protocol', () => {
+  it('types the strings catalogue as a member of the outbound union', () => {
+    const strings: DashboardOutboundMessage = {
+      type: 'strings',
+      language: 'fr',
+      messages: { 'Clear search': 'Effacer la recherche' },
+    };
+    expect(strings.type).to.equal('strings');
+    expect((strings as IStringsMessage).messages['Clear search']).to.equal('Effacer la recherche');
   });
 });
