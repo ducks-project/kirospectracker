@@ -42,8 +42,10 @@ settings only if you opt in to hiding specs by status.
   discreet global strip reports task-level statistics across all specs (done,
   cancelled, in-progress and to-do counts, plus an overall resolved percentage). Completed
   specs are set apart but stay visible. Each spec links to its `requirements.md`, `design.md`,
-  `tasks.md`, `notes.md` and `bugfix.md` when present. Clicking a card (and hovering it for
-  the introduction preview) uses the spec's _entry document_, read from its `.config.kiro`:
+  `tasks.md`, `notes.md` and `bugfix.md` when present. An eye icon next to the spec name
+  previews the introduction: hover or focus it to show the preview, click it to pin the
+  preview open. Clicking a card and the preview both use the spec's _entry document_, read
+  from its `.config.kiro`:
   `specType: bugfix` opens `bugfix.md`, else `workflowType: design-first` opens `design.md`,
   else `requirements.md`. When `.config.kiro` is absent, unreadable or has unknown values, or
   the resolved document is missing, the first present of `requirements.md`, `design.md`,

@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-10
+
+### Added
+
+- Add an eye icon next to the spec name on each dashboard card, shown when the spec has an entry
+  document. Hovering or focusing the icon opens the introduction preview after 150 ms, anchored
+  to the icon with its arrow pointing at it.
+- Pin the preview by clicking the eye icon (or pressing Enter or Space on it). A pinned preview
+  stays open when the pointer leaves, accepts pointer input so its text can be selected, and
+  shows a "Close preview" button. It closes on that button, Escape, a second click on the icon,
+  a click outside it or a scroll of the list, and returns the focus to the icon. Only one preview
+  is shown at a time.
+
+### Changed
+
+- Hovering or focusing a card no longer opens the introduction preview: only the eye icon does,
+  so the preview no longer appears while the pointer crosses the cards. Clicking the eye icon
+  does not open the document; clicking elsewhere on the card still opens the entry document.
+
 ## [0.14.1] - 2026-11-10
 
 ### Fixed
@@ -466,7 +485,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.14.1...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/ducks-project/kirospectracker/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/ducks-project/kirospectracker/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/ducks-project/kirospectracker/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/ducks-project/kirospectracker/compare/v0.13.0...v0.13.1

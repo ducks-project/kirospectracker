@@ -9,7 +9,7 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.15.0 — Split webview/main.ts into view modules [Planned]
+## v0.16.0 — Split webview/main.ts into view modules [Planned]
 
 - [ ] Split `src/webview/main.ts` (about 1,350 lines mixing state, DOM helpers, cards,
       toolbar, filters, stats, hover wiring and message handling) into cohesive view
