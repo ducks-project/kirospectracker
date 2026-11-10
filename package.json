@@ -2,7 +2,7 @@
   "name": "kirospectracker",
   "displayName": "Kiro Spec Tracker",
   "description": "Track the progress of your Kiro specs across the IDE: explorer badges, a dashboard, and per-spec status.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "publisher": "ducks-project",
   "license": "MIT",
   "author": "ducks-project",

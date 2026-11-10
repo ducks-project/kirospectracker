@@ -9,18 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.12.0 — Hide completed specs from VS Code views [Planned]
-
-- [ ] Add three independent settings so the user can, for completed specs: hide them from
-      the Explorer, exclude them from Search, and keep them out of Quick Open (Ctrl+P). The
-      extension drives the matching VS Code mechanisms (`files.exclude`, `search.exclude`)
-      from each spec's completion state and refreshes them when a spec's state changes.
-- [ ] Decide during the preparatory investigation whether a dedicated Quick Open setting is
-      warranted or whether `files.exclude` already covers it; drop the redundant setting if
-      so.
-- [ ] Add a dedicated configuration document (`docs/configuration.md`) listing every
-      setting (new and existing) and reference it from the README.
-
 ## v0.13.0 — Internationalization (French as first locale) [Planned]
 
 - [ ] Externalize all user-facing strings: manifest strings via `package.nls.json` /

@@ -6,6 +6,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-10
+
+### Added
+
+- Add a `kirospectracker.hideSpecs.mode` setting to hide specs from VS Code views: `off`
+  (default, nothing is written), `searchAndQuickOpen` (drives `search.exclude`, so Search and
+  Quick Open skip the specs) or `everywhere` (drives `files.exclude`, so the Explorer, Search and
+  Quick Open all skip them). VS Code has no lever for Quick Open alone or the Explorer alone, so
+  these three states are the only achievable ones.
+- Add a `kirospectracker.hideSpecs.statuses` setting that chooses which statuses are hidden, one
+  checkbox per spec status (`Completed` and `FullyCompleted` checked by default). The spec
+  discovery, the dashboard, the tree view and Kiro's own Specs panel are not affected: hidden
+  specs keep being tracked and listed there.
+- Write one `**/.kiro/specs/<name>/**` entry per hidden spec into the settings of the workspace
+  folder that owns it, refreshed whenever a spec status or one of these settings changes. Writes
+  are idempotent and debounced. The extension tracks which entries it added: it never modifies
+  or removes an entry it did not add, it does not re-add an entry the user removed by hand while
+  the spec stays hidden, and it removes its own entries when the mode returns to `off`. Glob
+  characters in spec names are escaped; a name that cannot be escaped reliably is skipped and
+  reported in the diagnostic output channel.
+- Add the `Kiro Spec Tracker: Reset Hidden Specs` command, which removes every entry the
+  extension added.
+- Show a non-blocking notification after the first write, with a button that opens the settings
+  file.
+- Add a configuration guide (`docs/configuration.md`) documenting every setting, the surfaces each
+  mode affects and the known side effects: Kiro agent search tools no longer find hidden specs,
+  VS Code purges the Quick Open history entries of hidden files, a versioned
+  `.vscode/settings.json` gets a diff when a spec status changes, and entries are left behind if
+  the extension is uninstalled while the mode is on.
+
 ## [0.11.0] - 2026-11-10
 
 ### Added
@@ -358,7 +388,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.11.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/ducks-project/kirospectracker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/ducks-project/kirospectracker/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ducks-project/kirospectracker/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ducks-project/kirospectracker/compare/v0.8.0...v0.9.0
