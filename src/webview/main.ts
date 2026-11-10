@@ -12,6 +12,8 @@ import type { WebviewMessageKey } from '../core/i18n/messages';
 import type { ITranslator } from '../core/ports/ITranslator';
 import { CatalogTranslator } from '../core/i18n/CatalogTranslator';
 import { IDENTITY_TRANSLATOR } from '../core/i18n/IdentityTranslator';
+import type { PluralMessageKey } from '../core/i18n/pluralMessage';
+import { translatePlural } from '../core/i18n/pluralMessage';
 import { statusLabel } from '../core/status/SpecStatusLabel';
 import type { RunScope } from '../core/ports/ISpecAgentGateway';
 import type { SpecFilterKey } from '../core/model/SpecFilterKey';
@@ -72,6 +74,15 @@ let translator: ITranslator = IDENTITY_TRANSLATOR;
  */
 function tw(key: WebviewMessageKey, ...args: ReadonlyArray<string | number>): string {
   return translator.t(key, ...args);
+}
+/**
+ * Translate a plural webview message and agree it with a count.
+ * @param key The plural English message.
+ * @param count The count, also substituted for `{0}`.
+ * @returns The translated phrase in the form matching the count.
+ */
+function twp(key: Extract<WebviewMessageKey, PluralMessageKey>, count: number): string {
+  return translatePlural(translator, key, count);
 }
 /** Pure core projectors shared across renders (rebuilt when the strings arrive). */
 let statToggleView = new SpecStatToggleView(translator);
@@ -278,8 +289,13 @@ function appendGlobalStatItem(
 function renderGlobalStats(stats: IGlobalTaskStats): HTMLElement {
   const strip = el('section', 'global-stats');
   strip.setAttribute('aria-label', tw('Global task statistics'));
-  appendGlobalStatItem(strip, 'global-stat-done', tw('done'), stats.done);
-  appendGlobalStatItem(strip, 'global-stat-cancelled', tw('cancelled'), stats.cancelled);
+  appendGlobalStatItem(strip, 'global-stat-done', twp('done|done', stats.done), stats.done);
+  appendGlobalStatItem(
+    strip,
+    'global-stat-cancelled',
+    twp('cancelled|cancelled', stats.cancelled),
+    stats.cancelled,
+  );
   appendGlobalStatItem(strip, 'global-stat-inProgress', tw('in progress'), stats.inProgress);
   appendGlobalStatItem(strip, 'global-stat-todo', tw('to-do'), stats.todo);
   const percent = Math.round(stats.percentComplete * PERCENT);
@@ -349,8 +365,13 @@ function renderCardBreakdown(card: ISpecCardView): HTMLElement | undefined {
     return undefined;
   }
   const row = el('div', 'task-states');
-  appendBreakdownItem(row, 'task-state-done', tw('{0} done', done), done);
-  appendBreakdownItem(row, 'task-state-cancelled', tw('{0} cancelled', cancelled), cancelled);
+  appendBreakdownItem(row, 'task-state-done', twp('{0} done|{0} done', done), done);
+  appendBreakdownItem(
+    row,
+    'task-state-cancelled',
+    twp('{0} cancelled|{0} cancelled', cancelled),
+    cancelled,
+  );
   appendBreakdownItem(row, 'task-state-inProgress', tw('{0} in progress', inProgress), inProgress);
   return row;
 }

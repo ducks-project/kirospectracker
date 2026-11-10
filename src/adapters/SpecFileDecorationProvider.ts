@@ -4,6 +4,7 @@ import type { ISpecSnapshot } from '../core/model/ISpecSnapshot';
 import type { SpecChangeDelta } from '../core/model/ISpecChangeDelta';
 import type { ITranslator } from '../core/ports/ITranslator';
 import { IDENTITY_TRANSLATOR } from '../core/i18n/IdentityTranslator';
+import { translatePlural } from '../core/i18n/pluralMessage';
 import type { SpecDecorationColor } from '../core/status/ISpecDecoration';
 import type { SpecDecorationMapper } from '../core/status/SpecDecorationMapper';
 import type { SpecStatsCalculator } from '../core/status/SpecStatsCalculator';
@@ -117,11 +118,11 @@ export class SpecFileDecorationProvider implements vscode.FileDecorationProvider
     }
     const counts = this.stats.calculate(this.repository.getSpecs());
     const tooltip = this.translator.t(
-      'Kiro specs — {0} completed, {1} in progress, {2} not started, {3} malformed',
-      counts.completed,
-      counts.inProgress,
-      counts.notStarted,
-      counts.malformed,
+      'Kiro specs — {0}, {1}, {2}, {3}',
+      translatePlural(this.translator, '{0} completed|{0} completed', counts.completed),
+      this.translator.t('{0} in progress', counts.inProgress),
+      translatePlural(this.translator, '{0} not started|{0} not started', counts.notStarted),
+      translatePlural(this.translator, '{0} malformed|{0} malformed', counts.malformed),
     );
     return { badge: SUMMARY_BADGE, tooltip };
   }

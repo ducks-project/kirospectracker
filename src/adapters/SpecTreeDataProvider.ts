@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import type { ITranslator } from '../core/ports/ITranslator';
 import { IDENTITY_TRANSLATOR } from '../core/i18n/IdentityTranslator';
 import type { SpecGrouper } from '../core/status/SpecGrouper';
+import { statusCountLabel } from '../core/status/SpecStatusLabel';
 import type { SpecRepository } from './SpecRepository';
 import type { SpecTreeNode } from './SpecTreeNode';
 import { buildSpecTreeContextValue } from '../core/status/SpecTreeContextValue';
@@ -57,7 +58,11 @@ export class SpecTreeDataProvider implements vscode.TreeDataProvider<SpecTreeNod
   public getTreeItem(node: SpecTreeNode): vscode.TreeItem {
     if ('group' === node.kind) {
       const item = new vscode.TreeItem(
-        this.translator.t('{0} ({1})', node.group.label, node.group.specs.length),
+        this.translator.t(
+          '{0} ({1})',
+          statusCountLabel(node.group.status, node.group.specs.length, this.translator),
+          node.group.specs.length,
+        ),
         vscode.TreeItemCollapsibleState.Expanded,
       );
       item.contextValue = 'specGroup';

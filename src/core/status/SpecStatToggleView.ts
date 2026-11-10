@@ -1,7 +1,8 @@
 import type { ISpecStats } from '../model/ISpecStats';
-import type { MessageKey } from '../i18n/messages';
+import type { PluralMessageKey } from '../i18n/pluralMessage';
 import type { ITranslator } from '../ports/ITranslator';
 import { IDENTITY_TRANSLATOR } from '../i18n/IdentityTranslator';
+import { translatePlural } from '../i18n/pluralMessage';
 import type { SpecFilterKey } from '../model/SpecFilterKey';
 import type { SpecStatusFilter } from './SpecStatusFilter';
 import { SPEC_FILTER_KEYS } from '../model/SpecFilterKey';
@@ -18,12 +19,16 @@ export interface ISpecStatToggleView {
   readonly pressed: boolean;
 }
 
-/** Filter-key-to-label-message table, in the stat header display order. */
-export const STAT_LABEL_KEYS: Readonly<Record<SpecFilterKey, MessageKey>> = {
-  completed: 'Completed',
-  inProgress: 'In progress',
-  notStarted: 'Not started',
-  malformed: 'Malformed',
+/**
+ * Filter-key-to-label-message table, in the stat header display order. The
+ * labels are plural messages agreed with the count (the card badge keeps the
+ * singular status label).
+ */
+export const STAT_LABEL_KEYS: Readonly<Record<SpecFilterKey, PluralMessageKey>> = {
+  completed: 'Completed|Completed',
+  inProgress: 'In progress|In progress',
+  notStarted: 'Not started|Not started',
+  malformed: 'Malformed|Malformed',
 };
 
 /**
@@ -80,11 +85,14 @@ export class SpecStatToggleView {
    * @returns The ordered stat toggle views.
    */
   public build(stats: ISpecStats, filter: SpecStatusFilter): readonly ISpecStatToggleView[] {
-    return SPEC_FILTER_KEYS.map((key) => ({
-      key,
-      label: this.translator.t(STAT_LABEL_KEYS[key]),
-      value: valueFor(key, stats),
-      pressed: filter.isActive(key),
-    }));
+    return SPEC_FILTER_KEYS.map((key) => {
+      const value = valueFor(key, stats);
+      return {
+        key,
+        label: translatePlural(this.translator, STAT_LABEL_KEYS[key], value),
+        value,
+        pressed: filter.isActive(key),
+      };
+    });
   }
 }

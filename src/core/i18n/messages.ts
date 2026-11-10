@@ -6,20 +6,32 @@
  * shared by host and webview, host only, or webview only. The compiler refuses
  * any message outside the group a surface is allowed to use.
  */
-/** Messages used by both the host and the webview (status labels). */
+/**
+ * Messages used by both the host and the webview (status labels, singular for a
+ * badge or `singular|plural` for a count, and the invariable in-progress count).
+ */
 export const SHARED_KEYS = [
   'Malformed',
   'Not started',
   'In progress',
   'Completed',
   'Fully completed',
+  'Malformed|Malformed',
+  'Not started|Not started',
+  'In progress|In progress',
+  'Completed|Completed',
+  'Fully completed|Fully completed',
+  '{0} in progress',
 ] as const;
 /** Messages used by the extension host only. */
 export const HOST_ONLY_KEYS = [
   'Unknown folder',
   '{0} — {1}',
   '{0}/{1} required ({2}%) · {3}/{4} optional',
-  'Kiro specs — {0} completed, {1} in progress, {2} not started, {3} malformed',
+  'Kiro specs — {0}, {1}, {2}, {3}',
+  '{0} completed|{0} completed',
+  '{0} not started|{0} not started',
+  '{0} malformed|{0} malformed',
   '{0} ({1})',
   'No spec found at {0}.',
   'The {0} document is not present for "{1}".',
@@ -49,15 +61,14 @@ export const HOST_ONLY_KEYS = [
 ] as const;
 /** Messages used by the webview only. */
 export const WEBVIEW_ONLY_KEYS = [
-  'done',
-  'cancelled',
+  'done|done',
+  'cancelled|cancelled',
   'in progress',
   'to-do',
   'resolved',
   '{0}%',
-  '{0} done',
-  '{0} cancelled',
-  '{0} in progress',
+  '{0} done|{0} done',
+  '{0} cancelled|{0} cancelled',
   'Required: {0}/{1}',
   'Optional: {0}/{1}',
   'Filter specs by status',
