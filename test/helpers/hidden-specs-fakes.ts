@@ -9,7 +9,10 @@ import type {
   IFirstWriteNotice,
   IHiddenSpecsNotifier,
 } from '../../src/adapters/ports/IHiddenSpecsNotifier';
-import type { ISettingsWriter } from '../../src/adapters/ports/ISettingsWriter';
+import type {
+  ISettingsWriter,
+  SettingsWriteResult,
+} from '../../src/adapters/ports/ISettingsWriter';
 import type { ISpecSource } from '../../src/adapters/ports/ISpecSource';
 
 /** One recorded settings write. */
@@ -54,6 +57,8 @@ export class FakeSettingsWriter implements ISettingsWriter {
   public readonly writes: IRecordedWrite[] = [];
   /** When set, writes reject with it. */
   public failWith: Error | undefined;
+  /** Folder paths that are not open: writes to them report `folderNotFound`. */
+  public readonly missingFolders = new Set<string>();
   private readonly values = new Map<string, ExcludeValue>();
 
   /**
@@ -82,17 +87,21 @@ export class FakeSettingsWriter implements ISettingsWriter {
     workspacePath: string,
     setting: ExcludeSettingKey,
     value: ExcludeValue | undefined,
-  ): Promise<void> {
+  ): Promise<SettingsWriteResult> {
     if (undefined !== this.failWith) {
       throw this.failWith;
+    }
+    if (this.missingFolders.has(workspacePath)) {
+      return 'folderNotFound';
     }
     this.writes.push({ workspacePath, setting, value });
     const key = `${workspacePath}|${setting}`;
     if (undefined === value) {
       this.values.delete(key);
-      return;
+      return 'written';
     }
     this.values.set(key, value);
+    return 'written';
   }
 }
 

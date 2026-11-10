@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { ExcludeValue } from '../core/hiding/ExcludeReconciler';
 import type { ExcludeSettingKey } from '../core/hiding/HideSpecsMode';
-import type { ISettingsWriter } from './ports/ISettingsWriter';
+import type { ISettingsWriter, SettingsWriteResult } from './ports/ISettingsWriter';
 
 /**
  * Thin host wrapper implementing {@link ISettingsWriter} over the workspace
@@ -29,15 +29,16 @@ export class VscodeSettingsWriter implements ISettingsWriter {
     workspacePath: string,
     setting: ExcludeSettingKey,
     value: ExcludeValue | undefined,
-  ): Promise<void> {
+  ): Promise<SettingsWriteResult> {
     const folder = this.findFolder(workspacePath);
     if (undefined === folder) {
-      return;
+      return 'folderNotFound';
     }
     const { section, key } = this.split(setting);
     await vscode.workspace
       .getConfiguration(section, folder.uri)
       .update(key, value, vscode.ConfigurationTarget.WorkspaceFolder);
+    return 'written';
   }
 
   private findFolder(workspacePath: string): vscode.WorkspaceFolder | undefined {

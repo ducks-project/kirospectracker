@@ -149,7 +149,11 @@ workspace state (per folder and per setting).
 - Only keys the extension recorded are removed, and only when no longer wanted: the status
   changed, the spec was deleted, the status was unticked, or the mode changed.
 - If you edited (for example set it to `false`) or deleted one of those keys, the extension
-  releases it and does not rewrite it.
+  releases it and does not rewrite it. The removal is remembered in the workspace state: a line
+  you delete by hand stays deleted while its spec remains hidden. It is forgotten as soon as
+  the spec stops being hidden (status changed, spec deleted, status unticked, mode changed or
+  `off`), or when you run **Reset Hidden Specs**; the next time the spec is hidden, the entry
+  is written again. A key you set to `false` stays yours and is never changed or removed.
 - Switching between `searchAndQuickOpen` and `everywhere` moves the entries from one setting
   to the other.
 - Setting the mode back to `off` removes the extension's entries, and only those. A setting
@@ -182,3 +186,8 @@ name, or trailing whitespace (the engine trims the pattern).
   **Reset Hidden Specs**, or remove the entries by hand.
 - **Lost state**: the ownership record lives in the workspace state. If it is lost (new
   clone, cleared storage), existing entries look like your own and are left alone.
+- **Transient empty snapshot**: if a full refresh temporarily finds no spec at all (for example
+  a read error), the extension removes its entries, then writes them back at the next refresh.
+  In a committed `.vscode/settings.json` this can show up as a back-and-forth in the diff.
+- **Folder not open**: if a recorded folder is no longer an open workspace folder, nothing is
+  written for it and a line is added once to the "Kiro Spec Tracker" output channel.

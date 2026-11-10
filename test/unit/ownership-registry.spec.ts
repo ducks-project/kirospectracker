@@ -37,4 +37,32 @@ describe('OwnershipRegistry', () => {
     const mixed = OwnershipRegistry.fromJSON({ '/ws': { 'files.exclude': ['a', 2] } });
     expect(mixed.keysFor('/ws', 'files.exclude')).to.deep.equal(['a']);
   });
+  it('stores withdrawn keys separately and counts them as non-empty', () => {
+    const registry = new OwnershipRegistry().withWithdrawn('/ws', 'files.exclude', ['a']);
+    expect(registry.withdrawnFor('/ws', 'files.exclude')).to.deep.equal(['a']);
+    expect(registry.keysFor('/ws', 'files.exclude')).to.deep.equal([]);
+    expect(registry.isEmpty()).to.equal(false);
+    expect(registry.workspaces()).to.deep.equal(['/ws']);
+    expect(registry.withWithdrawn('/ws', 'files.exclude', []).isEmpty()).to.equal(true);
+  });
+  it('round-trips the versioned shape with owned and withdrawn keys', () => {
+    const registry = new OwnershipRegistry()
+      .with('/ws', 'files.exclude', ['a'])
+      .withWithdrawn('/ws', 'files.exclude', ['b']);
+    const back = OwnershipRegistry.fromJSON(JSON.parse(JSON.stringify(registry.toJSON())));
+    expect(back.keysFor('/ws', 'files.exclude')).to.deep.equal(['a']);
+    expect(back.withdrawnFor('/ws', 'files.exclude')).to.deep.equal(['b']);
+  });
+  it('reads the legacy shape (no withdrawn field) without error', () => {
+    const legacy = { '/ws': { 'files.exclude': ['a'] } };
+    const registry = OwnershipRegistry.fromJSON(legacy);
+    expect(registry.keysFor('/ws', 'files.exclude')).to.deep.equal(['a']);
+    expect(registry.withdrawnFor('/ws', 'files.exclude')).to.deep.equal([]);
+    const partial = OwnershipRegistry.fromJSON({
+      version: 2,
+      owned: { '/ws': { 'files.exclude': ['a'] } },
+    });
+    expect(partial.keysFor('/ws', 'files.exclude')).to.deep.equal(['a']);
+    expect(OwnershipRegistry.fromJSON({ version: 2, withdrawn: 4 }).isEmpty()).to.equal(true);
+  });
 });

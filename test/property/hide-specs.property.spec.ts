@@ -71,7 +71,7 @@ describe('ExcludeReconciler (properties)', () => {
     fc.assert(
       fc.property(currentArb, keysArb, keysArb, (current, owned, desired) => {
         const first = reconciler.reconcile(current, owned, desired);
-        const second = reconciler.reconcile(first.value, first.owned, desired);
+        const second = reconciler.reconcile(first.value, first.owned, desired, first.withdrawn);
         expect(second.changed).to.equal(false);
         expect(second.owned).to.have.members([...first.owned]);
       }),
@@ -92,11 +92,11 @@ describe('ExcludeReconciler (properties)', () => {
   it('ends with every desired key present, unless the user holds it otherwise', () => {
     fc.assert(
       fc.property(currentArb, keysArb, keysArb, (current, owned, desired) => {
-        const next = reconciler.reconcile(current, owned, desired).value ?? {};
+        const result = reconciler.reconcile(current, owned, desired);
+        const next = result.value ?? {};
         desired.forEach((key) => {
-          expect(key in next || false === (current ?? {})[key] || key in (current ?? {})).to.equal(
-            true,
-          );
+          const lost = result.withdrawn.includes(key);
+          expect(key in next || lost || key in (current ?? {})).to.equal(true);
         });
       }),
     );
@@ -118,6 +118,53 @@ describe('ExcludeReconciler (properties)', () => {
   });
 });
 
+describe('ExcludeReconciler withdrawal (properties)', () => {
+  const reconciler = new ExcludeReconciler();
+  it('never rewrites a key the user removed while it stays desired; rewrites after a cycle', () => {
+    fc.assert(
+      fc.property(keysArb, (desired) => {
+        const first = reconciler.reconcile(undefined, [], desired);
+        // The user deletes every key we wrote.
+        const afterUser = reconciler.reconcile(undefined, first.owned, desired, first.withdrawn);
+        expect(afterUser.changed).to.equal(false);
+        expect(afterUser.owned).to.deep.equal([]);
+        // Later runs, still desired: never rewritten.
+        const later = reconciler.reconcile(
+          undefined,
+          afterUser.owned,
+          desired,
+          afterUser.withdrawn,
+        );
+        expect(later.changed).to.equal(false);
+        // Unhide, then hide again: written normally.
+        const unhidden = reconciler.reconcile(undefined, later.owned, [], later.withdrawn);
+        expect(unhidden.withdrawn).to.deep.equal([]);
+        const rehidden = reconciler.reconcile(
+          undefined,
+          unhidden.owned,
+          desired,
+          unhidden.withdrawn,
+        );
+        expect(Object.keys(rehidden.value ?? {}).sort()).to.deep.equal([...desired].sort());
+      }),
+    );
+  });
+  it('only remembers desired keys and never touches the user value because of it', () => {
+    fc.assert(
+      fc.property(currentArb, keysArb, keysArb, keysArb, (current, owned, desired, withdrawn) => {
+        const result = reconciler.reconcile(current, owned, desired, withdrawn);
+        result.withdrawn.forEach((key) => expect(desired).to.include(key));
+        result.added.forEach((key) => expect(withdrawn).to.not.include(key));
+        const next = result.value ?? {};
+        Object.entries(current ?? {}).forEach(([key, value]) => {
+          if (false === value) {
+            expect(next[key], key).to.equal(false);
+          }
+        });
+      }),
+    );
+  });
+});
 describe('HiddenSpecSelector (properties)', () => {
   const selector = new HiddenSpecSelector();
 

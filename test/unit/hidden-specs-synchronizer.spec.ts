@@ -3,7 +3,10 @@ import {
   HIDE_SYNC_DELAY_MS,
   HiddenSpecsSynchronizer,
 } from '../../src/adapters/HiddenSpecsSynchronizer';
-import { MementoHiddenSpecsState } from '../../src/adapters/MementoHiddenSpecsState';
+import {
+  MementoHiddenSpecsState,
+  OWNERSHIP_STATE_KEY,
+} from '../../src/adapters/MementoHiddenSpecsState';
 import { HideSpecsMode } from '../../src/core/hiding/HideSpecsMode';
 import { SpecStatus } from '../../src/core/model/SpecStatus';
 import {
@@ -158,6 +161,79 @@ describe('HiddenSpecsSynchronizer', () => {
     expect(h.writer.value('/ws', 'files.exclude')).to.deep.equal({ [DONE]: false });
   });
 
+  it('does not rewrite a key the user deleted while the spec stays hidden', async () => {
+    const h = harness();
+    activate(h, HideSpecsMode.Everywhere);
+    await h.sync.sync();
+    h.writer.value('/ws', 'files.exclude', {});
+    await h.sync.sync();
+    await h.sync.sync();
+    expect(h.writer.writes).to.have.length(1);
+    expect(h.writer.value('/ws', 'files.exclude')).to.deep.equal({});
+  });
+  it('never rewrites nor removes a key the user set to false', async () => {
+    const h = harness();
+    activate(h, HideSpecsMode.Everywhere);
+    await h.sync.sync();
+    h.writer.value('/ws', 'files.exclude', { [DONE]: false });
+    await h.sync.sync();
+    h.source.specs = [buildSnapshot('done', SpecStatus.InProgress)];
+    await h.sync.sync();
+    expect(h.writer.writes).to.have.length(1);
+    expect(h.writer.value('/ws', 'files.exclude')).to.deep.equal({ [DONE]: false });
+  });
+  it('rewrites a user-deleted key after an unhide then hide cycle', async () => {
+    const h = harness();
+    activate(h, HideSpecsMode.Everywhere);
+    await h.sync.sync();
+    h.writer.value('/ws', 'files.exclude', {});
+    await h.sync.sync();
+    h.source.specs = [buildSnapshot('done', SpecStatus.InProgress)];
+    await h.sync.sync();
+    h.source.specs = [buildSnapshot('done', SpecStatus.Completed)];
+    await h.sync.sync();
+    expect(h.writer.value('/ws', 'files.exclude')).to.deep.equal({ [DONE]: true });
+  });
+  it('forgets a withdrawal when the mode returns to off', async () => {
+    const h = harness();
+    activate(h, HideSpecsMode.Everywhere);
+    await h.sync.sync();
+    h.writer.value('/ws', 'files.exclude', {});
+    await h.sync.sync();
+    h.config.config = { ...h.config.config, mode: HideSpecsMode.Off };
+    await h.sync.sync();
+    expect(h.backing.values.has(OWNERSHIP_STATE_KEY)).to.equal(false);
+    h.config.config = { ...h.config.config, mode: HideSpecsMode.Everywhere };
+    await h.sync.sync();
+    expect(h.writer.value('/ws', 'files.exclude')).to.deep.equal({ [DONE]: true });
+  });
+  it('reset clears the remembered withdrawals so the entry comes back', async () => {
+    const h = harness();
+    activate(h, HideSpecsMode.Everywhere);
+    await h.sync.sync();
+    h.writer.value('/ws', 'files.exclude', {});
+    await h.sync.sync();
+    await h.sync.reset();
+    expect(h.backing.values.has(OWNERSHIP_STATE_KEY)).to.equal(false);
+    await h.sync.sync();
+    expect(h.writer.value('/ws', 'files.exclude')).to.deep.equal({ [DONE]: true });
+  });
+  it('records nothing and counts nothing when the folder is not open, logging once', async () => {
+    const h = harness();
+    h.writer.missingFolders.add('/ws');
+    activate(h, HideSpecsMode.Everywhere);
+    await h.sync.sync();
+    await h.sync.sync();
+    expect(h.writer.writes).to.deep.equal([]);
+    expect(h.backing.values.has(OWNERSHIP_STATE_KEY)).to.equal(false);
+    expect(h.notifier.firstWrites).to.deep.equal([]);
+    expect(h.sink.lines.filter((line) => line.includes('/ws'))).to.have.length(1);
+    h.writer.missingFolders.clear();
+    await h.sync.sync();
+    expect(h.notifier.firstWrites).to.deep.equal([
+      { count: 1, setting: 'files.exclude', workspacePath: '/ws' },
+    ]);
+  });
   it('batches all additions of a folder into a single write per setting', async () => {
     const h = harness();
     h.config.config = {

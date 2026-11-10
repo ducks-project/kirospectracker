@@ -62,6 +62,7 @@ export class HiddenSpecsSynchronizer {
   private readonly selector = new HiddenSpecSelector();
   private readonly modes = new HideSpecsModeMapper();
   private readonly loggedSkips = new Set<string>();
+  private readonly loggedMissingFolders = new Set<string>();
   private unsubscribe: (() => void) | undefined;
   private ready = false;
   private queue: Promise<unknown> = Promise.resolve();
@@ -198,17 +199,32 @@ export class HiddenSpecsSynchronizer {
       current,
       registry.keysFor(workspacePath, setting),
       desired(workspacePath, setting),
+      registry.withdrawnFor(workspacePath, setting),
     );
     if (result.changed) {
-      await this.deps.writer.writeExclude(workspacePath, setting, result.value);
+      const outcome = await this.deps.writer.writeExclude(workspacePath, setting, result.value);
+      if ('folderNotFound' === outcome) {
+        this.logMissingFolder(workspacePath);
+        return { registry, added: 0, removed: 0 };
+      }
     }
     return {
-      registry: registry.with(workspacePath, setting, result.owned),
+      registry: registry
+        .with(workspacePath, setting, result.owned)
+        .withWithdrawn(workspacePath, setting, result.withdrawn),
       added: result.added.length,
       removed: result.removed.length,
     };
   }
-
+  private logMissingFolder(workspacePath: string): void {
+    if (this.loggedMissingFolders.has(workspacePath)) {
+      return;
+    }
+    this.loggedMissingFolders.add(workspacePath);
+    this.deps.diagnostics.append(
+      `Hide specs: "${workspacePath}" is not an open workspace folder; nothing was written for it.`,
+    );
+  }
   private async announce(
     outcome: IApplyOutcome,
     target: ExcludeSettingKey | undefined,

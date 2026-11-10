@@ -25,6 +25,16 @@ describe('MementoHiddenSpecsState', () => {
     expect(backing.values.has(OWNERSHIP_STATE_KEY)).to.equal(false);
   });
 
+  it('persists withdrawn keys and loads a legacy record without them', async () => {
+    const backing = new MapState();
+    const state = new MementoHiddenSpecsState(backing);
+    await state.save(new OwnershipRegistry().withWithdrawn('/ws', 'files.exclude', ['w']));
+    expect(state.load().withdrawnFor('/ws', 'files.exclude')).to.deep.equal(['w']);
+    backing.values.set(OWNERSHIP_STATE_KEY, { '/ws': { 'files.exclude': ['a'] } });
+    const legacy = state.load();
+    expect(legacy.keysFor('/ws', 'files.exclude')).to.deep.equal(['a']);
+    expect(legacy.withdrawnFor('/ws', 'files.exclude')).to.deep.equal([]);
+  });
   it('remembers the notice was shown', async () => {
     const backing = new MapState();
     const state = new MementoHiddenSpecsState(backing);
