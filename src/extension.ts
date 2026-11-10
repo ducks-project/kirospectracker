@@ -46,7 +46,10 @@ import { WebCryptoRandomSource } from './adapters/WebCryptoRandomSource';
 import { SpecAgentActions } from './adapters/SpecAgentActions';
 import { UnavailableAgentGateway } from './adapters/agent/UnavailableAgentGateway';
 import { createSpecAgentGateway } from './adapters/agent/SpecAgentGatewayFactory';
-import { OpenDocumentCommand } from './adapters/commands/OpenDocumentCommand';
+import {
+  OpenDocumentCommand,
+  OPEN_DOCUMENT_COMMAND_ID,
+} from './adapters/commands/OpenDocumentCommand';
 import { RefreshCommand, REFRESH_COMMAND_ID } from './adapters/commands/RefreshCommand';
 import { RunTasksCommand, RUN_TASKS_COMMAND_ID } from './adapters/commands/RunTasksCommand';
 import {
@@ -57,9 +60,6 @@ import {
   ToggleLayoutCommand,
   TOGGLE_LAYOUT_COMMAND_ID,
 } from './adapters/commands/ToggleLayoutCommand';
-
-/** Command id opening a spec document, invoked from the dashboard webview. */
-const OPEN_DOCUMENT_COMMAND_ID = 'kirospectracker.openDocument';
 
 /**
  * Tree context-menu command ids. Each opens one document of the spec targeted by
