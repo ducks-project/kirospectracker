@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { MessageKey } from '../../src/core/i18n/messages';
@@ -18,12 +18,28 @@ class RecordingTranslator implements ITranslator {
     return key;
   }
 }
-/** Webview entry point source, read to check the keys it requests. */
-const MAIN_PATH = join(dirname(fileURLToPath(import.meta.url)), '../../src/webview/main.ts');
-/** Matches `tw('literal'` calls in the webview entry point. */
-const TW_CALL = /\btw\(\s*'((?:[^'\\]|\\.)*)'/g;
-/** Matches `twp('literal'` plural calls in the webview entry point. */
-const TWP_CALL = /\btwp\(\s*'((?:[^'\\]|\\.)*)'/g;
+/** Root of the webview sources, read recursively to check the keys they request. */
+const WEBVIEW_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../src/webview');
+/** Matches `tw('literal'` and `text.t('literal'` calls in the webview sources. */
+const TW_CALL = /\b(?:tw|text\.t)\(\s*'((?:[^'\\]|\\.)*)'/g;
+/** Matches `twp('literal'` and `text.tp('literal'` plural calls in the webview sources. */
+const TWP_CALL = /\b(?:twp|text\.tp)\(\s*'((?:[^'\\]|\\.)*)'/g;
+/**
+ * Concatenate the source of every `.ts` file under a directory, recursively.
+ * @param dir The directory to walk.
+ * @returns The concatenated sources.
+ */
+function readSources(dir: string): string {
+  return readdirSync(dir, { withFileTypes: true })
+    .map((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return readSources(path);
+      }
+      return entry.name.endsWith('.ts') ? readFileSync(path, 'utf8') : '';
+    })
+    .join('\n');
+}
 /**
  * The webview may only request messages the host puts in its catalogue.
  */
@@ -40,8 +56,8 @@ describe('webview message keys', () => {
     expect(recorder.keys.length).to.be.greaterThan(0);
     recorder.keys.forEach((key) => expect(WEBVIEW_MESSAGE_KEYS).to.include(key));
   });
-  it('requests only catalogued webview keys through tw() in main.ts', () => {
-    const source = readFileSync(MAIN_PATH, 'utf8');
+  it('requests only catalogued webview keys through the translator in src/webview', () => {
+    const source = readSources(WEBVIEW_DIR);
     const used = [...source.matchAll(TW_CALL), ...source.matchAll(TWP_CALL)].map(
       (match) => match[1],
     );
@@ -49,7 +65,7 @@ describe('webview message keys', () => {
     used.forEach((key) => expect(WEBVIEW_MESSAGE_KEYS as readonly string[]).to.include(key));
   });
   it('uses every webview-only message (no stale catalogue entry)', () => {
-    const source = readFileSync(MAIN_PATH, 'utf8');
+    const source = readSources(WEBVIEW_DIR);
     const used = new Set(
       [...source.matchAll(TW_CALL), ...source.matchAll(TWP_CALL)].map((match) => match[1]),
     );
