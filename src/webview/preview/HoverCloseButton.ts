@@ -1,3 +1,4 @@
+import { buttonEl } from '../createElement';
 import { HOVER_CLOSE_CLASS, PREVIEW_ICON_CLASS } from './previewDomNames';
 /** The multiplication sign used as the close glyph. */
 const CLOSE_GLYPH = '\u00D7';
@@ -26,10 +27,8 @@ function leaveOnTab(event: KeyboardEvent, onClose: () => void): void {
  * @param onClose Called when the button is activated.
  * @returns The button element.
  */
-export function createHoverCloseButton(label: string, onClose: () => void): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.className = HOVER_CLOSE_CLASS;
-  button.setAttribute('type', 'button');
+export function createHoverCloseButton(label: string, onClose: () => void): HTMLElement {
+  const button = buttonEl(HOVER_CLOSE_CLASS);
   button.setAttribute('aria-label', label);
   button.title = label;
   button.textContent = CLOSE_GLYPH;

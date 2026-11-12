@@ -1,9 +1,10 @@
+import { HOVER_PANEL_CLASS } from './previewDomNames';
 import type { IHoverPanelView } from './IHoverPanelView';
 import { computeHoverPlacement } from './computeHoverPlacement';
 import type { IHoverRect } from './computeHoverPlacement';
 
 /** Stable id of the popin, referenced by the icon's `aria-describedby` / `aria-controls`. */
-export const HOVER_PANEL_ID = 'card-hover-panel';
+export const HOVER_PANEL_ID = HOVER_PANEL_CLASS;
 /** Minimal preview-icon element the panel anchors to. */
 export interface IHoverAnchor {
   getBoundingClientRect(): IHoverRect;
@@ -84,10 +85,10 @@ export class DomHoverPanelView implements IHoverPanelView {
   /** @inheritdoc */
   public hide(): void {
     const restoreFocus = this.shouldRestoreFocus();
-    const anchor = this.shownAnchor;
+    const { panel, shownAnchor: anchor } = this;
     this.clearAnchor();
-    if (undefined !== this.panel) {
-      this.panel.hidden = true;
+    if (undefined !== panel) {
+      panel.hidden = true;
     }
     this.shownPinned = false;
     if (restoreFocus) {
@@ -110,13 +111,15 @@ export class DomHoverPanelView implements IHoverPanelView {
    * @returns The panel element.
    */
   private ensurePanel(): IHoverPanelElement {
-    if (undefined === this.panel) {
-      this.panel = this.dom.createPanel();
-      this.panel.setAttribute('id', HOVER_PANEL_ID);
-      this.panel.hidden = true;
-      this.dom.mountPanel(this.panel);
+    if (undefined !== this.panel) {
+      return this.panel;
     }
-    return this.panel;
+    const panel = this.dom.createPanel();
+    panel.setAttribute('id', HOVER_PANEL_ID);
+    panel.hidden = true;
+    this.dom.mountPanel(panel);
+    this.panel = panel;
+    return panel;
   }
   /**
    * Switch the panel between hover mode (inert tooltip) and pinned mode
@@ -158,9 +161,10 @@ export class DomHoverPanelView implements IHoverPanelView {
   }
   /** Drop the popin links from the icon it was last shown for. */
   private clearAnchor(): void {
-    this.shownAnchor?.removeAttribute('aria-describedby');
-    this.shownAnchor?.removeAttribute('aria-controls');
-    this.shownAnchor?.setAttribute('aria-expanded', 'false');
+    const anchor = this.shownAnchor;
+    anchor?.removeAttribute('aria-describedby');
+    anchor?.removeAttribute('aria-controls');
+    anchor?.setAttribute('aria-expanded', 'false');
     this.shownAnchor = undefined;
   }
   /**

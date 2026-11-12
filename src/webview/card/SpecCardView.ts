@@ -1,7 +1,7 @@
 import type { ISpecCardView } from '../../core/model/ISpecCardView';
 import type { SpecDocumentKind } from '../../core/model/SpecDocumentKind';
 import { SPEC_DOCUMENT_KINDS } from '../../core/model/SpecDocumentKind';
-import { el } from '../createElement';
+import { buttonEl, el, onInnerClick, setToggleState } from '../createElement';
 import type { IDashboardActions } from '../state/IDashboardActions';
 import type { IViewText } from '../state/IViewText';
 import type { DashboardStore } from '../state/DashboardStore';
@@ -24,9 +24,6 @@ export interface ICardDeps {
 
 /** Percentage multiplier for the required ratio. */
 const PERCENT = 100;
-
-/** Document links rendered per spec, in display order. */
-const DOCUMENT_KINDS: readonly SpecDocumentKind[] = SPEC_DOCUMENT_KINDS;
 
 /**
  * Render one progress bar.
@@ -94,29 +91,38 @@ function appendCardProgress(article: HTMLElement, card: ISpecCardView, text: IVi
 }
 
 /**
+ * Open a spec's resolved entry document through the existing openDocument intent.
+ * @param card The spec card view (with a resolved entry document).
+ * @param entry The entry document to open.
+ * @param actions The dashboard intents.
+ */
+function openCardEntry(
+  card: ISpecCardView,
+  entry: SpecDocumentKind,
+  actions: IDashboardActions,
+): void {
+  actions.post({
+    type: 'openDocument',
+    folderPath: card.folderPath,
+    document: entry,
+  });
+}
+
+/**
  * Render the document links for a spec: only present documents get a link.
  * @param card The spec card view.
  * @param actions The dashboard intents.
  * @returns The links container, or `undefined` when the spec has no document.
  */
 function renderLinks(card: ISpecCardView, actions: IDashboardActions): HTMLElement | undefined {
-  const kinds = visibleDocumentKinds(card.documents, DOCUMENT_KINDS);
+  const kinds = visibleDocumentKinds(card.documents, SPEC_DOCUMENT_KINDS);
   if (0 === kinds.length) {
     return undefined;
   }
   const links = el('div', 'links');
   kinds.forEach((kind) => {
-    const link = el('button', 'link', kind);
-    link.setAttribute('type', 'button');
-    link.addEventListener('click', (event) => {
-      // Inner control: do not also trigger the card-body open gesture.
-      event.stopPropagation();
-      actions.post({
-        type: 'openDocument',
-        folderPath: card.folderPath,
-        document: kind,
-      });
-    });
+    const link = buttonEl('link', kind);
+    onInnerClick(link, () => openCardEntry(card, kind, actions));
     links.appendChild(link);
   });
   return links;
@@ -136,36 +142,10 @@ function renderLinks(card: ISpecCardView, actions: IDashboardActions): HTMLEleme
  */
 function renderStatusBadge(card: ISpecCardView, deps: ICardDeps): HTMLElement {
   const model = buildBadgeModel(card, deps.store.filter, deps.text);
-  const badge = el('button', model.cssClass, model.label);
-  badge.setAttribute('type', 'button');
-  badge.setAttribute('aria-pressed', String(model.pressed));
-  badge.setAttribute('aria-label', model.ariaLabel);
-  badge.title = model.ariaLabel;
-  badge.addEventListener('click', (event) => {
-    // The badge is an inner control: stop the click from also triggering the
-    // card-body open gesture.
-    event.stopPropagation();
-    deps.actions.toggleStatusFilter(model.key);
-  });
+  const badge = buttonEl(model.cssClass, model.label);
+  setToggleState(badge, model.pressed, model.ariaLabel);
+  onInnerClick(badge, () => deps.actions.toggleStatusFilter(model.key));
   return badge;
-}
-
-/**
- * Open a spec's resolved entry document through the existing openDocument intent.
- * @param card The spec card view (with a resolved entry document).
- * @param entry The entry document to open.
- * @param actions The dashboard intents.
- */
-function openCardEntry(
-  card: ISpecCardView,
-  entry: SpecDocumentKind,
-  actions: IDashboardActions,
-): void {
-  actions.post({
-    type: 'openDocument',
-    folderPath: card.folderPath,
-    document: entry,
-  });
 }
 
 /**
@@ -217,16 +197,9 @@ function wireCardBody(article: HTMLElement, card: ISpecCardView, deps: ICardDeps
  */
 function renderOwnerLabel(card: ISpecCardView, deps: ICardDeps): HTMLElement {
   const model = buildOwnerModel(card, deps.store.folderFilter, deps.text);
-  const owner = el('button', 'card-owner', card.ownerLabel);
-  owner.setAttribute('type', 'button');
-  owner.setAttribute('aria-pressed', String(model.pressed));
-  owner.setAttribute('aria-label', model.ariaLabel);
-  owner.title = model.ariaLabel;
-  owner.addEventListener('click', (event) => {
-    // Inner control: do not also trigger the card-body open gesture.
-    event.stopPropagation();
-    deps.actions.toggleFolderFilter(card.folderKey);
-  });
+  const owner = buttonEl('card-owner', card.ownerLabel);
+  setToggleState(owner, model.pressed, model.ariaLabel);
+  onInnerClick(owner, () => deps.actions.toggleFolderFilter(card.folderKey));
   return owner;
 }
 

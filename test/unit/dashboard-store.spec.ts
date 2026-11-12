@@ -96,11 +96,10 @@ describe('DashboardStore', () => {
     const card = buildCardView(SpecStatus.InProgress);
     const stats = { total: 1, completed: 0, inProgress: 1, notStarted: 0, malformed: 0 };
     const message = { type: 'render', cards: [card], stats } as unknown as IRenderMessage;
+    expect(store.hasRendered).to.equal(false);
     store.applyRender({ ...message, globalTaskStats: store.globalTaskStats });
     expect(store.cards).to.deep.equal([card]);
     expect(store.stats).to.equal(stats);
-    expect(store.hasRendered).to.equal(false);
-    store.markRendered();
     expect(store.hasRendered).to.equal(true);
   });
 

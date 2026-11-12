@@ -9,10 +9,7 @@ import { DomHoverPanelView } from './DomHoverPanelView';
 import { createHoverCloseButton } from './HoverCloseButton';
 import { HoverIntroductionController } from './HoverIntroductionController';
 import { createPreviewIconButton } from './PreviewIconButton';
-import { PREVIEW_ICON_CLASS } from './previewDomNames';
-
-/** Class of the floating hover panel, whose own inner scroll must not dismiss it. */
-const HOVER_PANEL_CLASS = 'card-hover-panel';
+import { HOVER_PANEL_CLASS, PREVIEW_ICON_CLASS } from './previewDomNames';
 
 /** What the composition root needs from the preview feature. */
 export interface IPreviewWiring {

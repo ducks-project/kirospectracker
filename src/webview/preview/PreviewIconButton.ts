@@ -1,3 +1,4 @@
+import { onInnerClick, buttonEl } from '../createElement';
 import { HOVER_PANEL_ID } from './DomHoverPanelView';
 import { HOVER_CLOSE_CLASS, PREVIEW_ICON_CLASS } from './previewDomNames';
 import { ACTIVATION_KEYS } from '../activationKeys';
@@ -45,11 +46,9 @@ function focusCloseOnTab(event: KeyboardEvent, icon: HTMLElement): void {
  * @param options The folder, label, glyph and controller.
  * @returns The button element.
  */
-export function createPreviewIconButton(options: IPreviewIconOptions): HTMLButtonElement {
+export function createPreviewIconButton(options: IPreviewIconOptions): HTMLElement {
   const { folderPath, label, glyph, controls } = options;
-  const button = document.createElement('button');
-  button.className = PREVIEW_ICON_CLASS;
-  button.setAttribute('type', 'button');
+  const button = buttonEl(PREVIEW_ICON_CLASS);
   button.setAttribute('aria-label', label);
   button.setAttribute('aria-expanded', 'false');
   button.appendChild(glyph);
@@ -57,11 +56,7 @@ export function createPreviewIconButton(options: IPreviewIconOptions): HTMLButto
   button.addEventListener('focus', () => controls.enter(folderPath));
   button.addEventListener('mouseleave', () => controls.leave());
   button.addEventListener('blur', () => controls.leave());
-  button.addEventListener('click', (event) => {
-    // Inner control: do not also trigger the card-body open gesture.
-    event.stopPropagation();
-    controls.togglePin(folderPath);
-  });
+  onInnerClick(button, () => controls.togglePin(folderPath));
   button.addEventListener('keydown', (event) => {
     if (ACTIVATION_KEYS.has(event.key)) {
       // Let the native button click through, but keep the card from opening.

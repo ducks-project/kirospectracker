@@ -1,8 +1,8 @@
 import type { ISpecFolderToggleView } from '../../core/status/SpecFolderToggleView';
-import { el } from '../createElement';
+import { buttonEl, el, onInnerClick, setToggleState } from '../createElement';
 import { icon } from '../ToolbarIcon';
 import type { IToolbarDeps } from './IToolbarDeps';
-import { MENU_TOGGLE_KEYS } from '../activationKeys';
+import { handleMenuToggleKey } from '../handleMenuToggleKey';
 
 /**
  * Populate the folder-filter menu with one accessible toggle item per distinct
@@ -41,14 +41,12 @@ function folderMenuItem(
   closeMenu: () => void,
   deps: IToolbarDeps,
 ): HTMLElement {
-  const button = el('button', item.pressed ? 'folder-menu-item pressed' : 'folder-menu-item');
-  button.setAttribute('type', 'button');
+  const button = buttonEl(item.pressed ? 'folder-menu-item pressed' : 'folder-menu-item');
   button.setAttribute('role', 'menuitemcheckbox');
   button.setAttribute('aria-checked', String(item.pressed));
   button.appendChild(el('span', 'folder-menu-label', item.label));
   button.appendChild(el('span', 'folder-menu-count', String(item.count)));
-  button.addEventListener('click', (event) => {
-    event.stopPropagation();
+  onInnerClick(button, () => {
     closeMenu();
     deps.actions.toggleFolderFilter(item.key);
   });
@@ -71,21 +69,8 @@ function wireFolderFilter(button: HTMLElement, menu: HTMLElement, deps: IToolbar
     menu.hidden = !open;
     button.setAttribute('aria-expanded', String(open));
   };
-  button.addEventListener('click', (event) => {
-    event.stopPropagation();
-    setExpanded(menu.hidden);
-  });
-  button.addEventListener('keydown', (event) => {
-    if ('Escape' === event.key) {
-      setExpanded(false);
-      return;
-    }
-    if (!MENU_TOGGLE_KEYS.has(event.key)) {
-      return;
-    }
-    event.preventDefault();
-    setExpanded(menu.hidden);
-  });
+  onInnerClick(button, () => setExpanded(menu.hidden));
+  button.addEventListener('keydown', (event) => handleMenuToggleKey(event, menu, setExpanded));
 }
 
 /**
@@ -101,13 +86,10 @@ function wireFolderFilter(button: HTMLElement, menu: HTMLElement, deps: IToolbar
  */
 export function renderFolderFilter(deps: IToolbarDeps): HTMLElement {
   const group = el('div', 'folder-filter');
-  const button = el('button', 'folder-filter-button');
-  button.setAttribute('type', 'button');
+  const button = buttonEl('folder-filter-button');
   button.setAttribute('aria-haspopup', 'true');
   button.setAttribute('aria-expanded', 'false');
-  button.setAttribute('aria-pressed', String(!deps.store.folderFilter.isEmpty()));
-  button.setAttribute('aria-label', deps.text.t('Filter by folder'));
-  button.title = deps.text.t('Filter by folder');
+  setToggleState(button, !deps.store.folderFilter.isEmpty(), deps.text.t('Filter by folder'));
   button.appendChild(icon('filter'));
   const menu = el('div', 'folder-menu');
   menu.setAttribute('role', 'menu');

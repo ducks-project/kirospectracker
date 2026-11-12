@@ -1,5 +1,5 @@
 import type { ISpecLayoutToggleView } from '../../core/status/SpecLayoutToggleView';
-import { el } from '../createElement';
+import { buttonEl, el, setToggleState } from '../createElement';
 import { icon } from '../ToolbarIcon';
 import { renderFolderFilter } from './FolderFilterMenu';
 import type { IToolbarDeps } from './IToolbarDeps';
@@ -12,9 +12,7 @@ import type { IToolbarDeps } from './IToolbarDeps';
  */
 export function applyLayoutToggle(button: HTMLElement, toggle: ISpecLayoutToggleView): void {
   button.setAttribute('data-next-layout', toggle.nextLayout);
-  button.setAttribute('aria-pressed', String(toggle.pressed));
-  button.setAttribute('aria-label', toggle.label);
-  button.title = toggle.label;
+  setToggleState(button, toggle.pressed, toggle.label);
   button.classList.toggle('pressed', toggle.pressed);
   button.replaceChildren(icon(toggle.glyph));
 }
@@ -29,8 +27,7 @@ export function applyLayoutToggle(button: HTMLElement, toggle: ISpecLayoutToggle
  * @returns The toggle button element.
  */
 function renderLayoutToggle(deps: IToolbarDeps): HTMLElement {
-  const button = el('button', 'toggle');
-  button.setAttribute('type', 'button');
+  const button = buttonEl('toggle');
   const toggle = deps.text.layoutToggle.describeToggle(deps.store.layout);
   applyLayoutToggle(button, toggle);
   button.addEventListener('click', () =>
@@ -58,8 +55,7 @@ function renderSearch(deps: IToolbarDeps): HTMLElement {
   search.addEventListener('input', () => {
     deps.actions.setQuery(search.value);
   });
-  const clear = el('button', 'search-clear');
-  clear.setAttribute('type', 'button');
+  const clear = buttonEl('search-clear');
   clear.setAttribute('aria-label', deps.text.t('Clear search'));
   clear.title = deps.text.t('Clear search');
   clear.appendChild(icon('close'));

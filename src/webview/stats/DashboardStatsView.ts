@@ -2,7 +2,7 @@ import type { IGlobalTaskStats } from '../../core/model/IGlobalTaskStats';
 import type { ISpecStats } from '../../core/model/ISpecStats';
 import type { SpecStatusFilter } from '../../core/status/SpecStatusFilter';
 import type { SpecStatToggleView, ISpecStatToggleView } from '../../core/status/SpecStatToggleView';
-import { el } from '../createElement';
+import { buttonEl, el, setToggleState } from '../createElement';
 import type { IDashboardActions } from '../state/IDashboardActions';
 import type { IViewText } from '../state/IViewText';
 import type { IGlobalStatItem } from './GlobalStatsViewModel';
@@ -20,11 +20,8 @@ function renderStatToggle(
   text: IViewText,
   actions: IDashboardActions,
 ): HTMLElement {
-  const button = el('button', toggle.pressed ? 'stat pressed' : 'stat');
-  button.setAttribute('type', 'button');
-  button.setAttribute('aria-pressed', String(toggle.pressed));
-  button.setAttribute('aria-label', text.t('Filter by {0}', toggle.label));
-  button.title = text.t('Filter by {0}', toggle.label);
+  const button = buttonEl(toggle.pressed ? 'stat pressed' : 'stat');
+  setToggleState(button, toggle.pressed, text.t('Filter by {0}', toggle.label));
   button.appendChild(el('span', 'stat-value', String(toggle.value)));
   button.appendChild(el('span', 'stat-label', toggle.label));
   button.addEventListener('click', () => actions.toggleStatusFilter(toggle.key));
@@ -57,17 +54,16 @@ export function renderStats(
 }
 
 /**
- * Append one labelled task-count item to the global-stats strip.
+ * Append one labelled item to the global-stats strip.
  * @param strip The strip element to append to.
  * @param item The item to show.
  */
 function appendGlobalStatItem(strip: HTMLElement, item: IGlobalStatItem): void {
   const node = el('span', `global-stat ${item.cssClass}`);
-  node.appendChild(el('span', 'global-stat-value', String(item.value)));
+  node.appendChild(el('span', 'global-stat-value', item.value));
   node.appendChild(el('span', 'global-stat-label', item.label));
   strip.appendChild(node);
 }
-
 /**
  * Render the compact global task-statistics strip.
  *
@@ -83,9 +79,5 @@ export function renderGlobalStats(stats: IGlobalTaskStats, text: IViewText): HTM
   const strip = el('section', 'global-stats');
   strip.setAttribute('aria-label', text.t('Global task statistics'));
   model.items.forEach((item) => appendGlobalStatItem(strip, item));
-  const overall = el('span', 'global-stat global-stat-overall');
-  overall.appendChild(el('span', 'global-stat-value', model.overall.valueText));
-  overall.appendChild(el('span', 'global-stat-label', model.overall.label));
-  strip.appendChild(overall);
   return strip;
 }

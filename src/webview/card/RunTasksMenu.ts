@@ -1,9 +1,9 @@
 import type { ISpecCardView } from '../../core/model/ISpecCardView';
 import type { RunScope } from '../../core/ports/ISpecAgentGateway';
-import { el } from '../createElement';
+import { buttonEl, el, onInnerClick } from '../createElement';
 import type { IDashboardActions } from '../state/IDashboardActions';
 import type { IViewText } from '../state/IViewText';
-import { MENU_TOGGLE_KEYS } from '../activationKeys';
+import { handleMenuToggleKey } from '../handleMenuToggleKey';
 
 /**
  * Post a scoped run-tasks intent for a spec.
@@ -22,13 +22,9 @@ function postRunTasks(actions: IDashboardActions, card: ISpecCardView, scope: Ru
  * @returns The menu-item button element.
  */
 function dropdownItem(label: string, onActivate: () => void): HTMLElement {
-  const item = el('button', 'run-menu-item', label);
-  item.setAttribute('type', 'button');
+  const item = buttonEl('run-menu-item', label);
   item.setAttribute('role', 'menuitem');
-  item.addEventListener('click', (event) => {
-    event.stopPropagation();
-    onActivate();
-  });
+  onInnerClick(item, () => onActivate());
   return item;
 }
 
@@ -105,39 +101,9 @@ function wireRunSplit(
     toggle.setAttribute('aria-expanded', String(open));
   };
   buildRunMenu(menu, card, () => setExpanded(false), text, actions);
-  primary.addEventListener('click', (event) => {
-    // Inner control: do not also trigger the card-body open gesture.
-    event.stopPropagation();
-    postRunTasks(actions, card, 'required');
-  });
-  toggle.addEventListener('click', (event) => {
-    event.stopPropagation();
-    setExpanded(menu.hidden);
-  });
-  toggle.addEventListener('keydown', (event) => handleToggleKey(event, menu, setExpanded));
-}
-
-/**
- * Handle a keydown on the run-scope toggle: Escape closes the menu, Enter/Space
- * toggle it.
- * @param event The keyboard event.
- * @param menu The dropdown menu element.
- * @param setExpanded Callback setting the open/closed state.
- */
-function handleToggleKey(
-  event: KeyboardEvent,
-  menu: HTMLElement,
-  setExpanded: (open: boolean) => void,
-): void {
-  if ('Escape' === event.key) {
-    setExpanded(false);
-    return;
-  }
-  if (!MENU_TOGGLE_KEYS.has(event.key)) {
-    return;
-  }
-  event.preventDefault();
-  setExpanded(menu.hidden);
+  onInnerClick(primary, () => postRunTasks(actions, card, 'required'));
+  onInnerClick(toggle, () => setExpanded(menu.hidden));
+  toggle.addEventListener('keydown', (event) => handleMenuToggleKey(event, menu, setExpanded));
 }
 
 /**
@@ -154,11 +120,9 @@ function renderRunButton(
   text: IViewText,
   actions: IDashboardActions,
 ): HTMLElement {
-  const primary = el('button', 'run run-primary', text.t('Run tasks'));
-  primary.setAttribute('type', 'button');
+  const primary = buttonEl('run run-primary', text.t('Run tasks'));
   primary.setAttribute('aria-label', text.t('Run required tasks for {0}', card.name));
-  const toggle = el('button', 'run run-toggle', '\u25BE');
-  toggle.setAttribute('type', 'button');
+  const toggle = buttonEl('run run-toggle', '\u25BE');
   toggle.setAttribute('aria-haspopup', 'true');
   toggle.setAttribute('aria-expanded', 'false');
   toggle.setAttribute('aria-label', text.t('Choose run scope for {0}', card.name));
@@ -188,19 +152,14 @@ function renderSyncButton(
   text: IViewText,
   actions: IDashboardActions,
 ): HTMLElement {
-  const sync = el('button', 'run sync', text.t('Sync Files'));
-  sync.setAttribute('type', 'button');
+  const sync = buttonEl('run sync', text.t('Sync Files'));
   sync.setAttribute('aria-label', text.t('Sync files for {0}', card.name));
   if ('Malformed' === card.status) {
     sync.setAttribute('disabled', 'true');
     sync.title = text.t('A malformed spec cannot be synced');
     return sync;
   }
-  sync.addEventListener('click', (event) => {
-    // Inner control: do not also trigger the card-body open gesture.
-    event.stopPropagation();
-    actions.post({ type: 'syncFiles', folderPath: card.folderPath });
-  });
+  onInnerClick(sync, () => actions.post({ type: 'syncFiles', folderPath: card.folderPath }));
   return sync;
 }
 

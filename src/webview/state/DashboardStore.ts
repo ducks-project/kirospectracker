@@ -115,17 +115,14 @@ export class DashboardStore {
   }
 
   /**
-   * Store the content of a full `render` message.
+   * Store the content of a full `render` message and record that a full render
+   * has been applied.
    * @param message The render message.
    */
   public applyRender(message: IRenderMessage): void {
     this.cards = message.cards;
     this.stats = message.stats;
     this.globalTaskStats = message.globalTaskStats;
-  }
-
-  /** Record that a full render has been applied. */
-  public markRendered(): void {
     this.hasRendered = true;
   }
 

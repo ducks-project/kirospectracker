@@ -25,8 +25,8 @@ import type { IToolbarDeps } from './toolbar/IToolbarDeps';
  */
 export class DashboardRenderer {
   private readonly cardNodes = new Map<string, HTMLElement>();
-  private readonly toolbarDeps: IToolbarDeps;
-  private readonly cardDeps: ICardDeps;
+  /** One bag serving both the toolbar (live state) and the cards. */
+  private readonly deps: ICardDeps & IToolbarDeps;
 
   /**
    * Build the renderer over the live state.
@@ -36,13 +36,12 @@ export class DashboardRenderer {
    * @param renderPreviewIcon Factory of a card's preview eye button.
    */
   public constructor(
-    private readonly store: DashboardStore,
-    private readonly text: ViewText,
-    private readonly actions: IDashboardActions,
+    store: DashboardStore,
+    text: ViewText,
+    actions: IDashboardActions,
     renderPreviewIcon: (card: ISpecCardView) => HTMLElement | undefined,
   ) {
-    this.toolbarDeps = { store, text, actions };
-    this.cardDeps = { store, text, actions, renderPreviewIcon };
+    this.deps = { store, text, actions, renderPreviewIcon };
   }
 
   /**
@@ -94,7 +93,7 @@ export class DashboardRenderer {
    * @param card The updated card view.
    */
   public applySpecUpdate(card: ISpecCardView): void {
-    const previousCard = this.store.replaceCard(card);
+    const previousCard = this.deps.store.replaceCard(card);
     const app = document.getElementById('app');
     if (null === app) {
       return;
@@ -121,11 +120,11 @@ export class DashboardRenderer {
    * @returns The content container the subsequent renders rewrite.
    */
   private mount(app: HTMLElement): HTMLElement {
-    const { store, text, actions } = this;
+    const { store, text, actions } = this.deps;
     app.replaceChildren();
     app.appendChild(renderStats(store.stats, store.filter, text.statToggles, text, actions));
     app.appendChild(renderGlobalStats(store.globalTaskStats, text));
-    app.appendChild(renderToolbar(this.toolbarDeps));
+    app.appendChild(renderToolbar(this.deps));
     const content = el('section', 'content');
     app.appendChild(content);
     return content;
@@ -137,7 +136,7 @@ export class DashboardRenderer {
    * @param content The content container to populate.
    */
   private renderContent(content: HTMLElement): void {
-    const { store, text } = this;
+    const { store, text } = this.deps;
     content.replaceChildren();
     this.cardNodes.clear();
     const filtered = filterCards(store.cards, store.filter, store.folderFilter, store.query);
@@ -162,12 +161,12 @@ export class DashboardRenderer {
     if (0 === cards.length) {
       return undefined;
     }
-    const { layout } = this.store;
+    const { layout } = this.deps.store;
     const section = el('section', `group layout-${layout}`);
     section.appendChild(el('h1', 'group-title', title));
     const grid = el('div', `cards layout-${layout}`);
     cards.forEach((card) => {
-      const node = renderCard(card, this.cardDeps);
+      const node = renderCard(card, this.deps);
       this.cardNodes.set(card.folderPath, node);
       grid.appendChild(node);
     });
@@ -181,7 +180,7 @@ export class DashboardRenderer {
    * @param app The app root hosting the stats regions.
    */
   private replaceStats(app: HTMLElement): void {
-    const { store, text, actions } = this;
+    const { store, text, actions } = this.deps;
     const stats = app.querySelector('.stats');
     stats?.replaceWith(renderStats(store.stats, store.filter, text.statToggles, text, actions));
     const strip = app.querySelector('.global-stats');
@@ -199,7 +198,7 @@ export class DashboardRenderer {
     if (!(node instanceof HTMLElement)) {
       return;
     }
-    applyLayoutToggle(node, this.text.layoutToggle.describeToggle(this.store.layout));
+    applyLayoutToggle(node, this.deps.text.layoutToggle.describeToggle(this.deps.store.layout));
   }
 
   /**
@@ -213,7 +212,7 @@ export class DashboardRenderer {
     if (!(node instanceof HTMLElement)) {
       return;
     }
-    const active = !this.store.folderFilter.isEmpty();
+    const active = !this.deps.store.folderFilter.isEmpty();
     node.classList.toggle('pressed', active);
     node.setAttribute('aria-pressed', String(active));
   }
@@ -225,7 +224,7 @@ export class DashboardRenderer {
    * @param previous The currently mounted node for this card.
    */
   private swapCardNode(card: ISpecCardView, previous: HTMLElement): void {
-    const next = renderCard(card, this.cardDeps);
+    const next = renderCard(card, this.deps);
     this.cardNodes.set(card.folderPath, next);
     previous.replaceWith(next);
   }

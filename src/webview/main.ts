@@ -86,7 +86,6 @@ const handlers: IDashboardMessageHandlers = {
     // later hover can retry a spec whose reply was lost or whose entry document
     // appeared after the first hover.
     preview.reset();
-    store.markRendered();
     renderer.render();
   },
   specUpdated: (message) => {

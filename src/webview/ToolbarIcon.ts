@@ -31,11 +31,14 @@ const EVEN_ODD_GLYPHS: ReadonlySet<string> = new Set(['eye']);
  */
 export function icon(glyph: string): SVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${ICON_SIZE} ${ICON_SIZE}`);
-  svg.setAttribute('width', String(ICON_SIZE));
-  svg.setAttribute('height', String(ICON_SIZE));
-  svg.setAttribute('aria-hidden', 'true');
-  svg.setAttribute('focusable', 'false');
+  const side = String(ICON_SIZE);
+  Object.entries({
+    viewBox: `0 0 ${side} ${side}`,
+    width: side,
+    height: side,
+    'aria-hidden': 'true',
+    focusable: 'false',
+  }).forEach(([name, value]) => svg.setAttribute(name, value));
   svg.classList.add('icon');
   const path = document.createElementNS(SVG_NS, 'path');
   path.setAttribute('d', ICON_PATHS[glyph] ?? '');
