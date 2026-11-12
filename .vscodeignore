@@ -34,8 +34,7 @@ esbuild.mjs
 .prettierignore
 .mocharc.json
 .markdownlint.json
-.c8rc.json
-.c8rc.adapters.json
+.c8rc*.json
 lefthook.yml
 
 # TypeScript sources, source maps and build info
