@@ -140,8 +140,44 @@ single changed `folderPath`, while a `fullRefresh` delta marks a full rediscover
 or a `fullRefresh` the provider sends a `render` message carrying every card; on a
 `specChanged` it sends an incremental `specUpdated` message carrying only the one
 [ISpecCardView](../src/core/model/ISpecCardView.ts) plus the recomputed aggregate stats. The
-webview keeps a `Map` of mounted card nodes keyed by `folderPath` and replaces only the
-changed node, so a single edit no longer reprocesses or re-renders all N specs.
+webview keeps a private `Map` of mounted card nodes (inside `DashboardRenderer`) keyed by
+`folderPath` and replaces only the changed node, so a single edit no longer reprocesses or
+re-renders all N specs.
+
+### Webview module layout
+
+`src/webview/main.ts` is only the composition root. The other modules are grouped by feature,
+not by code type:
+
+| Folder     | Content                                                                                                                                                         |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `state/`   | `DashboardStore` (render state and persistence), `ViewText` (translation and translated projectors), `IWebviewApi`, `IViewText`, `IDashboardActions`            |
+| `stats/`   | `DashboardStatsView` (DOM) and `GlobalStatsViewModel` (pure)                                                                                                    |
+| `card/`    | `SpecCardView`, `RunTasksMenu` (DOM); `CardViewModel`, `CardGrouping`, `SpecUpdatePlanner`, `visibleDocumentKinds` (pure)                                       |
+| `toolbar/` | `DashboardToolbar`, `FolderFilterMenu`, `IToolbarDeps`                                                                                                          |
+| `preview/` | `PreviewWiring` plus the hover-preview controller, panel view, placement and buttons                                                                            |
+| root       | `main.ts`, `DashboardRenderer`, `DashboardRenderPlanner`, `DashboardMessageRouter`, `DocumentDismissal`, `resolveTrustedOrigin`, `createElement`, `ToolbarIcon` |
+
+`createElement` and `ToolbarIcon` stay at the root because the card, toolbar, stats and
+preview features all use them, so no feature folder fits; a `dom/` folder would group by code
+type. The renderer, the planner, the router and the origin guard compose or protect the whole
+dashboard, so they stay at the root too. `visibleDocumentKinds` is used only by the card, so it
+lives in `card/`.
+
+Invariants:
+
+- Views never call the renderer. They raise intents through `IDashboardActions`, implemented
+  by closures in `main.ts` that keep the effect order: mutate and persist the state, post to
+  the host, then redraw. A scoped `specUpdated` still replaces a single card node.
+- The only mutable state is the `DashboardStore` and `ViewText` instances created in `main.ts`
+  and the renderer's private node cache. No module keeps state at import time and there is no
+  subscription store.
+- Modules register no listener when imported. `main.ts` calls the `install*` functions in a
+  fixed order: keydown, scroll (capture) and click (capture) for the preview, the bubble click
+  that closes open menus, the `message` listener, then the `ready` post.
+- The origin guard (`event.origin !== resolveTrustedOrigin(window.location.origin)`) stays in
+  the `message` listener of `main.ts`, before any read of `event.data`. The router only
+  receives validated data.
 
 ## Dashboard interactions (filtering, toggles, tree menu)
 

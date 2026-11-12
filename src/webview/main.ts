@@ -1,4 +1,7 @@
-import type { DashboardOutboundMessage, IRenderMessage } from '../core/model/IDashboardMessage';
+import type { DashboardOutboundMessage } from '../core/model/IDashboardMessage';
+import { routeDashboardMessage } from './DashboardMessageRouter';
+import type { IDashboardMessageHandlers } from './DashboardMessageRouter';
+import { installMenuDismissal } from './DocumentDismissal';
 import { DashboardRenderer } from './DashboardRenderer';
 import { createPreviewWiring } from './preview/PreviewWiring';
 import { resolveTrustedOrigin } from './resolveTrustedOrigin';
@@ -57,92 +60,61 @@ const renderer = new DashboardRenderer(store, text, actions, (card) =>
   preview.renderPreviewIcon(card),
 );
 
-preview.installDismissal();
-
-// Close any open run-scope dropdown when a click lands outside it, so the menu
-// behaves like a native popup. The handler only hides already-open menus; it
-// never rebuilds the DOM.
-document.addEventListener('click', () => {
-  document.querySelectorAll('.run-menu').forEach((menu) => {
-    if (!(menu instanceof HTMLElement) || menu.hidden) {
-      return;
-    }
-    menu.hidden = true;
-    const toggle = menu.parentElement?.querySelector('.run-toggle');
-    toggle?.setAttribute('aria-expanded', 'false');
-  });
-  document.querySelectorAll('.folder-menu').forEach((menu) => {
-    if (!(menu instanceof HTMLElement) || menu.hidden) {
-      return;
-    }
-    menu.hidden = true;
-    const button = menu.parentElement?.querySelector('.folder-filter-button');
-    button?.setAttribute('aria-expanded', 'false');
-  });
-});
-
 /**
- * Adopt the translated catalogue the host posted and rebuild the UI in that
- * language. The persistent toolbar is dropped so it is rebuilt with the new
- * strings; a first `render` after this message builds it directly translated.
- * @param messages The translated templates keyed by English message.
+ * Handlers of the host messages. Each keeps today's effect order: store, then
+ * hover caches, then redraw.
  */
-function applyStrings(messages: Readonly<Record<string, string>>): void {
-  text.adopt(messages);
-  const app = document.getElementById('app');
-  if (null === app) {
-    return;
-  }
-  app.replaceChildren();
-  if (store.hasRendered) {
+const handlers: IDashboardMessageHandlers = {
+  // Adopt the translated catalogue and rebuild the UI in that language. The
+  // persistent toolbar is dropped so it is rebuilt with the new strings; a first
+  // `render` after this message builds it directly translated.
+  strings: (message) => {
+    text.adopt(message.messages);
+    const app = document.getElementById('app');
+    if (null === app) {
+      return;
+    }
+    app.replaceChildren();
+    if (store.hasRendered) {
+      renderer.render();
+    }
+  },
+  render: (message) => {
+    store.applyRender(message);
+    // A full re-render means the specs were re-discovered (workspace change, a
+    // entry document added), so clear the hover request gate and cache: a
+    // later hover can retry a spec whose reply was lost or whose entry document
+    // appeared after the first hover.
+    preview.reset();
+    store.markRendered();
     renderer.render();
-  }
-}
-/**
- * Apply a full `render` message: store the new state and redraw.
- * @param message The render message.
- */
-function applyRender(message: IRenderMessage): void {
-  store.applyRender(message);
-  // A full re-render means the specs were re-discovered (workspace change, a
-  // entry document added), so clear the hover request gate and cache: a
-  // later hover can retry a spec whose reply was lost or whose entry document
-  // appeared after the first hover.
-  preview.reset();
-  store.markRendered();
-  renderer.render();
-}
+  },
+  specUpdated: (message) => {
+    store.applySpecStats(message.stats, message.globalTaskStats);
+    // The entry document may have changed (`.config.kiro`, `bugfix.md` added):
+    // drop this card's hover caches so the next hover re-asks the host.
+    preview.invalidate(message.card.folderPath);
+    renderer.applySpecUpdate(message.card);
+  },
+  toggleLayout: () => {
+    store.flipLayout();
+    renderer.render();
+  },
+  introduction: (message) => preview.receive(message.folderPath, message.introduction),
+};
+
+// Listener order matters: document keydown, scroll (capture) and click (capture)
+// dismissals of the preview, then the bubble click closing the open menus, then
+// the host message listener, then the `ready` handshake.
+preview.installDismissal();
+installMenuDismissal();
 window.addEventListener('message', (event: MessageEvent<DashboardOutboundMessage>) => {
   // Only the webview host (same origin as this document) may drive the
   // dashboard; ignore anything else before reading its data (CWE-940).
   if (event.origin !== resolveTrustedOrigin(window.location.origin)) {
     return;
   }
-  const message = event.data;
-  if ('strings' === message.type) {
-    applyStrings(message.messages);
-    return;
-  }
-  if ('render' === message.type) {
-    applyRender(message);
-    return;
-  }
-  if ('specUpdated' === message.type) {
-    store.applySpecStats(message.stats, message.globalTaskStats);
-    // The entry document may have changed (`.config.kiro`, `bugfix.md` added):
-    // drop this card's hover caches so the next hover re-asks the host.
-    preview.invalidate(message.card.folderPath);
-    renderer.applySpecUpdate(message.card);
-    return;
-  }
-  if ('toggleLayout' === message.type) {
-    store.flipLayout();
-    renderer.render();
-    return;
-  }
-  if ('introduction' === message.type) {
-    preview.receive(message.folderPath, message.introduction);
-  }
+  routeDashboardMessage(event.data, handlers);
 });
 // Signal the host that the listener above is wired. VS Code disposes and
 // re-creates this webview when the view is hidden and shown again, so on every
