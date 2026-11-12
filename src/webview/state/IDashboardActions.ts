@@ -1,4 +1,4 @@
-import type { DashboardInboundMessage } from '../../core/model/IDashboardMessage';
+import type { DashboardInboundMessage, DashboardLayout } from '../../core/model/IDashboardMessage';
 import type { SpecFilterKey } from '../../core/model/SpecFilterKey';
 
 /**
@@ -13,6 +13,21 @@ export interface IDashboardActions {
    * @param key The filter key to toggle.
    */
   toggleStatusFilter(key: SpecFilterKey): void;
+  /**
+   * Toggle a folder filter key, persist the new set and re-render.
+   * @param key The stable folder key to toggle.
+   */
+  toggleFolderFilter(key: string): void;
+  /**
+   * Switch the layout: persist it, inform the host, then re-render.
+   * @param layout The layout to activate.
+   */
+  selectLayout(layout: DashboardLayout): void;
+  /**
+   * Store the search query and re-render.
+   * @param query The new query.
+   */
+  setQuery(query: string): void;
   /**
    * Post a message to the extension host.
    * @param message The inbound message.
