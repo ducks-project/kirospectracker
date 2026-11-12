@@ -2,7 +2,7 @@
   "name": "kirospectracker",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "publisher": "ducks-project",
   "license": "MIT",
   "author": "ducks-project",

@@ -9,14 +9,6 @@ its shipped content then lives in the [CHANGELOG](CHANGELOG.md), which is the si
 of truth for what has been released. Items use GitHub task lists: `- [ ]` (not done) and
 `- [x]` (done).
 
-## v0.17.0 — Restrict the test-only extension API [Planned]
-
-- [ ] Return the internal objects that `activate` exposes for the integration tests
-      (`repository`, `fileSystem`, `hiddenSpecs`, `agentActions`, `agentErrorReporter` and
-      the other test hooks) only when the extension runs in test mode
-      (`context.extensionMode === ExtensionMode.Test`), so another installed extension
-      cannot reach them, for example to swap the agent gateway.
-
 ## v1.0.0 — First stable release [Planned]
 
 - [ ] Publish to Open VSX and stabilize the public contribution points and settings.

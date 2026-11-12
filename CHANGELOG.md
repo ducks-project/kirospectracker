@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-12
+
+### Fixed
+
+- Keep every c8 configuration file out of the packaged extension: v0.16.0 shipped
+  `.c8rc.webview.json` by mistake. It had no effect at runtime.
+
+### Security
+
+- Export the extension's internal objects (repository, file system, agent actions, error
+  reporter and the other integration-test hooks) only when the extension runs in test mode
+  (`ExtensionMode.Test`). In production and development, `activate` now exports nothing, so
+  another installed extension can no longer reach them, for example to replace the agent
+  gateway. The extension behaves the same in every mode; a source-level test guards the mode
+  condition, which no runtime test can observe outside test mode.
+
 ## [0.16.0] - 2026-11-12
 
 ### Added
@@ -523,7 +539,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.16.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/ducks-project/kirospectracker/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/ducks-project/kirospectracker/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/ducks-project/kirospectracker/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/ducks-project/kirospectracker/compare/v0.14.1...v0.15.0
