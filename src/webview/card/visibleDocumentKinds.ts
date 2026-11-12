@@ -1,5 +1,5 @@
-import type { ISpecDocuments } from '../core/model/ISpecDocuments';
-import type { SpecDocumentKind } from '../core/model/SpecDocumentKind';
+import type { ISpecDocuments } from '../../core/model/ISpecDocuments';
+import type { SpecDocumentKind } from '../../core/model/SpecDocumentKind';
 
 /**
  * Decide which document links a card renders: only the kinds whose document is

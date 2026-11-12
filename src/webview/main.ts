@@ -17,11 +17,9 @@ import { translatePlural } from '../core/i18n/pluralMessage';
 import type { RunScope } from '../core/ports/ISpecAgentGateway';
 import type { SpecFilterKey } from '../core/model/SpecFilterKey';
 import type { ISpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
-import type { ISpecStatToggleView } from '../core/status/SpecStatToggleView';
 import type { ISpecFolderToggleView } from '../core/status/SpecFolderToggleView';
 import type { IScheduler, ScheduleHandle } from '../core/ports/IScheduler';
 import { planDashboardRender } from './DashboardRenderPlanner';
-import { visibleDocumentKinds } from './visibleDocumentKinds';
 import { HoverIntroductionController } from './HoverIntroductionController';
 import type { IHoverPanelView } from './IHoverPanelView';
 import { DomHoverPanelView } from './DomHoverPanelView';
@@ -33,15 +31,15 @@ import { SpecFolderFilter } from '../core/status/SpecFolderFilter';
 import { SpecFolderToggleView } from '../core/status/SpecFolderToggleView';
 import { SpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
 import { SpecStatToggleView } from '../core/status/SpecStatToggleView';
-import { SPEC_DOCUMENT_KINDS } from '../core/model/SpecDocumentKind';
 import { SpecStatusFilter } from '../core/status/SpecStatusFilter';
 import { resolveTrustedOrigin } from './resolveTrustedOrigin';
 import { el } from './createElement';
 import { icon } from './ToolbarIcon';
 import type { IViewText } from './state/IViewText';
-import type { IGlobalStatItem } from './stats/GlobalStatsViewModel';
-import { buildGlobalStatsModel } from './stats/GlobalStatsViewModel';
-import { buildBadgeModel, buildCardBreakdown, buildOwnerModel } from './card/CardViewModel';
+import type { IDashboardActions } from './state/IDashboardActions';
+import { renderGlobalStats, renderStats } from './stats/DashboardStatsView';
+import { appendCardProgress, renderLinks } from './card/SpecCardView';
+import { buildBadgeModel, buildOwnerModel } from './card/CardViewModel';
 import { filterCards, partitionCards } from './card/CardGrouping';
 import { planSpecUpdate } from './card/SpecUpdatePlanner';
 
@@ -60,12 +58,6 @@ interface IWebviewApi {
 }
 
 declare function acquireVsCodeApi(): IWebviewApi;
-
-/** Percentage multiplier for the required ratio. */
-const PERCENT = 100;
-
-/** Document links rendered per spec, in display order. */
-const DOCUMENT_KINDS: readonly SpecDocumentKind[] = SPEC_DOCUMENT_KINDS;
 
 /**
  * Translator for the webview. It starts as the English identity and is replaced
@@ -169,6 +161,12 @@ function toggleStatusFilter(key: SpecFilterKey): void {
   rerender();
 }
 
+/** Dashboard intents handed to the extracted views. */
+const actions: IDashboardActions = {
+  toggleStatusFilter: (key) => toggleStatusFilter(key),
+  post: (message) => vscodeApi.postMessage(message),
+};
+
 /**
  * Toggle a folder filter key, persist the new set and re-render. Shared by the
  * search-box folder menu and the clickable card folder label so both stay in
@@ -179,136 +177,6 @@ function toggleFolderFilter(key: string): void {
   state.folderFilter = state.folderFilter.toggle(key);
   persistState();
   rerender();
-}
-
-/**
- * Render one clickable statistic toggle as an accessible pressed-state button.
- * @param toggle The stat toggle view (key, label, value, pressed).
- * @returns The button element.
- */
-function renderStatToggle(toggle: ISpecStatToggleView): HTMLElement {
-  const button = el('button', toggle.pressed ? 'stat pressed' : 'stat');
-  button.setAttribute('type', 'button');
-  button.setAttribute('aria-pressed', String(toggle.pressed));
-  button.setAttribute('aria-label', tw('Filter by {0}', toggle.label));
-  button.title = tw('Filter by {0}', toggle.label);
-  button.appendChild(el('span', 'stat-value', String(toggle.value)));
-  button.appendChild(el('span', 'stat-label', toggle.label));
-  button.addEventListener('click', () => toggleStatusFilter(toggle.key));
-  return button;
-}
-
-/**
- * Render the aggregate statistics header as additive toggle filters.
- * @param stats The aggregate counts.
- * @returns The header element.
- */
-function renderStats(stats: ISpecStats): HTMLElement {
-  const header = el('section', 'stats');
-  header.setAttribute('role', 'group');
-  header.setAttribute('aria-label', tw('Filter specs by status'));
-  statToggleView.build(stats, state.filter).forEach((toggle) => {
-    header.appendChild(renderStatToggle(toggle));
-  });
-  return header;
-}
-
-/**
- * Append one labelled task-count item to the global-stats strip.
- * @param strip The strip element to append to.
- * @param item The item to show.
- */
-function appendGlobalStatItem(strip: HTMLElement, item: IGlobalStatItem): void {
-  const node = el('span', `global-stat ${item.cssClass}`);
-  node.appendChild(el('span', 'global-stat-value', String(item.value)));
-  node.appendChild(el('span', 'global-stat-label', item.label));
-  strip.appendChild(node);
-}
-
-/**
- * Render the compact global task-statistics strip.
- *
- * It is a single discreet line summarising the aggregate leaf tasks across
- * every spec (done, cancelled, in-progress, to-do) plus the overall resolved
- * percentage. It is intentionally non-dominating: a small strip, not a header.
- * @param stats The aggregate global task stats.
- * @returns The strip element.
- */
-function renderGlobalStats(stats: IGlobalTaskStats): HTMLElement {
-  const model = buildGlobalStatsModel(stats, viewText);
-  const strip = el('section', 'global-stats');
-  strip.setAttribute('aria-label', tw('Global task statistics'));
-  model.items.forEach((item) => appendGlobalStatItem(strip, item));
-  const overall = el('span', 'global-stat global-stat-overall');
-  overall.appendChild(el('span', 'global-stat-value', model.overall.valueText));
-  overall.appendChild(el('span', 'global-stat-label', model.overall.label));
-  strip.appendChild(overall);
-  return strip;
-}
-
-/**
- * Render one progress bar.
- * @param text Translated row text, including the counts.
- * @param ratio Completion ratio in [0, 1].
- * @returns The progress row element.
- */
-function renderProgress(text: string, ratio: number): HTMLElement {
-  const row = el('div', 'progress');
-  row.appendChild(el('span', 'progress-label', text));
-  const track = el('div', 'progress-track');
-  const fill = el('div', 'progress-fill');
-  fill.style.width = `${Math.round(ratio * PERCENT)}%`;
-  track.appendChild(fill);
-  row.appendChild(track);
-  return row;
-}
-
-/**
- * Render the per-state task breakdown of a card.
- *
- * Zero-count states are omitted to keep the row compact; each shown state wears
- * its own class so the stylesheet renders done normally, cancelled dimmed and
- * struck through, and in-progress in a subtle style. The whole row is hidden
- * when the spec has no leaf task.
- * @param card The spec card view.
- * @returns The breakdown row, or `undefined` when there is nothing to show.
- */
-function renderCardBreakdown(card: ISpecCardView): HTMLElement | undefined {
-  const items = buildCardBreakdown(card, viewText);
-  if (0 === items.length) {
-    return undefined;
-  }
-  const row = el('div', 'task-states');
-  items.forEach((item) => row.appendChild(el('span', `task-state ${item.cssClass}`, item.text)));
-  return row;
-}
-
-/**
- * Render the document links for a spec: only present documents get a link.
- * @param card The spec card view.
- * @returns The links container, or `undefined` when the spec has no document.
- */
-function renderLinks(card: ISpecCardView): HTMLElement | undefined {
-  const kinds = visibleDocumentKinds(card.documents, DOCUMENT_KINDS);
-  if (0 === kinds.length) {
-    return undefined;
-  }
-  const links = el('div', 'links');
-  kinds.forEach((kind) => {
-    const link = el('button', 'link', kind);
-    link.setAttribute('type', 'button');
-    link.addEventListener('click', (event) => {
-      // Inner control: do not also trigger the card-body open gesture.
-      event.stopPropagation();
-      vscodeApi.postMessage({
-        type: 'openDocument',
-        folderPath: card.folderPath,
-        document: kind,
-      });
-    });
-    links.appendChild(link);
-  });
-  return links;
 }
 
 /**
@@ -520,10 +388,10 @@ function renderSyncButton(card: ISpecCardView): HTMLElement {
  * @returns The action-row element.
  */
 function renderActions(card: ISpecCardView): HTMLElement {
-  const actions = el('div', 'actions');
-  actions.appendChild(renderSyncButton(card));
-  actions.appendChild(renderRunButton(card));
-  return actions;
+  const row = el('div', 'actions');
+  row.appendChild(renderSyncButton(card));
+  row.appendChild(renderRunButton(card));
+  return row;
 }
 
 /** Keys that activate the card-body open gesture from the keyboard. */
@@ -672,32 +540,6 @@ document.addEventListener(
   { capture: true },
 );
 /**
- * Append the required/optional progress bars and the per-state breakdown row to
- * a card.
- * @param article The card element to populate.
- * @param card The spec card view.
- */
-function appendCardProgress(article: HTMLElement, card: ISpecCardView): void {
-  const { progress } = card;
-  article.appendChild(
-    renderProgress(
-      tw('Required: {0}/{1}', progress.requiredDone, progress.requiredTotal),
-      progress.requiredRatio,
-    ),
-  );
-  article.appendChild(
-    renderProgress(
-      tw('Optional: {0}/{1}', progress.optionalDone, progress.optionalTotal),
-      progress.optionalRatio,
-    ),
-  );
-  const breakdown = renderCardBreakdown(card);
-  if (undefined !== breakdown) {
-    article.appendChild(breakdown);
-  }
-}
-
-/**
  * Render the owning-folder label of a card as a clickable toggle button.
  *
  * Clicking it toggles that folder in the shared {@link SpecFolderFilter}, so it
@@ -742,8 +584,8 @@ function renderCard(card: ISpecCardView): HTMLElement {
   header.appendChild(renderStatusBadge(card));
   article.appendChild(header);
   article.appendChild(renderOwnerLabel(card));
-  appendCardProgress(article, card);
-  const links = renderLinks(card);
+  appendCardProgress(article, card, viewText);
+  const links = renderLinks(card, actions);
   if (undefined !== links) {
     article.appendChild(links);
   }
@@ -1059,8 +901,8 @@ function renderContent(content: HTMLElement): void {
  */
 function mount(app: HTMLElement): HTMLElement {
   app.replaceChildren();
-  app.appendChild(renderStats(state.stats));
-  app.appendChild(renderGlobalStats(state.globalTaskStats));
+  app.appendChild(renderStats(state.stats, state.filter, statToggleView, viewText, actions));
+  app.appendChild(renderGlobalStats(state.globalTaskStats, viewText));
   app.appendChild(renderToolbar());
   const content = el('section', 'content');
   app.appendChild(content);
@@ -1086,7 +928,7 @@ function render(): void {
     return;
   }
   const stats = app.querySelector('.stats');
-  stats?.replaceWith(renderStats(state.stats));
+  stats?.replaceWith(renderStats(state.stats, state.filter, statToggleView, viewText, actions));
   replaceGlobalStats(app);
   syncToggleLabel(app);
   syncFolderFilterButton(app);
@@ -1104,7 +946,7 @@ rerender = render;
  */
 function replaceGlobalStats(app: HTMLElement): void {
   const strip = app.querySelector('.global-stats');
-  strip?.replaceWith(renderGlobalStats(state.globalTaskStats));
+  strip?.replaceWith(renderGlobalStats(state.globalTaskStats, viewText));
 }
 
 /**
@@ -1114,7 +956,7 @@ function replaceGlobalStats(app: HTMLElement): void {
  */
 function replaceStats(app: HTMLElement): void {
   const stats = app.querySelector('.stats');
-  stats?.replaceWith(renderStats(state.stats));
+  stats?.replaceWith(renderStats(state.stats, state.filter, statToggleView, viewText, actions));
   replaceGlobalStats(app);
 }
 

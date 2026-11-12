@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import type { ISpecDocuments } from '../../src/core/model/ISpecDocuments';
 import { SPEC_DOCUMENT_KINDS } from '../../src/core/model/SpecDocumentKind';
-import { visibleDocumentKinds } from '../../src/webview/visibleDocumentKinds';
+import { visibleDocumentKinds } from '../../src/webview/card/visibleDocumentKinds';
 
 /** Behaviour specification for {@link visibleDocumentKinds}. */
 describe('visibleDocumentKinds', () => {
