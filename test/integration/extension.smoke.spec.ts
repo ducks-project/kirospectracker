@@ -53,6 +53,12 @@ describe('Extension smoke (Node host)', () => {
     expect(extension?.isActive).to.equal(true);
   });
 
+  it('exports the test-only API, which proves the host runs in ExtensionMode.Test', () => {
+    // `activate` returns the API only when `context.extensionMode` is
+    // `ExtensionMode.Test`, so a defined export is the proof of the mode.
+    const extension = vscode.extensions.getExtension(EXTENSION_ID);
+    expect(extension?.exports).to.not.equal(undefined);
+  });
   it('registers every contributed command', async () => {
     const commands = await vscode.commands.getCommands(true);
     EXPECTED_COMMANDS.forEach((command) => {

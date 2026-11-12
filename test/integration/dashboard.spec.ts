@@ -4,9 +4,7 @@ import * as vscode from 'vscode';
 
 import type { DashboardOutboundMessage } from '../../src/core/model/IDashboardMessage';
 import type { IExtensionApi } from '../../src/extension';
-
-const EXTENSION_ID = 'ducks-project.kirospectracker';
-const isCi = 'true' === process.env.CI;
+import { loadTestApi } from '../helpers/test-extension-api';
 
 /**
  * Await a condition, polling until it holds or a timeout elapses.
@@ -146,15 +144,12 @@ describe('Spec dashboard (Node host)', () => {
   let originalTasksContent: Uint8Array | undefined;
 
   before(async function activateExtension() {
-    const extension = vscode.extensions.getExtension<IExtensionApi>(EXTENSION_ID);
-    if (undefined === extension) {
-      if (isCi) {
-        throw new Error('Extension not loaded under CI; this must not be skipped.');
-      }
+    const loaded = await loadTestApi();
+    if (undefined === loaded) {
       this.skip();
       return;
     }
-    api = await extension.activate();
+    api = loaded;
     await waitFor(() => 0 < api.repository.getSpecs().length);
     const inProgress = api.repository.getSpecs().find((spec) => 'in-progress' === spec.name);
     expect(inProgress).to.not.equal(undefined);

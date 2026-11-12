@@ -2,9 +2,8 @@ import { expect } from 'chai';
 import * as vscode from 'vscode';
 import { SpecExcludeGlob } from '../../src/core/hiding/SpecExcludeGlob';
 import type { IExtensionApi } from '../../src/extension';
+import { loadTestApi } from '../helpers/test-extension-api';
 
-const EXTENSION_ID = 'ducks-project.kirospectracker';
-const isCi = 'true' === process.env.CI;
 const USER_ENTRY = '**/user-owned-entry';
 /** Completed spec whose name needs escaping; `[` and `]` are valid folder names on every OS. */
 const BRACKET_SPEC = 'brackets[1]';
@@ -53,15 +52,12 @@ describe('Hide specs by status (Node host)', () => {
       .sort();
 
   before(async function activateExtension() {
-    const extension = vscode.extensions.getExtension<IExtensionApi>(EXTENSION_ID);
-    if (undefined === extension) {
-      if (isCi) {
-        throw new Error('Extension not loaded under CI; this must not be skipped.');
-      }
+    const loaded = await loadTestApi();
+    if (undefined === loaded) {
       this.skip();
       return;
     }
-    api = await extension.activate();
+    api = loaded;
     await api.repository.refresh();
     folder = (vscode.workspace.workspaceFolders ?? [])[0];
     settingsDirUri = vscode.Uri.joinPath(folder.uri, '.vscode');

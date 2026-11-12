@@ -3,11 +3,9 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 import type { IExtensionApi } from '../../src/extension';
+import { loadTestApi } from '../helpers/test-extension-api';
 import type { ISpecSnapshot } from '../../src/core/model/ISpecSnapshot';
 import type { ISpecAgentGateway } from '../../src/core/ports/ISpecAgentGateway';
-
-const EXTENSION_ID = 'ducks-project.kirospectracker';
-const isCi = 'true' === process.env.CI;
 
 /**
  * Await a condition, polling until it holds or a timeout elapses.
@@ -63,15 +61,12 @@ describe('Tree context menu (Node host)', () => {
   let api: IExtensionApi;
 
   before(async function activateExtension() {
-    const extension = vscode.extensions.getExtension<IExtensionApi>(EXTENSION_ID);
-    if (undefined === extension) {
-      if (isCi) {
-        throw new Error('Extension not loaded under CI; this must not be skipped.');
-      }
+    const loaded = await loadTestApi();
+    if (undefined === loaded) {
       this.skip();
       return;
     }
-    api = await extension.activate();
+    api = loaded;
     await waitFor(() => 0 < api.repository.getSpecs().length);
   });
 
