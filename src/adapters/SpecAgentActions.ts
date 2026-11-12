@@ -64,6 +64,14 @@ export class SpecAgentActions {
   }
 
   /**
+   * The gateway currently wired (read back so a test can swap one in and
+   * restore the original).
+   * @returns The current gateway.
+   */
+  public getGateway(): ISpecAgentGateway {
+    return this.gateway;
+  }
+  /**
    * Sync/update the tasks of the spec at a folder path.
    * @param folderPath Absolute path of the spec folder.
    */

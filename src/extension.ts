@@ -125,6 +125,14 @@ export interface IExtensionApi {
    * instance instead of patching the `vscode` API.
    */
   readonly agentErrorReporter: IAgentErrorReporter;
+  /**
+   * The shared agent task actions.
+   *
+   * Exposed for tests only, so the integration harness can swap in a
+   * recording gateway (and restore the original) to prove a refused spec never
+   * reaches any gateway.
+   */
+  readonly agentActions: SpecAgentActions;
 }
 
 /** Disposable collaborators registered at activation. */
@@ -590,6 +598,7 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
     fileSystem: wiring.fileSystem,
     hiddenSpecs,
     agentErrorReporter: wiring.gateway,
+    agentActions: wiring.agentActions,
   };
 }
 

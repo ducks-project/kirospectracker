@@ -123,6 +123,7 @@ describe('SpecAgentActions', () => {
     await actions.syncTasks(ALPHA);
     expect(first.synced).to.have.length(0);
     expect(second.synced).to.have.length(1);
+    expect(actions.getGateway()).to.equal(second);
   });
   it('refuses runTasks of a malformed spec for both scopes without calling the gateway', async () => {
     const gateway = new FakeAgentGateway();

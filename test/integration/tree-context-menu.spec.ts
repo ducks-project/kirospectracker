@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 
 import type { IExtensionApi } from '../../src/extension';
 import type { ISpecSnapshot } from '../../src/core/model/ISpecSnapshot';
+import type { ISpecAgentGateway } from '../../src/core/ports/ISpecAgentGateway';
 
 const EXTENSION_ID = 'ducks-project.kirospectracker';
 const isCi = 'true' === process.env.CI;
@@ -36,6 +37,23 @@ function specNode(spec: ISpecSnapshot): { kind: 'spec'; spec: ISpecSnapshot } {
   return { kind: 'spec', spec };
 }
 
+/**
+ * Build a gateway recording every call, to prove the guard stops a spec before
+ * any gateway (Kiro chat or fallback) is reached.
+ * @param calls The list receiving one entry per gateway call.
+ * @returns The recording gateway.
+ */
+function recordingGateway(calls: string[]): ISpecAgentGateway {
+  return {
+    availability: () => 'integrated',
+    syncTasks: async (): Promise<void> => {
+      calls.push('syncTasks');
+    },
+    runTasks: async (): Promise<void> => {
+      calls.push('runTasks');
+    },
+  };
+}
 /**
  * Integration suite asserting the "Specs by Status" tree context-menu commands
  * are wired to the shared open/run behaviour and resolve their target from the
@@ -90,6 +108,9 @@ describe('Tree context menu (Node host)', () => {
     const reported: string[] = [];
     const reporter = api.agentErrorReporter;
     const original = reporter.showError;
+    const originalGateway = api.agentActions.getGateway();
+    const gatewayCalls: string[] = [];
+    api.agentActions.setGateway(recordingGateway(gatewayCalls));
     reporter.showError = (message: string): void => {
       reported.push(message);
     };
@@ -100,7 +121,9 @@ describe('Tree context menu (Node host)', () => {
       );
     } finally {
       reporter.showError = original;
+      api.agentActions.setGateway(originalGateway);
     }
+    expect(gatewayCalls).to.deep.equal([]);
     expect(reported).to.have.length(1);
     expect(reported[0]).to.contain('"malformed"');
     expect(vscode.window.activeTextEditor).to.equal(undefined);
