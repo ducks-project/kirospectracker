@@ -9,6 +9,14 @@ import { runTests } from '@vscode/test-electron';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
+ * VS Code build the integration suite runs against. Pinned (instead of the
+ * moving `stable`) so a given commit behaves the same from one day to the next.
+ * Raise it deliberately, see docs/testing.md. Ignored when an executable is
+ * provided through `KIRO_SPEC_TRACKER_TEST_EXECUTABLE`.
+ */
+const PINNED_VSCODE_VERSION = '1.146.0';
+
+/**
  * Read an optional, non-empty environment variable.
  * @param name The variable name.
  * @returns Its value, or `undefined` when unset or empty.
@@ -63,7 +71,9 @@ async function main(): Promise<void> {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
-      ...(undefined === options.executable ? {} : { vscodeExecutablePath: options.executable }),
+      ...(undefined === options.executable
+        ? { version: PINNED_VSCODE_VERSION }
+        : { vscodeExecutablePath: options.executable }),
       ...(undefined === options.locale
         ? {}
         : { extensionTestsEnv: { KIRO_SPEC_TRACKER_TEST_LOCALE: options.locale } }),

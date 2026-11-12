@@ -53,6 +53,12 @@ npm run test:property
   fixture's `.vscode` folder first and restores or removes it in an `after` hook, so no
   versioned fixture file is left modified, even on failure.
 - On CI Linux the suite runs under `xvfb-run` (virtual display).
+- Pinned VS Code version: the harness ([runTest.ts](../test/runTest.ts)) downloads the build
+  named by `PINNED_VSCODE_VERSION` (currently 1.146.0) instead of the moving `stable`, so a
+  commit behaves the same from one day to the next. CI uses the same script and needs no
+  change. To bump it, edit that constant, run `xvfb-run -a npm run test:integration` several
+  times, and commit the new value. When `KIRO_SPEC_TRACKER_TEST_EXECUTABLE` is set, that
+  executable takes precedence and the pinned version is not used.
 
 ```bash
 npm run test:integration

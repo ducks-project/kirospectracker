@@ -49,9 +49,10 @@ class RecordingReporter implements IAgentErrorReporter {
   }
 }
 
-/** Build a repository seeded with one in-progress spec named `alpha`. */
+const BROKEN = `${ROOT}/broken`;
+/** Build a repository seeded with `alpha` (in progress) and `broken` (no tasks.md). */
 async function seededRepository(): Promise<SpecRepository> {
-  const directories = new Set<string>([ALPHA]);
+  const directories = new Set<string>([ALPHA, BROKEN]);
   const files = new Map<string, string>([[`${ALPHA}/tasks.md`, '- [x] 1. Done\n- [ ] 2. Todo']]);
   const fileSystem = new FakeSpecFileSystem([WORKSPACE], files, directories);
   const factory = new SpecSnapshotFactory(
@@ -122,5 +123,37 @@ describe('SpecAgentActions', () => {
     await actions.syncTasks(ALPHA);
     expect(first.synced).to.have.length(0);
     expect(second.synced).to.have.length(1);
+  });
+  it('refuses runTasks of a malformed spec for both scopes without calling the gateway', async () => {
+    const gateway = new FakeAgentGateway();
+    const reporter = new RecordingReporter();
+    const actions = new SpecAgentActions(await seededRepository(), gateway, reporter);
+    await actions.runTasks(BROKEN, 'required');
+    await actions.runTasks(BROKEN, 'required-and-optional');
+    expect(gateway.ran).to.have.length(0);
+    expect(reporter.errors).to.have.length(2);
+    expect(reporter.errors[0]).to.equal(
+      '"broken" is malformed (missing or unreadable tasks.md) and cannot be run.',
+    );
+  });
+  it('refuses syncTasks of a malformed spec without calling the gateway', async () => {
+    const gateway = new FakeAgentGateway();
+    const reporter = new RecordingReporter();
+    const actions = new SpecAgentActions(await seededRepository(), gateway, reporter);
+    await actions.syncTasks(BROKEN);
+    expect(gateway.synced).to.have.length(0);
+    expect(reporter.errors).to.deep.equal([
+      '"broken" is malformed (missing or unreadable tasks.md) and cannot be synced.',
+    ]);
+  });
+  it('reports no error for a well-formed spec', async () => {
+    const reporter = new RecordingReporter();
+    const actions = new SpecAgentActions(
+      await seededRepository(),
+      new FakeAgentGateway(),
+      reporter,
+    );
+    await actions.runTasks(ALPHA, 'required');
+    expect(reporter.errors).to.have.length(0);
   });
 });

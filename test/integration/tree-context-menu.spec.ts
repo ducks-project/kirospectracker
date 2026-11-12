@@ -84,17 +84,25 @@ describe('Tree context menu (Node host)', () => {
     expect(opened).to.equal(path.join((spec as ISpecSnapshot).folderPath, 'tasks.md'));
   });
 
-  it('refuses to run a malformed spec (opens no tasks editor)', async () => {
+  it('refuses to run a malformed spec (reports an error, opens no editor)', async () => {
     const spec = api.repository.getSpecs().find((candidate) => 'malformed' === candidate.name);
     expect(spec).to.not.equal(undefined);
-    await vscode.commands.executeCommand(
-      'kirospectracker.tree.runRequired',
-      specNode(spec as ISpecSnapshot),
-    );
-    // A malformed spec is refused before any document is opened.
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 300);
-    });
+    const reported: string[] = [];
+    const reporter = api.agentErrorReporter;
+    const original = reporter.showError;
+    reporter.showError = (message: string): void => {
+      reported.push(message);
+    };
+    try {
+      await vscode.commands.executeCommand(
+        'kirospectracker.tree.runRequired',
+        specNode(spec as ISpecSnapshot),
+      );
+    } finally {
+      reporter.showError = original;
+    }
+    expect(reported).to.have.length(1);
+    expect(reported[0]).to.contain('"malformed"');
     expect(vscode.window.activeTextEditor).to.equal(undefined);
   });
 });
