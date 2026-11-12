@@ -2,6 +2,7 @@ import type { ISpecFolderToggleView } from '../../core/status/SpecFolderToggleVi
 import { el } from '../createElement';
 import { icon } from '../ToolbarIcon';
 import type { IToolbarDeps } from './IToolbarDeps';
+import { MENU_TOGGLE_KEYS } from '../activationKeys';
 
 /**
  * Populate the folder-filter menu with one accessible toggle item per distinct
@@ -54,9 +55,6 @@ function folderMenuItem(
   return button;
 }
 
-/** Keys that toggle or close the folder-filter menu from the keyboard. */
-const FOLDER_MENU_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', 'Escape']);
-
 /**
  * Wire the folder-filter button and menu to open/close by mouse and keyboard
  * (click or Enter/Space toggle, Escape closes), rebuilding the menu on each open
@@ -82,7 +80,7 @@ function wireFolderFilter(button: HTMLElement, menu: HTMLElement, deps: IToolbar
       setExpanded(false);
       return;
     }
-    if (!FOLDER_MENU_KEYS.has(event.key)) {
+    if (!MENU_TOGGLE_KEYS.has(event.key)) {
       return;
     }
     event.preventDefault();

@@ -1,7 +1,6 @@
 import { HOVER_PANEL_ID } from './DomHoverPanelView';
 import { HOVER_CLOSE_CLASS, PREVIEW_ICON_CLASS } from './previewDomNames';
-/** Keys whose keydown must not reach the card-body open gesture. */
-const ACTIVATION_KEYS: ReadonlySet<string> = new Set(['Enter', ' ']);
+import { ACTIVATION_KEYS } from '../activationKeys';
 /** The subset of the hover controller the preview icon drives. */
 export interface IPreviewIconControls {
   enter(folderPath: string): void;

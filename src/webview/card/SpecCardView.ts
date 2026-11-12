@@ -8,6 +8,7 @@ import type { DashboardStore } from '../state/DashboardStore';
 import { buildBadgeModel, buildCardBreakdown, buildOwnerModel } from './CardViewModel';
 import { renderActions } from './RunTasksMenu';
 import { visibleDocumentKinds } from './visibleDocumentKinds';
+import { ACTIVATION_KEYS } from '../activationKeys';
 
 /** Dependencies a card render needs. */
 export interface ICardDeps {
@@ -148,9 +149,6 @@ function renderStatusBadge(card: ISpecCardView, deps: ICardDeps): HTMLElement {
   });
   return badge;
 }
-
-/** Keys that activate the card-body open gesture from the keyboard. */
-const ACTIVATION_KEYS: ReadonlySet<string> = new Set(['Enter', ' ']);
 
 /**
  * Open a spec's resolved entry document through the existing openDocument intent.

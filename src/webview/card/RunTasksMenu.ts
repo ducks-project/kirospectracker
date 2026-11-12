@@ -3,9 +3,7 @@ import type { RunScope } from '../../core/ports/ISpecAgentGateway';
 import { el } from '../createElement';
 import type { IDashboardActions } from '../state/IDashboardActions';
 import type { IViewText } from '../state/IViewText';
-
-/** Keys that activate or close the run-scope dropdown from the keyboard. */
-const DROPDOWN_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', 'Escape']);
+import { MENU_TOGGLE_KEYS } from '../activationKeys';
 
 /**
  * Post a scoped run-tasks intent for a spec.
@@ -135,7 +133,7 @@ function handleToggleKey(
     setExpanded(false);
     return;
   }
-  if (!DROPDOWN_KEYS.has(event.key)) {
+  if (!MENU_TOGGLE_KEYS.has(event.key)) {
     return;
   }
   event.preventDefault();
