@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-12
+
+### Fixed
+
+- Refuse a malformed spec (missing or unreadable `tasks.md`) for "Run tasks" and "Sync Files"
+  before any agent gateway is reached, with an error message naming the spec. The refusal used
+  to live only in the fallback gateway, so with the Kiro chat gateway a malformed spec could be
+  sent to the agent. The dashboard and the tree already hide these actions for a malformed spec,
+  so nothing changes in the interface.
+- Make the integration test for that refusal check the refusal itself (an error is reported, no
+  gateway is called, no editor is opened) instead of waiting a fixed delay. It no longer depends
+  on the editor's built-in chat command, whose response time made it fail about one run in two
+  on VS Code 1.146.0.
+- Pin the VS Code build used by the integration tests to 1.146.0, so a given commit behaves the
+  same from one day to the next, and rebuild the extension before running them locally.
+
 ## [0.15.0] - 2026-11-10
 
 ### Added
@@ -485,7 +501,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.15.0...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/ducks-project/kirospectracker/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/ducks-project/kirospectracker/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/ducks-project/kirospectracker/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/ducks-project/kirospectracker/compare/v0.13.1...v0.14.0
