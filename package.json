@@ -305,7 +305,7 @@
     "coverage": "npm run coverage:core && npm run coverage:adapters",
     "test": "npm run coverage",
     "compile:test": "tsc -p tsconfig.test.json",
-    "pretest:integration": "npm run compile:test",
+    "pretest:integration": "npm run compile:test && npm run build",
     "test:integration": "node --loader ts-node/esm --no-warnings ./test/runTest.ts",
     "bench": "node --loader ts-node/esm --no-warnings ./benchmark/parse.bench.ts",
     "bench:update": "node --loader ts-node/esm --no-warnings ./benchmark/incremental-update.bench.ts",

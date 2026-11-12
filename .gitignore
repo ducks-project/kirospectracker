@@ -42,5 +42,10 @@ coverage/
 # Local git worktrees used to develop a feature branch next to the main checkout.
 .worktrees/
 
+# Root workspace settings are local: the installed extension itself writes its
+# hidden-spec exclusions here when kirospectracker.hideSpecs.mode is on.
+# Anchored to the root so a settings file left in a test fixture stays visible.
+/.vscode/settings.json
+
 # VS Code multi-root workspace file
 *.code-workspace
