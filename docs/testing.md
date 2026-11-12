@@ -52,6 +52,13 @@ npm run test:property
   globs, and discovery, watcher path and decorations left unaffected. The suite captures the
   fixture's `.vscode` folder first and restores or removes it in an `after` hook, so no
   versioned fixture file is left modified, even on failure.
+- Test-only API: the specs read the internal objects (`repository`, `fileSystem`,
+  `agentActions`, ...) from the extension's `exports`, through the shared helper
+  [test-extension-api.ts](../test/helpers/test-extension-api.ts). `activate` exports them only
+  in `ExtensionMode.Test`, which `@vscode/test-electron` (`extensionTestsPath`) and the
+  "Extension Tests" launch configuration both use; in production and development the export is
+  `undefined`. The helper fails loudly when the export is missing, and the smoke suite asserts
+  it, so a run outside test mode cannot pass silently.
 - On CI Linux the suite runs under `xvfb-run` (virtual display).
 - Pinned VS Code version: the harness ([runTest.ts](../test/runTest.ts)) downloads the build
   named by `PINNED_VSCODE_VERSION` (currently 1.146.0) instead of the moving `stable`, so a

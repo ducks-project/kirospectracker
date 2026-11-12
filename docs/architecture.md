@@ -26,7 +26,14 @@ boundary with `vscode`.
   the file system, decorates the explorer, hosts the dashboard webview and the tree view,
   and registers the commands.
 - Entry point ([extension.ts](../src/extension.ts)): composition root that wires the
-  dependencies and registers everything into `context.subscriptions`.
+  dependencies and registers everything into `context.subscriptions`. It returns the
+  internal objects the integration tests observe (`repository`, `fileSystem`, `hiddenSpecs`,
+  `agentActions`, `agentErrorReporter`, ...) as `IExtensionApi` ONLY when
+  `context.extensionMode === ExtensionMode.Test`; in production and development it exports
+  `undefined`, so no other installed extension can reach them through `exports` (for example
+  to swap the agent gateway). The rule is the pure
+  [selectExportedApi](../src/adapters/TestApiExposure.ts); the behaviour of the extension is
+  the same in every mode.
 
 ## Layer diagram
 
