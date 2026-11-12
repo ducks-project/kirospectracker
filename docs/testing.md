@@ -72,7 +72,7 @@ npm run test:integration
   exactly the typed catalogue keys; the three JSON files are sorted by key; `package.json`
   declares `"l10n": "./l10n"` and the folder exists; the `hideSpecs.statuses` keys equal the
   `SpecStatus` values. [webview-keys.spec.ts](../test/unit/webview-keys.spec.ts) checks that
-  `main.ts` only requests catalogued webview keys. Tests that read a manifest title resolve it
+  every `.ts` file under `src/webview` (read recursively) only requests catalogued webview keys. Tests that read a manifest title resolve it
   through [manifest-nls.ts](../test/helpers/manifest-nls.ts).
 - Real French run: [localization.spec.ts](../test/integration/localization.spec.ts) checks English
   output by default and, when `KIRO_SPEC_TRACKER_TEST_LOCALE=fr` is set, the French command title and
@@ -107,11 +107,15 @@ KIRO_SPEC_TRACKER_TEST_EXTRA_ARGS="--disable-gpu" xvfb-run -a npm run test:integ
 
 ## Coverage
 
-Coverage is gated per layer with c8, run twice (once per config) so each layer is checked
+Coverage is gated per layer with c8, run once per config so each layer is checked
 against its own threshold:
 
 - Core layer ([.c8rc.json](../.c8rc.json)): >= 95% statements, >= 90% branches.
 - Adapter layer ([.c8rc.adapters.json](../.c8rc.adapters.json)): >= 85% statements.
+- Webview ([.c8rc.webview.json](../.c8rc.webview.json)): >= 90% statements, >= 80% branches,
+  on the DOM-free modules of `src/webview/**` and the preview modules tested against fakes.
+  `main.ts`, the type-only `I*.ts` files and the modules that only build real DOM nodes are
+  excluded, with the reason in the `_comment` of the config.
 
 ```bash
 npm run coverage
@@ -120,8 +124,25 @@ npm run coverage
 Type-only ports and host-only `vscode` wrappers/providers are excluded from the gated
 scope with documented rationale in the c8 config comments: they emit no in-process-testable
 runtime logic and are evidenced behaviourally by the host harnesses. Each config writes an
-`lcov` report under `coverage/core/` and `coverage/adapters/`, uploaded to Codecov from CI
-with the flags `core` and `adapters`.
+`lcov` report under `coverage/core/`, `coverage/adapters/` and `coverage/webview/`, uploaded to
+Codecov from CI with the flags `core`, `adapters` and `webview`.
+
+### Dashboard bundle safety net
+
+The dashboard script is a browser bundle that c8 cannot measure in `node:vm`, so its behaviour
+is pinned by [dashboard-bundle.spec.ts](../test/unit/dashboard-bundle.spec.ts). It builds the
+real `src/webview/main.ts` with esbuild, runs it in `node:vm` against the hand-written fake DOM
+in [test/helpers/fake-dom](../test/helpers/fake-dom), replays 61 scenarios (renders, clicks,
+keyboard, origin guard, scoped updates, rendering cost) and compares a serialized trace of the
+DOM, the `postMessage` and `setState` effects and their order with the reference snapshots in
+[test/fixtures/dashboard-snapshot](../test/fixtures/dashboard-snapshot). The fake DOM throws on
+any API it does not model, so a refactor cannot silently start using a new one.
+
+The reference is only regenerated on purpose, when a visible behaviour change is intended and
+reviewed: run `UPDATE_DASHBOARD_SNAPSHOT=1 npm run test:unit` and review the diff of the fixtures
+like production code. A refactor must never need it; a snapshot diff means the refactor changed
+behaviour. This net does not replace a manual pass for visual rendering, focus and real
+keyboard behaviour in the editor.
 
 ## What the project does not test
 

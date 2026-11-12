@@ -51,6 +51,14 @@ jobs:
           flags: adapters
           fail_ci_if_error: false
 
+      - name: Upload webview coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/webview/lcov.info
+          flags: webview
+          fail_ci_if_error: false
+
       - name: Integration tests (headless)
         run: xvfb-run -a npm run test:integration
 
