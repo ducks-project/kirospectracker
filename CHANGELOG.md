@@ -6,6 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-12
+
+### Added
+
+- Add a permanent safety-net test for the dashboard webview: it runs the real dashboard bundle
+  in `node:vm` against a hand-written fake DOM, replays 61 scenarios (host messages, filters,
+  search, menus, card actions, the preview, a hostile message origin) and compares the result
+  with reference snapshots stored under `test/fixtures/dashboard-snapshot/`. The references are
+  only regenerated on purpose, with `UPDATE_DASHBOARD_SNAPSHOT=1`.
+- Gate the coverage of the webview's DOM-free modules (90 % statements, 80 % branches) and
+  upload it to Codecov under a `webview` flag.
+
+### Changed
+
+- Split the dashboard webview script, previously a single file of about 1,400 lines, into
+  cohesive modules grouped in feature folders (`card/`, `toolbar/`, `stats/`, `preview/`,
+  `state/`). `main.ts` is now a composition root of about 120 lines that keeps the message
+  origin check. The state and the translations live in single injected instances, and the views
+  act through an injected `IDashboardActions` interface instead of a shared re-render hook.
+  No behaviour, protocol or style change: the safety-net references are unchanged and the host
+  bundles are byte-identical.
+
 ## [0.15.1] - 2026-11-12
 
 ### Fixed
@@ -501,7 +523,8 @@ the v0.4.1 ready handshake are all preserved.
 - Unit, property-based (fast-check), and VS Code integration test suites, plus a mitata
   parsing benchmark.
 
-[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.15.1...HEAD
+[unreleased]: https://github.com/ducks-project/kirospectracker/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/ducks-project/kirospectracker/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/ducks-project/kirospectracker/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/ducks-project/kirospectracker/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/ducks-project/kirospectracker/compare/v0.14.0...v0.14.1
