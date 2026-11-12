@@ -1,0 +1,16 @@
+# scenario: boot-ready-handshake
+## boot
+effects (+1):
+  1. post {"type":"ready"}
+timers: []
+active: body
+note: the bundle posts ready once its listeners are wired, and draws nothing yet
+## final
+effects (+0):
+timers: []
+active: body
+window listeners: message
+document listeners: keydown, scroll(capture), click(capture), click
+dom:
+  <body>  [active]
+    <main aria-live="polite" id="app">

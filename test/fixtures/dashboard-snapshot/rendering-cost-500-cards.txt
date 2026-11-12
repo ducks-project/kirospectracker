@@ -1,0 +1,28 @@
+# scenario: rendering-cost-500-cards
+## boot
+effects (+1):
+  1. post {"type":"ready"}
+timers: []
+active: body
+note: boot: createElement=0, createElementNS=0
+note: first render of 500 cards: createElement=14173, createElementNS=862
+note: second render of the same 500 cards: createElement=14163, createElementNS=858
+note: specUpdated, same group: createElement=58, createElementNS=2
+note: card nodes after the same-group update: kept=499, replaced=1, new=0
+note: specUpdated, active to completed: createElement=14163, createElementNS=856
+note: card nodes after the regrouping update: kept=0, replaced=500, new=0
+note: search "spec-00": createElement=316, createElementNS=18
+note: search cleared: createElement=14163, createElementNS=858
+note: strings (fr) after the render: createElement=14173, createElementNS=862
+## after the cost measurements
+effects (+1):
+  2. dom
+timers: []
+active: body
+## final
+effects (+0):
+timers: []
+active: body
+window listeners: message
+document listeners: keydown, scroll(capture), click(capture), click
+dom: 21981 nodes below body

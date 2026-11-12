@@ -1,0 +1,21 @@
+# scenario: message-origin-guard-opaque-null-location
+## boot
+effects (+1):
+  1. post {"type":"ready"}
+timers: []
+active: body
+## opaque webview origin: every message is rejected
+effects (+0):
+timers: []
+active: body
+dom #app:
+  <main aria-live="polite" id="app">
+## final
+effects (+0):
+timers: []
+active: body
+window listeners: message
+document listeners: keydown, scroll(capture), click(capture), click
+dom:
+  <body>  [active]
+    <main aria-live="polite" id="app">

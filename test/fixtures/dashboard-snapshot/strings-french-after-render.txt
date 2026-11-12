@@ -1,0 +1,227 @@
+# scenario: strings-french-after-render
+## boot
+effects (+1):
+  1. post {"type":"ready"}
+timers: []
+active: body
+## first render, English
+effects (+1):
+  2. dom
+timers: []
+active: body
+## strings (fr) after a render: the app is rebuilt translated
+effects (+0):
+timers: []
+active: body
+## final
+effects (+0):
+timers: []
+active: body
+window listeners: message
+document listeners: keydown, scroll(capture), click(capture), click
+dom:
+  <body>  [active]
+    <main aria-live="polite" id="app">
+      <section aria-label="fr~Filter specs by status" class="stats" role="group">
+        <button aria-label="fr~Filter by fr~one~Completed" aria-pressed="false" class="stat" title="fr~Filter by fr~one~Completed" type="button">
+          <span class="stat-value">
+            "1"
+          <span class="stat-label">
+            "fr~one~Completed"
+        <button aria-label="fr~Filter by fr~one~In progress" aria-pressed="false" class="stat" title="fr~Filter by fr~one~In progress" type="button">
+          <span class="stat-value">
+            "1"
+          <span class="stat-label">
+            "fr~one~In progress"
+        <button aria-label="fr~Filter by fr~one~Not started" aria-pressed="false" class="stat" title="fr~Filter by fr~one~Not started" type="button">
+          <span class="stat-value">
+            "1"
+          <span class="stat-label">
+            "fr~one~Not started"
+        <button aria-label="fr~Filter by fr~one~Malformed" aria-pressed="false" class="stat" title="fr~Filter by fr~one~Malformed" type="button">
+          <span class="stat-value">
+            "0"
+          <span class="stat-label">
+            "fr~one~Malformed"
+      <section aria-label="fr~Global task statistics" class="global-stats">
+        <span class="global-stat global-stat-done">
+          <span class="global-stat-value">
+            "12"
+          <span class="global-stat-label">
+            "fr~many~done"
+        <span class="global-stat global-stat-cancelled">
+          <span class="global-stat-value">
+            "1"
+          <span class="global-stat-label">
+            "fr~one~cancelled"
+        <span class="global-stat global-stat-inProgress">
+          <span class="global-stat-value">
+            "2"
+          <span class="global-stat-label">
+            "fr~in progress"
+        <span class="global-stat global-stat-todo">
+          <span class="global-stat-value">
+            "9"
+          <span class="global-stat-label">
+            "fr~to-do"
+        <span class="global-stat global-stat-overall">
+          <span class="global-stat-value">
+            "fr~54%"
+          <span class="global-stat-label">
+            "fr~resolved"
+      <div class="toolbar">
+        <div class="search-box">
+          <input class="search" placeholder="fr~Search specs by name" type="search">
+          <button aria-label="fr~Clear search" class="search-clear" title="fr~Clear search" type="button">
+            <svg:svg aria-hidden="true" class="icon" focusable="false" height="16" viewBox="0 0 16 16" width="16">
+              <svg:path d="M4 3L3 4l3.5 3.5L3 11l1 1 3.5-3.5L11 12l1-1-3.5-3.5L12 4l-1-1-3.5 3.5L4 3z" fill="currentColor">
+        <div class="folder-filter">
+          <button aria-expanded="false" aria-haspopup="true" aria-label="fr~Filter by folder" aria-pressed="false" class="folder-filter-button" title="fr~Filter by folder" type="button">
+            <svg:svg aria-hidden="true" class="icon" focusable="false" height="16" viewBox="0 0 16 16" width="16">
+              <svg:path d="M1 2h14v2l-5 5v5l-4-2V9L1 4V2z" fill="currentColor">
+          <div class="folder-menu" hidden="" role="menu">
+        <div aria-label="fr~Dashboard layout" class="layout-toggles" role="group">
+          <button aria-label="fr~Switch to grid view" aria-pressed="false" class="toggle" data-next-layout="grid" title="fr~Switch to grid view" type="button">
+            <svg:svg aria-hidden="true" class="icon" focusable="false" height="16" viewBox="0 0 16 16" width="16">
+              <svg:path d="M2 2h5v5H2V2zm7 0h5v5H9V2zM2 9h5v5H2V9zm7 0h5v5H9V9z" fill="currentColor">
+      <section class="content">
+        <section class="group layout-list">
+          <h1 class="group-title">
+            "fr~Active specs"
+          <div class="cards layout-list">
+            <article aria-label="fr~Open requirements for alpha" class="card status-InProgress card-clickable" role="button" tabindex="0">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">
+                    "alpha"
+                  <button aria-expanded="false" aria-label="fr~Preview alpha" class="card-preview" type="button">
+                    <svg:svg aria-hidden="true" class="icon" focusable="false" height="16" viewBox="0 0 16 16" width="16">
+                      <svg:path d=long(192 chars, sha1 78483286b4af) fill="currentColor" fill-rule="evenodd">
+                <button aria-label="fr~Filter by fr~In progress status" aria-pressed="false" class="card-status badge badge-inProgress" title="fr~Filter by fr~In progress status" type="button">
+                  "fr~In progress"
+              <button aria-label="fr~Filter by alpha-app folder" aria-pressed="false" class="card-owner" title="fr~Filter by alpha-app folder" type="button">
+                "alpha-app"
+              <div class="progress">
+                <span class="progress-label">
+                  "fr~Required: 4/7"
+                <div class="progress-track">
+                  <div class="progress-fill" style="width: 57%">
+              <div class="progress">
+                <span class="progress-label">
+                  "fr~Optional: 0/0"
+                <div class="progress-track">
+                  <div class="progress-fill" style="width: 0%">
+              <div class="task-states">
+                <span class="task-state task-state-done">
+                  "fr~many~3 done"
+                <span class="task-state task-state-cancelled">
+                  "fr~one~1 cancelled"
+                <span class="task-state task-state-inProgress">
+                  "fr~1 in progress"
+              <div class="links">
+                <button class="link" type="button">
+                  "requirements"
+                <button class="link" type="button">
+                  "design"
+                <button class="link" type="button">
+                  "tasks"
+              <div class="actions">
+                <button aria-label="fr~Sync files for alpha" class="run sync" type="button">
+                  "fr~Sync Files"
+                <div aria-label="fr~Run tasks for alpha" class="run-split" role="group">
+                  <button aria-label="fr~Run required tasks for alpha" class="run run-primary" type="button">
+                    "fr~Run tasks"
+                  <button aria-expanded="false" aria-haspopup="true" aria-label="fr~Choose run scope for alpha" class="run run-toggle" type="button">
+                    "▾"
+                  <div class="run-menu" hidden="" role="menu">
+                    <button class="run-menu-item" role="menuitem" type="button">
+                      "fr~Run required tasks"
+                    <button class="run-menu-item" role="menuitem" type="button">
+                      "fr~Run required and optional tasks"
+            <article aria-label="fr~Open tasks for beta" class="card status-NotStarted card-clickable" role="button" tabindex="0">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">
+                    "beta"
+                  <button aria-expanded="false" aria-label="fr~Preview beta" class="card-preview" type="button">
+                    <svg:svg aria-hidden="true" class="icon" focusable="false" height="16" viewBox="0 0 16 16" width="16">
+                      <svg:path d=long(192 chars, sha1 78483286b4af) fill="currentColor" fill-rule="evenodd">
+                <button aria-label="fr~Filter by fr~Not started status" aria-pressed="false" class="card-status badge badge-notStarted" title="fr~Filter by fr~Not started status" type="button">
+                  "fr~Not started"
+              <button aria-label="fr~Filter by alpha-app folder" aria-pressed="false" class="card-owner" title="fr~Filter by alpha-app folder" type="button">
+                "alpha-app"
+              <div class="progress">
+                <span class="progress-label">
+                  "fr~Required: 0/4"
+                <div class="progress-track">
+                  <div class="progress-fill" style="width: 0%">
+              <div class="progress">
+                <span class="progress-label">
+                  "fr~Optional: 0/1"
+                <div class="progress-track">
+                  <div class="progress-fill" style="width: 0%">
+              <div class="links">
+                <button class="link" type="button">
+                  "tasks"
+              <div class="actions">
+                <button aria-label="fr~Sync files for beta" class="run sync" type="button">
+                  "fr~Sync Files"
+                <div aria-label="fr~Run tasks for beta" class="run-split" role="group">
+                  <button aria-label="fr~Run required tasks for beta" class="run run-primary" type="button">
+                    "fr~Run tasks"
+                  <button aria-expanded="false" aria-haspopup="true" aria-label="fr~Choose run scope for beta" class="run run-toggle" type="button">
+                    "▾"
+                  <div class="run-menu" hidden="" role="menu">
+                    <button class="run-menu-item" role="menuitem" type="button">
+                      "fr~Run required tasks"
+                    <button class="run-menu-item" role="menuitem" type="button">
+                      "fr~Run required and optional tasks"
+        <section class="group layout-list">
+          <h1 class="group-title">
+            "fr~Completed specs"
+          <div class="cards layout-list">
+            <article aria-label="fr~Open requirements for gamma" class="card status-Completed card-clickable" role="button" tabindex="0">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">
+                    "gamma"
+                  <button aria-expanded="false" aria-label="fr~Preview gamma" class="card-preview" type="button">
+                    <svg:svg aria-hidden="true" class="icon" focusable="false" height="16" viewBox="0 0 16 16" width="16">
+                      <svg:path d=long(192 chars, sha1 78483286b4af) fill="currentColor" fill-rule="evenodd">
+                <button aria-label="fr~Filter by fr~Completed status" aria-pressed="false" class="card-status badge badge-completed" title="fr~Filter by fr~Completed status" type="button">
+                  "fr~Completed"
+              <button aria-label="fr~Filter by beta-lib folder" aria-pressed="false" class="card-owner" title="fr~Filter by beta-lib folder" type="button">
+                "beta-lib"
+              <div class="progress">
+                <span class="progress-label">
+                  "fr~Required: 5/5"
+                <div class="progress-track">
+                  <div class="progress-fill" style="width: 100%">
+              <div class="progress">
+                <span class="progress-label">
+                  "fr~Optional: 0/2"
+                <div class="progress-track">
+                  <div class="progress-fill" style="width: 0%">
+              <div class="task-states">
+                <span class="task-state task-state-done">
+                  "fr~many~5 done"
+              <div class="links">
+                <button class="link" type="button">
+                  "requirements"
+                <button class="link" type="button">
+                  "design"
+                <button class="link" type="button">
+                  "tasks"
+              <div class="actions">
+                <button aria-label="fr~Sync files for gamma" class="run sync" type="button">
+                  "fr~Sync Files"
+                <div aria-label="fr~Run tasks for gamma" class="run-split" role="group">
+                  <button aria-label="fr~Run required tasks for gamma" class="run run-primary" type="button">
+                    "fr~Run tasks"
+                  <button aria-expanded="false" aria-haspopup="true" aria-label="fr~Choose run scope for gamma" class="run run-toggle" type="button">
+                    "▾"
+                  <div class="run-menu" hidden="" role="menu">
+                    <button class="run-menu-item" role="menuitem" type="button">
+                      "fr~Run required tasks"
+                    <button class="run-menu-item" role="menuitem" type="button">
+                      "fr~Run required and optional tasks"
