@@ -1,5 +1,5 @@
-import type { IScheduler, ScheduleHandle } from '../core/ports/IScheduler';
-import type { DashboardInboundMessage } from '../core/model/IDashboardMessage';
+import type { IScheduler, ScheduleHandle } from '../../core/ports/IScheduler';
+import type { DashboardInboundMessage } from '../../core/model/IDashboardMessage';
 import type { IHoverPanelView } from './IHoverPanelView';
 
 /** Debounce delay, in milliseconds, before a hovered preview icon requests its intro. */

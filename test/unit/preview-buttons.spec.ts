@@ -1,8 +1,8 @@
 /// <reference lib="dom" />
 import { expect } from 'chai';
-import { createHoverCloseButton } from '../../src/webview/HoverCloseButton';
-import { createPreviewIconButton } from '../../src/webview/PreviewIconButton';
-import type { IPreviewIconControls } from '../../src/webview/PreviewIconButton';
+import { createHoverCloseButton } from '../../src/webview/preview/HoverCloseButton';
+import { createPreviewIconButton } from '../../src/webview/preview/PreviewIconButton';
+import type { IPreviewIconControls } from '../../src/webview/preview/PreviewIconButton';
 
 /** Minimal fake element recording attributes, listeners and focus. */
 class FakeElement {

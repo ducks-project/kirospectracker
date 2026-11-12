@@ -1,11 +1,11 @@
 import { expect } from 'chai';
-import { DomHoverPanelView } from '../../src/webview/DomHoverPanelView';
-import type { IHoverRect } from '../../src/webview/computeHoverPlacement';
+import { DomHoverPanelView } from '../../src/webview/preview/DomHoverPanelView';
+import type { IHoverRect } from '../../src/webview/preview/computeHoverPlacement';
 import type {
   IHoverAnchor,
   IHoverDom,
   IHoverPanelElement,
-} from '../../src/webview/DomHoverPanelView';
+} from '../../src/webview/preview/DomHoverPanelView';
 
 /** Fake panel element recording what the adapter does to it. */
 class FakePanel implements IHoverPanelElement {

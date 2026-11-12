@@ -2,11 +2,11 @@ import { expect } from 'chai';
 
 import type { DashboardInboundMessage } from '../../src/core/model/IDashboardMessage';
 import type { IScheduler, ScheduleHandle } from '../../src/core/ports/IScheduler';
-import type { IHoverPanelView } from '../../src/webview/IHoverPanelView';
+import type { IHoverPanelView } from '../../src/webview/preview/IHoverPanelView';
 import {
   HOVER_REQUEST_DELAY_MS,
   HoverIntroductionController,
-} from '../../src/webview/HoverIntroductionController';
+} from '../../src/webview/preview/HoverIntroductionController';
 
 /**
  * Manual scheduler recording pending callbacks so a test can flush them,

@@ -4,8 +4,8 @@ import {
   HOVER_ARROW_MIN_INSET,
   HOVER_ARROW_SIZE,
   HOVER_VIEWPORT_MARGIN,
-} from '../../src/webview/computeHoverPlacement';
-import type { IHoverRect, IHoverSize } from '../../src/webview/computeHoverPlacement';
+} from '../../src/webview/preview/computeHoverPlacement';
+import type { IHoverRect, IHoverSize } from '../../src/webview/preview/computeHoverPlacement';
 
 const VIEWPORT: IHoverSize = { width: 400, height: 600 };
 const PANEL: IHoverSize = { width: 200, height: 100 };
