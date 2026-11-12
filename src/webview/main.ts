@@ -14,7 +14,6 @@ import { CatalogTranslator } from '../core/i18n/CatalogTranslator';
 import { IDENTITY_TRANSLATOR } from '../core/i18n/IdentityTranslator';
 import type { PluralMessageKey } from '../core/i18n/pluralMessage';
 import { translatePlural } from '../core/i18n/pluralMessage';
-import { statusLabel } from '../core/status/SpecStatusLabel';
 import type { RunScope } from '../core/ports/ISpecAgentGateway';
 import type { SpecFilterKey } from '../core/model/SpecFilterKey';
 import type { ISpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
@@ -30,18 +29,21 @@ import { createHoverCloseButton } from './HoverCloseButton';
 import { createPreviewIconButton } from './PreviewIconButton';
 import { PREVIEW_ICON_CLASS } from './previewDomNames';
 import type { IHoverAnchor, IHoverDom, IHoverPanelElement } from './DomHoverPanelView';
-import { SpecCardFilter } from '../core/status/SpecCardFilter';
 import { SpecFolderFilter } from '../core/status/SpecFolderFilter';
 import { SpecFolderToggleView } from '../core/status/SpecFolderToggleView';
 import { SpecLayoutToggleView } from '../core/status/SpecLayoutToggleView';
 import { SpecStatToggleView } from '../core/status/SpecStatToggleView';
 import { SPEC_DOCUMENT_KINDS } from '../core/model/SpecDocumentKind';
 import { SpecStatusFilter } from '../core/status/SpecStatusFilter';
-import { colorTokenForStatus } from '../core/status/SpecStatusColor';
-import { statusToFilterKey } from '../core/model/SpecFilterKey';
 import { resolveTrustedOrigin } from './resolveTrustedOrigin';
 import { el } from './createElement';
 import { icon } from './ToolbarIcon';
+import type { IViewText } from './state/IViewText';
+import type { IGlobalStatItem } from './stats/GlobalStatsViewModel';
+import { buildGlobalStatsModel } from './stats/GlobalStatsViewModel';
+import { buildBadgeModel, buildCardBreakdown, buildOwnerModel } from './card/CardViewModel';
+import { filterCards, partitionCards } from './card/CardGrouping';
+import { planSpecUpdate } from './card/SpecUpdatePlanner';
 
 /** Persisted webview state surviving re-renders and view reloads. */
 interface IWebviewState {
@@ -89,6 +91,14 @@ function tw(key: WebviewMessageKey, ...args: ReadonlyArray<string | number>): st
 function twp(key: Extract<WebviewMessageKey, PluralMessageKey>, count: number): string {
   return translatePlural(translator, key, count);
 }
+/** Temporary adapter exposing the live translator through {@link IViewText}. */
+const viewText: IViewText = {
+  t: (key, ...args) => tw(key, ...args),
+  tp: (key, count) => twp(key, count),
+  get translator(): ITranslator {
+    return translator;
+  },
+};
 /** Pure core projectors shared across renders (rebuilt when the strings arrive). */
 let statToggleView = new SpecStatToggleView(translator);
 let layoutToggleView = new SpecLayoutToggleView(translator);
@@ -206,20 +216,13 @@ function renderStats(stats: ISpecStats): HTMLElement {
 /**
  * Append one labelled task-count item to the global-stats strip.
  * @param strip The strip element to append to.
- * @param cssClass Extra class applied to the item for its state color.
- * @param label The human-readable state label.
- * @param value The count to show.
+ * @param item The item to show.
  */
-function appendGlobalStatItem(
-  strip: HTMLElement,
-  cssClass: string,
-  label: string,
-  value: number,
-): void {
-  const item = el('span', `global-stat ${cssClass}`);
-  item.appendChild(el('span', 'global-stat-value', String(value)));
-  item.appendChild(el('span', 'global-stat-label', label));
-  strip.appendChild(item);
+function appendGlobalStatItem(strip: HTMLElement, item: IGlobalStatItem): void {
+  const node = el('span', `global-stat ${item.cssClass}`);
+  node.appendChild(el('span', 'global-stat-value', String(item.value)));
+  node.appendChild(el('span', 'global-stat-label', item.label));
+  strip.appendChild(node);
 }
 
 /**
@@ -232,21 +235,13 @@ function appendGlobalStatItem(
  * @returns The strip element.
  */
 function renderGlobalStats(stats: IGlobalTaskStats): HTMLElement {
+  const model = buildGlobalStatsModel(stats, viewText);
   const strip = el('section', 'global-stats');
   strip.setAttribute('aria-label', tw('Global task statistics'));
-  appendGlobalStatItem(strip, 'global-stat-done', twp('done|done', stats.done), stats.done);
-  appendGlobalStatItem(
-    strip,
-    'global-stat-cancelled',
-    twp('cancelled|cancelled', stats.cancelled),
-    stats.cancelled,
-  );
-  appendGlobalStatItem(strip, 'global-stat-inProgress', tw('in progress'), stats.inProgress);
-  appendGlobalStatItem(strip, 'global-stat-todo', tw('to-do'), stats.todo);
-  const percent = Math.round(stats.percentComplete * PERCENT);
+  model.items.forEach((item) => appendGlobalStatItem(strip, item));
   const overall = el('span', 'global-stat global-stat-overall');
-  overall.appendChild(el('span', 'global-stat-value', tw('{0}%', percent)));
-  overall.appendChild(el('span', 'global-stat-label', tw('resolved')));
+  overall.appendChild(el('span', 'global-stat-value', model.overall.valueText));
+  overall.appendChild(el('span', 'global-stat-label', model.overall.label));
   strip.appendChild(overall);
   return strip;
 }
@@ -269,55 +264,22 @@ function renderProgress(text: string, ratio: number): HTMLElement {
 }
 
 /**
- * Append one per-state count to a card's breakdown row when it is non-zero.
+ * Render the per-state task breakdown of a card.
  *
  * Zero-count states are omitted to keep the row compact; each shown state wears
  * its own class so the stylesheet renders done normally, cancelled dimmed and
- * struck through, and in-progress in a subtle style.
- * @param row The breakdown row element.
- * @param cssClass The per-state class driving its theme-aware look.
- * @param text The translated text, including the count.
- * @param count The leaf count for this state (required + optional).
- */
-function appendBreakdownItem(
-  row: HTMLElement,
-  cssClass: string,
-  text: string,
-  count: number,
-): void {
-  if (0 === count) {
-    return;
-  }
-  row.appendChild(el('span', `task-state ${cssClass}`, text));
-}
-
-/**
- * Render the per-state task breakdown of a card.
- *
- * It sums the required and optional per-state counts from the card's progress
- * and shows done, cancelled and in-progress distinctly (to-do is implied by the
- * progress bar and omitted to stay compact). The whole row is hidden when the
- * spec has no leaf task.
+ * struck through, and in-progress in a subtle style. The whole row is hidden
+ * when the spec has no leaf task.
  * @param card The spec card view.
  * @returns The breakdown row, or `undefined` when there is nothing to show.
  */
 function renderCardBreakdown(card: ISpecCardView): HTMLElement | undefined {
-  const { progress } = card;
-  const done = progress.requiredResolvedDone + progress.optionalResolvedDone;
-  const cancelled = progress.requiredResolvedCancelled + progress.optionalResolvedCancelled;
-  const inProgress = progress.requiredInProgress + progress.optionalInProgress;
-  if (0 === done && 0 === cancelled && 0 === inProgress) {
+  const items = buildCardBreakdown(card, viewText);
+  if (0 === items.length) {
     return undefined;
   }
   const row = el('div', 'task-states');
-  appendBreakdownItem(row, 'task-state-done', twp('{0} done|{0} done', done), done);
-  appendBreakdownItem(
-    row,
-    'task-state-cancelled',
-    twp('{0} cancelled|{0} cancelled', cancelled),
-    cancelled,
-  );
-  appendBreakdownItem(row, 'task-state-inProgress', tw('{0} in progress', inProgress), inProgress);
+  items.forEach((item) => row.appendChild(el('span', `task-state ${item.cssClass}`, item.text)));
   return row;
 }
 
@@ -361,19 +323,17 @@ function renderLinks(card: ISpecCardView): HTMLElement | undefined {
  * @returns The badge button element.
  */
 function renderStatusBadge(card: ISpecCardView): HTMLElement {
-  const key = statusToFilterKey(card.status);
-  const pressed = state.filter.isActive(key);
-  const label = statusLabel(card.status, translator);
-  const badge = el('button', `card-status badge ${colorTokenForStatus(card.status)}`, label);
+  const model = buildBadgeModel(card, state.filter, viewText);
+  const badge = el('button', model.cssClass, model.label);
   badge.setAttribute('type', 'button');
-  badge.setAttribute('aria-pressed', String(pressed));
-  badge.setAttribute('aria-label', tw('Filter by {0} status', label));
-  badge.title = tw('Filter by {0} status', label);
+  badge.setAttribute('aria-pressed', String(model.pressed));
+  badge.setAttribute('aria-label', model.ariaLabel);
+  badge.title = model.ariaLabel;
   badge.addEventListener('click', (event) => {
     // The badge is an inner control: stop the click from also triggering the
     // card-body open gesture.
     event.stopPropagation();
-    toggleStatusFilter(key);
+    toggleStatusFilter(model.key);
   });
   return badge;
 }
@@ -750,12 +710,12 @@ function appendCardProgress(article: HTMLElement, card: ISpecCardView): void {
  * @returns The owner-label button element.
  */
 function renderOwnerLabel(card: ISpecCardView): HTMLElement {
-  const pressed = state.folderFilter.isActive(card.folderKey);
+  const model = buildOwnerModel(card, state.folderFilter, viewText);
   const owner = el('button', 'card-owner', card.ownerLabel);
   owner.setAttribute('type', 'button');
-  owner.setAttribute('aria-pressed', String(pressed));
-  owner.setAttribute('aria-label', tw('Filter by {0} folder', card.ownerLabel));
-  owner.title = tw('Filter by {0} folder', card.ownerLabel);
+  owner.setAttribute('aria-pressed', String(model.pressed));
+  owner.setAttribute('aria-label', model.ariaLabel);
+  owner.title = model.ariaLabel;
   owner.addEventListener('click', (event) => {
     // Inner control: do not also trigger the card-body open gesture.
     event.stopPropagation();
@@ -794,35 +754,11 @@ function renderCard(card: ISpecCardView): HTMLElement {
 
 /**
  * Filter cards by the active status toggles, the active folder filter and the
- * search query, composed (logical AND) by the pure {@link SpecCardFilter}.
+ * search query.
  * @returns The filtered cards.
  */
 function filtered(): readonly ISpecCardView[] {
-  return new SpecCardFilter(state.filter, state.folderFilter, state.query).apply(state.cards);
-}
-
-/**
- * Whether a status places a card in the completed group.
- * @param status The spec status string.
- * @returns `true` for `Completed` or `FullyCompleted`.
- */
-function isDoneStatus(status: string): boolean {
-  return 'Completed' === status || 'FullyCompleted' === status;
-}
-
-/**
- * Split cards into active and completed groups, completed kept visible but set
- * apart.
- * @param cards The cards to split.
- * @returns A tuple of active and completed cards.
- */
-function partition(
-  cards: readonly ISpecCardView[],
-): readonly [readonly ISpecCardView[], readonly ISpecCardView[]] {
-  return [
-    cards.filter((card) => !isDoneStatus(card.status)),
-    cards.filter((card) => isDoneStatus(card.status)),
-  ];
+  return filterCards(state.cards, state.filter, state.folderFilter, state.query);
 }
 
 /**
@@ -1104,7 +1040,7 @@ function syncFolderFilterButton(app: HTMLElement): void {
 function renderContent(content: HTMLElement): void {
   content.replaceChildren();
   cardNodes.clear();
-  const [active, done] = partition(filtered());
+  const [active, done] = partitionCards(filtered());
   const activeGroup = renderGroup(tw('Active specs'), active);
   const doneGroup = renderGroup(tw('Completed specs'), done);
   if (undefined !== activeGroup) {
@@ -1222,9 +1158,8 @@ function applySpecUpdate(card: ISpecCardView): void {
     render();
     return;
   }
-  const movesGroup =
-    undefined === previousCard || isDoneStatus(previousCard.status) !== isDoneStatus(card.status);
-  if (undefined === previousNode || movesGroup) {
+  const action = planSpecUpdate(previousCard, card, undefined !== previousNode);
+  if (undefined === previousNode || 'rebuild-content' === action) {
     renderContent(content);
     return;
   }
