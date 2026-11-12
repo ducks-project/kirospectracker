@@ -57,6 +57,7 @@ import {
   RESET_HIDDEN_SPECS_COMMAND_ID,
   ResetHiddenSpecsCommand,
 } from './adapters/commands/ResetHiddenSpecsCommand';
+import { selectExportedApi } from './adapters/TestApiExposure';
 import {
   ToggleLayoutCommand,
   TOGGLE_LAYOUT_COMMAND_ID,
@@ -89,10 +90,13 @@ const TREE_RUN_REQUIRED_COMMAND_ID = 'kirospectracker.tree.runRequired';
 const TREE_RUN_REQUIRED_AND_OPTIONAL_COMMAND_ID = 'kirospectracker.tree.runRequiredAndOptional';
 
 /**
- * Public API the extension returns from {@link activate}.
+ * Test-only API the extension returns from {@link activate}.
  *
  * It is intentionally minimal and exists for the integration harness to observe
  * the wired providers and repository without reaching into private state.
+ * Because any installed extension can read `exports`, it is returned ONLY when
+ * the extension runs in test mode (`ExtensionMode.Test`); in production and
+ * development `activate` exports nothing (see {@link selectExportedApi}).
  */
 export interface IExtensionApi {
   /** The spec repository (discovery, caching, change events). */
@@ -581,9 +585,12 @@ function registerHiddenSpecs(
  * commands, registers every disposable into `context.subscriptions`, and kicks
  * off the first discovery. No network, no telemetry, no `eval`; activation is
  * driven by the targeted `onView:`/`onCommand:` events declared in `package.json`.
+ * Its behaviour is identical in every extension mode; only the exported value
+ * differs: the test-only {@link IExtensionApi} in test mode, `undefined` otherwise.
  * @param context The extension context owning the disposables.
+ * @returns The test-only API in test mode, `undefined` in any other mode.
  */
-export function activate(context: vscode.ExtensionContext): IExtensionApi {
+export function activate(context: vscode.ExtensionContext): IExtensionApi | undefined {
   const wiring = buildWiring(context);
   registerDisposables(context, wiring);
   const hiddenSpecs = registerHiddenSpecs(context, wiring);
@@ -591,7 +598,7 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
     .refresh()
     .then(undefined, (error) => reportError(wiring.gateway, wiring.translator, error));
   setUpAgentIntegration(context, wiring);
-  return {
+  return selectExportedApi(vscode.ExtensionMode.Test === context.extensionMode, () => ({
     repository: wiring.repository,
     decorations: wiring.decorations,
     dashboard: wiring.dashboard,
@@ -599,7 +606,7 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
     hiddenSpecs,
     agentErrorReporter: wiring.gateway,
     agentActions: wiring.agentActions,
-  };
+  }));
 }
 
 /**
