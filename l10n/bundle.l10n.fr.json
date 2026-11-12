@@ -1,5 +1,6 @@
 {
   "\"{0}\" is malformed (missing or unreadable tasks.md) and cannot be run.": "« {0} » est mal formée (tasks.md manquant ou illisible) et ne peut pas être exécutée.",
+  "\"{0}\" is malformed (missing or unreadable tasks.md) and cannot be synced.": "« {0} » est mal formée (tasks.md manquant ou illisible) et ne peut pas être synchronisée.",
   "A malformed spec cannot be run": "Une spec mal formée ne peut pas être exécutée",
   "A malformed spec cannot be synced": "Une spec mal formée ne peut pas être synchronisée",
   "Active specs": "Specs actives",

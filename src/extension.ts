@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import type { SpecDocumentKind } from './core/model/IDashboardMessage';
 import type { RunScope } from './core/ports/ISpecAgentGateway';
 import type { ITranslator } from './core/ports/ITranslator';
+import type { IAgentErrorReporter } from './adapters/ports/IAgentErrorReporter';
 import type { IDashboardActions } from './adapters/ports/IDashboardActions';
 import { DashboardHtmlBuilder } from './core/DashboardHtmlBuilder';
 import { HtmlEscaper } from './core/HtmlEscaper';
@@ -115,6 +116,15 @@ export interface IExtensionApi {
    * deterministically instead of racing the debounce window.
    */
   readonly hiddenSpecs: HiddenSpecsSynchronizer;
+  /**
+   * The error reporter injected into the agent actions (the real window
+   * gateway).
+   *
+   * Exposed for tests only, so the integration harness can observe the error a
+   * refused spec reports; a test wraps `showError` on this
+   * instance instead of patching the `vscode` API.
+   */
+  readonly agentErrorReporter: IAgentErrorReporter;
 }
 
 /** Disposable collaborators registered at activation. */
@@ -579,6 +589,7 @@ export function activate(context: vscode.ExtensionContext): IExtensionApi {
     dashboard: wiring.dashboard,
     fileSystem: wiring.fileSystem,
     hiddenSpecs,
+    agentErrorReporter: wiring.gateway,
   };
 }
 

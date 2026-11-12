@@ -36,6 +36,7 @@ export const HOST_ONLY_KEYS = [
   'No spec found at {0}.',
   'The {0} document is not present for "{1}".',
   '"{0}" is malformed (missing or unreadable tasks.md) and cannot be run.',
+  '"{0}" is malformed (missing or unreadable tasks.md) and cannot be synced.',
   'Copy a ready-to-paste execution prompt for this spec to the clipboard?',
   'Copy prompt',
   'Execution prompt copied to the clipboard.',
